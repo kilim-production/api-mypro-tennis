@@ -1,0 +1,14 @@
+node_modules
+dist
+coverage
+.agents
+.codex
+tmp
+.env
+.env.local
+*.db
+*.db-journal
+dev.db
+dev.db-journal
+*.log
+apps/*/dist

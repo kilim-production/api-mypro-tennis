@@ -1,0 +1,17 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/auth" },
+    { "path": "packages/economy" },
+    { "path": "packages/database" },
+    { "path": "packages/realtime" },
+    { "path": "packages/notifications" },
+    { "path": "packages/ui" },
+    { "path": "packages/shared" },
+    { "path": "packages/sports-tennis" },
+    { "path": "packages/match-engine-tennis" },
+    { "path": "apps/mypro-tennis-server" },
+    { "path": "apps/mypro-tennis-web" }
+  ]
+}

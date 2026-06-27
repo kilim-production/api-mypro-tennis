@@ -1,0 +1,4 @@
+ALTER TABLE "TeamChampionshipEntry" ADD COLUMN "setsFor" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "TeamChampionshipEntry" ADD COLUMN "setsAgainst" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "TeamChampionshipEntry" ADD COLUMN "gamesFor" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "TeamChampionshipEntry" ADD COLUMN "gamesAgainst" INTEGER NOT NULL DEFAULT 0;

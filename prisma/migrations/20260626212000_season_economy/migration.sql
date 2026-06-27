@@ -1,0 +1,2 @@
+ALTER TABLE "SeasonCompetitionEntry" ADD COLUMN "entryFee" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "SeasonCompetitionEntry" ADD COLUMN "cashPrize" INTEGER NOT NULL DEFAULT 0;

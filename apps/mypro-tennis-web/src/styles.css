@@ -1,0 +1,333 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  background: #07111f;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 20% -10%, rgba(32, 196, 122, 0.16), transparent 28%),
+    linear-gradient(135deg, #07111f 0%, #0b1d31 46%, #06121e 100%);
+  color: #f8fafc;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.panel {
+  @apply rounded-lg border border-white/10 bg-slate-950/70 shadow-glow backdrop-blur;
+}
+
+.metric {
+  @apply rounded-md border border-white/10 bg-white/[0.04] p-3;
+}
+
+.metric.rarity-bronze,
+.rarity-bronze:not(.tennis-bag) {
+  border-color: rgba(205, 127, 50, 0.42);
+}
+
+.metric.rarity-argent,
+.rarity-argent:not(.tennis-bag) {
+  border-color: rgba(203, 213, 225, 0.46);
+}
+
+.metric.rarity-or,
+.rarity-or:not(.tennis-bag) {
+  border-color: rgba(250, 204, 21, 0.5);
+}
+
+.metric.rarity-legendaire,
+.rarity-legendaire:not(.tennis-bag) {
+  border-color: rgba(168, 85, 247, 0.56);
+}
+
+.metric.rarity-mythique,
+.rarity-mythique:not(.tennis-bag) {
+  border-color: rgba(45, 212, 191, 0.62);
+}
+
+.court {
+  background:
+    linear-gradient(
+      90deg,
+      transparent 49.5%,
+      rgba(255, 255, 255, 0.85) 49.5%,
+      rgba(255, 255, 255, 0.85) 50.5%,
+      transparent 50.5%
+    ),
+    linear-gradient(
+      0deg,
+      transparent 49.5%,
+      rgba(255, 255, 255, 0.85) 49.5%,
+      rgba(255, 255, 255, 0.85) 50.5%,
+      transparent 50.5%
+    ),
+    #1ab36d;
+  border: 10px solid #dffcf0;
+  box-shadow: inset 0 0 0 3px rgba(7, 17, 31, 0.18);
+}
+
+.match-console {
+  background:
+    linear-gradient(120deg, rgba(250, 255, 0, 0.08), transparent 18%),
+    radial-gradient(circle at 74% 88%, rgba(250, 255, 0, 0.12), transparent 26%),
+    linear-gradient(135deg, #062631 0%, #041923 48%, #020b13 100%);
+}
+
+.match-console::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+}
+
+.replay-court {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(10, 56, 57, 0.62),
+      transparent 9%,
+      transparent 91%,
+      rgba(10, 56, 57, 0.62)
+    ),
+    radial-gradient(circle at center, rgba(41, 245, 235, 0.16), transparent 48%),
+    linear-gradient(180deg, rgba(13, 133, 108, 0.44), rgba(0, 58, 62, 0.9));
+  box-shadow:
+    inset 0 0 80px rgba(41, 245, 235, 0.18),
+    0 0 42px rgba(41, 245, 235, 0.14);
+}
+
+.replay-court::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(196, 255, 36, 0.18) 1px, transparent 1.5px);
+  background-size: 18px 18px;
+  mask-image: linear-gradient(135deg, transparent 0%, transparent 56%, black 74%);
+  opacity: 0.55;
+}
+
+.bag-slot {
+  min-height: 268px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.025));
+  padding: 14px;
+}
+
+.tennis-bag {
+  position: relative;
+  height: 112px;
+  border-radius: 28px 28px 18px 18px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 38%),
+    linear-gradient(180deg, #5f6b78, #263141);
+  box-shadow:
+    inset 0 -12px 20px rgba(0, 0, 0, 0.22),
+    0 18px 38px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+
+.tennis-bag::before,
+.tennis-bag::after {
+  content: "";
+  position: absolute;
+  top: 24px;
+  bottom: 16px;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.tennis-bag::before {
+  left: 34%;
+}
+
+.tennis-bag::after {
+  right: 34%;
+}
+
+.tennis-bag-handle {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  width: 72px;
+  height: 34px;
+  transform: translateX(-50%);
+  border: 7px solid rgba(7, 17, 31, 0.72);
+  border-bottom: 0;
+  border-radius: 42px 42px 0 0;
+}
+
+.tennis-bag-flap {
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  top: 48px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(7, 17, 31, 0.34);
+}
+
+.tennis-bag-mark {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 16px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.rarity-bronze .tennis-bag,
+.tennis-bag.rarity-bronze {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.18), transparent 38%),
+    linear-gradient(180deg, #a96b3d, #52321f);
+}
+
+.rarity-argent .tennis-bag,
+.tennis-bag.rarity-argent {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.25), transparent 38%),
+    linear-gradient(180deg, #cbd5e1, #536170);
+}
+
+.rarity-or .tennis-bag,
+.tennis-bag.rarity-or {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.22), transparent 38%),
+    linear-gradient(180deg, #f3c951, #8a5b0b);
+}
+
+.rarity-legendaire .tennis-bag,
+.tennis-bag.rarity-legendaire {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.24), transparent 38%),
+    linear-gradient(180deg, #b47cff, #41226f);
+  box-shadow:
+    0 0 34px rgba(180, 124, 255, 0.28),
+    inset 0 -12px 20px rgba(0, 0, 0, 0.22);
+}
+
+.rarity-mythique .tennis-bag,
+.tennis-bag.rarity-mythique {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.26), transparent 38%),
+    linear-gradient(180deg, #32f5c8, #0f5d77 58%, #0b1733);
+  box-shadow:
+    0 0 40px rgba(50, 245, 200, 0.34),
+    inset 0 -12px 20px rgba(0, 0, 0, 0.22);
+}
+
+.tennis-bag-opening {
+  animation: bag-open 1.25s ease-in-out infinite;
+}
+
+.reward-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  padding: 14px;
+  animation: reward-rise 0.45s ease both;
+}
+
+.reward-card-boost {
+  border-color: rgba(110, 231, 183, 0.52);
+  background: linear-gradient(180deg, rgba(110, 231, 183, 0.16), rgba(255, 255, 255, 0.05));
+}
+
+.profile-picture {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  object-fit: cover;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+
+.profile-picture-preset {
+  position: relative;
+  color: #06121e;
+  font-weight: 950;
+  isolation: isolate;
+}
+
+.profile-picture-preset::before {
+  content: "";
+  position: absolute;
+  inset: 14%;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+}
+
+.profile-picture-preset::after {
+  content: "";
+  position: absolute;
+  bottom: 15%;
+  width: 62%;
+  height: 18%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.profile-picture-mark {
+  position: absolute;
+  right: 14%;
+  top: 16%;
+  font-size: 0.62rem;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.profile-picture strong {
+  position: relative;
+  z-index: 1;
+  letter-spacing: 0.04em;
+}
+
+@keyframes bag-open {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg) scale(1);
+    filter: brightness(1);
+  }
+  45% {
+    transform: translateY(-10px) rotate(-2deg) scale(1.04);
+    filter: brightness(1.35);
+  }
+  70% {
+    transform: translateY(2px) rotate(2deg) scale(1.01);
+  }
+}
+
+@keyframes reward-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

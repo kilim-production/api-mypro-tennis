@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: mypro-tennis-api
+    runtime: node
+    plan: starter
+    buildCommand: npm install --include=dev && npm run api:build
+    startCommand: npm run api:start
+    healthCheckPath: /health
+    disk:
+      name: mypro-tennis-sqlite
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        value: file:/data/mypro-tennis.db
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CLIENT_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false

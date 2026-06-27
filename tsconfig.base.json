@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@mypro/core": ["packages/core/src/index.ts"],
+      "@mypro/auth": ["packages/auth/src/index.ts"],
+      "@mypro/economy": ["packages/economy/src/index.ts"],
+      "@mypro/database": ["packages/database/src/index.ts"],
+      "@mypro/realtime": ["packages/realtime/src/index.ts"],
+      "@mypro/notifications": ["packages/notifications/src/index.ts"],
+      "@mypro/ui": ["packages/ui/src/index.ts"],
+      "@mypro/shared": ["packages/shared/src/index.ts"],
+      "@mypro/sports-tennis": ["packages/sports-tennis/src/index.ts"],
+      "@mypro/match-engine-tennis": ["packages/match-engine-tennis/src/index.ts"]
+    }
+  }
+}

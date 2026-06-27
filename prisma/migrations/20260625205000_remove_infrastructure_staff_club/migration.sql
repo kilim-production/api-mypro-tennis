@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS "ClubMembership";
+DROP TABLE IF EXISTS "Club";
+DROP TABLE IF EXISTS "StaffContract";
+DROP TABLE IF EXISTS "FacilityInstance";
