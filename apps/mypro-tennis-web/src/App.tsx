@@ -7,6 +7,7 @@ import {
   Navigate,
   Route,
   Routes,
+  useLocation,
   useNavigate,
   useParams,
   useSearchParams
@@ -1208,6 +1209,8 @@ function NotificationCenter({ compact = false }: { compact?: boolean }) {
 
 function Shell({ children }: { children: React.ReactNode }) {
   const { user, player, notifications, logout } = useGameStore();
+  const location = useLocation();
+  const showSidebar = user && !["/", "/login", "/signup", "/oauth/google"].includes(location.pathname);
   const navBadges = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const notification of notifications) {
@@ -1272,28 +1275,34 @@ function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-5 lg:grid-cols-[250px_1fr]">
-        <aside className="panel h-fit p-2">
-          <nav className="grid gap-1">
-            {nav.map(([label, path, Icon]) => (
-              <NavLink
-                key={path}
-                to={path}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${isActive ? "bg-emerald-400 text-slate-950" : "text-slate-300 hover:bg-white/[0.08] hover:text-white"}`
-                }
-              >
-                <Icon size={17} />
-                <span className="min-w-0 flex-1">{label}</span>
-                {navBadges[path] ? (
-                  <span className="grid h-5 min-w-5 place-items-center rounded-full bg-emerald-300 px-1 text-[11px] font-black text-slate-950">
-                    {navBadges[path]}
-                  </span>
-                ) : null}
-              </NavLink>
-            ))}
-          </nav>
-        </aside>
+      <div
+        className={`mx-auto grid max-w-7xl gap-5 px-4 py-5 ${
+          showSidebar ? "lg:grid-cols-[250px_1fr]" : ""
+        }`}
+      >
+        {showSidebar ? (
+          <aside className="panel h-fit p-2">
+            <nav className="grid gap-1">
+              {nav.map(([label, path, Icon]) => (
+                <NavLink
+                  key={path}
+                  to={path}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${isActive ? "bg-emerald-400 text-slate-950" : "text-slate-300 hover:bg-white/[0.08] hover:text-white"}`
+                  }
+                >
+                  <Icon size={17} />
+                  <span className="min-w-0 flex-1">{label}</span>
+                  {navBadges[path] ? (
+                    <span className="grid h-5 min-w-5 place-items-center rounded-full bg-emerald-300 px-1 text-[11px] font-black text-slate-950">
+                      {navBadges[path]}
+                    </span>
+                  ) : null}
+                </NavLink>
+              ))}
+            </nav>
+          </aside>
+        ) : null}
         <main>{children}</main>
       </div>
     </div>
@@ -1339,7 +1348,7 @@ function Landing() {
               <Sparkles size={15} />
               Saison persistante · tennis manager MMO
             </div>
-            <h1 className="mt-5 text-4xl font-black leading-tight text-white md:text-6xl">
+            <h1 className="mt-5 text-4xl font-black leading-tight text-white md:text-5xl xl:text-6xl">
               De non classé à légende du circuit MyPro.
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-200">
@@ -1416,7 +1425,7 @@ function Landing() {
           </div>
         </div>
       </section>
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="landing-pillars grid gap-4 md:grid-cols-3">
         {pillars.map(({ title, body, icon: Icon }) => (
           <article key={title} className="panel p-5">
             <div className="mb-4 grid h-11 w-11 place-items-center rounded-md bg-emerald-300/12 text-emerald-200">
@@ -1462,7 +1471,7 @@ function AuthPage({ mode }: { mode: "login" | "signup" }) {
     }
   }
   return (
-    <div className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-[1fr_430px]">
+    <div className="auth-scene mx-auto grid max-w-5xl gap-5 lg:grid-cols-[1fr_430px]">
       <section className="panel overflow-hidden p-6">
         <p className="text-sm font-bold uppercase tracking-[0.24em] text-emerald-300">
           {isLogin ? "Retour sur le circuit" : "Nouvelle carrière"}
@@ -1538,7 +1547,7 @@ function AuthPage({ mode }: { mode: "login" | "signup" }) {
           )}
         </div>
       </section>
-      <aside className="panel p-6">
+      <aside className="panel auth-highlight p-6">
         <p className="text-sm font-bold uppercase tracking-[0.24em] text-emerald-300">
           Inclus au départ
         </p>
