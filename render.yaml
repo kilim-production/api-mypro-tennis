@@ -12,7 +12,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        value: file:./render-free.db
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: CLIENT_URL

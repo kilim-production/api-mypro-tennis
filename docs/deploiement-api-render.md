@@ -2,9 +2,9 @@
 
 Netlify sert uniquement l'application React. Pour le multijoueur web, il faut publier l'API Express + Socket.IO sur un hebergeur Node public. Ce projet est pret pour Render avec `render.yaml`.
 
-La configuration par defaut utilise l'instance gratuite Render. Elle permet de tester le jeu en ligne sans carte bancaire, mais la base SQLite n'est pas persistante : les donnees peuvent etre perdues lors d'un redeploiement ou d'un redemarrage.
+La configuration recommandee utilise Render pour l'API et Neon pour PostgreSQL. Cela permet de garder les comptes, les joueurs, les matchs et les clubs meme si Render redeploie le serveur.
 
-Pour une vraie persistance multijoueur, il faudra passer ensuite sur PostgreSQL ou ajouter un disque persistant payant.
+Le lancement local Windows reste en SQLite. Le serveur public Render utilise `prisma/schema.postgres.prisma`.
 
 ## 1. Preparer le depot
 
@@ -27,13 +27,31 @@ Health check path: /health
 
 Ne creez pas de disque persistant si vous voulez rester sur l'offre gratuite.
 
-## 3. Variables serveur
+## 3. Creer la base Neon
+
+Dans Neon :
+
+1. Creez un compte sur `https://neon.tech`.
+2. Creez un projet, par exemple `mypro-tennis`.
+3. Ouvrez `Connection Details`.
+4. Choisissez une connexion Node.js ou Prisma.
+5. Copiez l'URL PostgreSQL.
+
+Elle ressemble a ceci :
+
+```text
+postgresql://user:password@host.neon.tech/mypro-tennis?sslmode=require
+```
+
+Gardez cette URL privee. Elle sera collee dans Render comme variable `DATABASE_URL`.
+
+## 4. Variables serveur
 
 Dans Render, ajoutez :
 
 ```env
 NODE_ENV=production
-DATABASE_URL=file:./render-free.db
+DATABASE_URL=postgresql://user:password@host.neon.tech/mypro-tennis?sslmode=require
 JWT_SECRET=une-cle-longue-et-secrete
 CLIENT_URL=https://votre-site-netlify.netlify.app
 GOOGLE_CLIENT_ID=
@@ -49,9 +67,9 @@ Render fournit automatiquement `PORT`, donc il n'est pas necessaire de le rensei
 CLIENT_URL=https://votre-site.netlify.app,https://deploy-preview-1--votre-site.netlify.app
 ```
 
-## 4. Initialiser la base la premiere fois
+## 5. Initialiser la base la premiere fois
 
-Au premier demarrage, `npm run api:start` applique les migrations Prisma automatiquement.
+Au premier demarrage, `npm run api:start` synchronise automatiquement le schema Prisma PostgreSQL avec Neon.
 
 Pour ajouter les donnees de demonstration, ouvrez le shell Render du service et lancez :
 
@@ -61,9 +79,7 @@ npm run db:seed
 
 Attention : le seed actuel remet les donnees de jeu a zero. Lancez-le seulement sur une base neuve, avant d'ouvrir le jeu aux vrais joueurs.
 
-Sur l'offre gratuite sans disque persistant, cette base sert surtout aux tests web. Elle n'est pas adaptee a une vraie saison multijoueur durable.
-
-## 5. Verifier l'API
+## 6. Verifier l'API
 
 Quand le deploy est termine, ouvrez :
 
@@ -77,7 +93,7 @@ La reponse attendue est :
 { "ok": true, "service": "MYPRO - TENNIS" }
 ```
 
-## 6. Reconnecter Netlify a l'API
+## 7. Reconnecter Netlify a l'API
 
 Dans Netlify, ouvrez `Site configuration > Environment variables` et renseignez :
 
@@ -88,7 +104,7 @@ VITE_SOCKET_URL=https://votre-api-render.onrender.com
 
 Redeployez ensuite le site Netlify.
 
-## 7. Google OAuth
+## 8. Google OAuth
 
 Si la connexion Google est active, ajoutez dans Google Cloud :
 
@@ -98,8 +114,8 @@ https://votre-api-render.onrender.com/api/auth/google/callback
 
 Cette URL doit pointer vers l'API Render, pas vers Netlify.
 
-## 8. Notes multijoueur
+## 9. Notes multijoueur
 
 Render peut faire tourner Express et Socket.IO, donc la presence en ligne et les notifications temps reel fonctionneront depuis le web.
 
-Pour un serveur durable avec beaucoup de joueurs, il faudra remplacer SQLite par PostgreSQL manage ou utiliser un disque persistant payant. Le code Prisma est deja organise pour cette evolution.
+Neon garde la base separee du serveur Render. C'est beaucoup plus propre pour un jeu persistant que SQLite temporaire sur l'instance Render gratuite.

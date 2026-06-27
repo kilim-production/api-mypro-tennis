@@ -20,5 +20,10 @@ function run(command, args) {
   });
 }
 
-await run(npmCommand, ["run", "db:deploy"]);
+if (process.env.DATABASE_URL?.startsWith("postgres")) {
+  await run(npmCommand, ["run", "db:generate:postgres"]);
+  await run(npmCommand, ["run", "db:push:postgres"]);
+} else {
+  await run(npmCommand, ["run", "db:deploy"]);
+}
 await run(npmCommand, ["exec", "tsx", "apps/mypro-tennis-server/src/server.ts"]);
