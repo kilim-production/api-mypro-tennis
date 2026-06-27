@@ -1,6 +1,10 @@
 # Deploiement de l'API MYPRO - TENNIS sur Render
 
-Netlify sert uniquement l'application React. Pour le multijoueur persistant, il faut publier l'API Express + Socket.IO sur un hebergeur Node public. Ce projet est pret pour Render avec `render.yaml`.
+Netlify sert uniquement l'application React. Pour le multijoueur web, il faut publier l'API Express + Socket.IO sur un hebergeur Node public. Ce projet est pret pour Render avec `render.yaml`.
+
+La configuration par defaut utilise l'instance gratuite Render. Elle permet de tester le jeu en ligne sans carte bancaire, mais la base SQLite n'est pas persistante : les donnees peuvent etre perdues lors d'un redeploiement ou d'un redemarrage.
+
+Pour une vraie persistance multijoueur, il faudra passer ensuite sur PostgreSQL ou ajouter un disque persistant payant.
 
 ## 1. Preparer le depot
 
@@ -21,14 +25,7 @@ Start command: npm run api:start
 Health check path: /health
 ```
 
-Ajoutez un disque persistant :
-
-```text
-Mount path: /data
-Size: 1 GB minimum
-```
-
-SQLite a besoin de ce disque pour conserver les comptes, les joueurs, les matchs et les clubs entre deux redemarrages.
+Ne creez pas de disque persistant si vous voulez rester sur l'offre gratuite.
 
 ## 3. Variables serveur
 
@@ -36,7 +33,7 @@ Dans Render, ajoutez :
 
 ```env
 NODE_ENV=production
-DATABASE_URL=file:/data/mypro-tennis.db
+DATABASE_URL=file:./render-free.db
 JWT_SECRET=une-cle-longue-et-secrete
 CLIENT_URL=https://votre-site-netlify.netlify.app
 GOOGLE_CLIENT_ID=
@@ -63,6 +60,8 @@ npm run db:seed
 ```
 
 Attention : le seed actuel remet les donnees de jeu a zero. Lancez-le seulement sur une base neuve, avant d'ouvrir le jeu aux vrais joueurs.
+
+Sur l'offre gratuite sans disque persistant, cette base sert surtout aux tests web. Elle n'est pas adaptee a une vraie saison multijoueur durable.
 
 ## 5. Verifier l'API
 
@@ -103,4 +102,4 @@ Cette URL doit pointer vers l'API Render, pas vers Netlify.
 
 Render peut faire tourner Express et Socket.IO, donc la presence en ligne et les notifications temps reel fonctionneront depuis le web.
 
-Pour un serveur durable avec beaucoup de joueurs, il faudra remplacer SQLite par PostgreSQL manage. Le code Prisma est deja organise pour cette evolution.
+Pour un serveur durable avec beaucoup de joueurs, il faudra remplacer SQLite par PostgreSQL manage ou utiliser un disque persistant payant. Le code Prisma est deja organise pour cette evolution.
