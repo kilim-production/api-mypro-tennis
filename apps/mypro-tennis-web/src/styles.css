@@ -39,6 +39,18 @@ select {
   @apply rounded-md border border-white/10 bg-white/[0.04] p-3;
 }
 
+.landing-hero {
+  background:
+    linear-gradient(120deg, rgba(45, 212, 191, 0.12), transparent 24%),
+    radial-gradient(circle at 82% 12%, rgba(94, 234, 212, 0.16), transparent 30%),
+    linear-gradient(135deg, #07111f 0%, #0a2634 48%, #06271f 100%);
+}
+
+.landing-card {
+  @apply rounded-lg border border-white/10 p-5 shadow-2xl shadow-black/30 backdrop-blur;
+  background: rgba(2, 6, 23, 0.78);
+}
+
 .stat-card {
   @apply rounded-md border border-white/10 bg-white/[0.04] p-3;
   background:

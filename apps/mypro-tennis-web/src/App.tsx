@@ -164,6 +164,20 @@ function statVisual(key: string) {
 
 const stat = (player: Player, key: string) => player.stats[key] ?? 0;
 
+const landingFacts: Array<[string, string]> = [
+  ["Saison", "30 jours réels"],
+  ["Duel", "3 adversaires proposés"],
+  ["Club", "championnat par équipe"],
+  ["Match", "calcul serveur point par point"]
+];
+
+const authBenefits: Array<[string, string]> = [
+  ["Classement initial", "NC"],
+  ["Sacs offerts", "2 Bronze · 1 Argent · 1 Or"],
+  ["Énergie", "10 points rechargeables"],
+  ["Modes", "Duel · saison · club · collection"]
+];
+
 type AvatarPicture = { kind: "preset"; id: string } | { kind: "upload"; dataUrl: string };
 type PictureAvatarPayload = {
   type: "picture-v1";
@@ -1171,65 +1185,133 @@ function NeedPlayer({ children }: { children: React.ReactNode }) {
 }
 
 function Landing() {
+  const pillars = [
+    {
+      title: "Carrière FFT",
+      body: "Commencez non classé, progressez dans toute la pyramide amateur et validez -15 pour ouvrir le circuit pro.",
+      icon: Trophy
+    },
+    {
+      title: "Sacs et collection",
+      body: "Gagnez des sacs de tennis, collectionnez les 12 cartes statistiques et débloquez vos bonus au bon moment.",
+      icon: PackageOpen
+    },
+    {
+      title: "Multijoueur persistant",
+      body: "Affrontez des profils réels ou IA, rejoignez un club, disputez des championnats par équipe et suivez votre rang.",
+      icon: Users
+    }
+  ];
   return (
-    <div className="grid gap-8">
-      <section className="relative overflow-hidden rounded-lg border border-white/10 bg-[linear-gradient(120deg,#07111f,#0b2a3f_48%,#0b3a2b)] p-8 shadow-glow md:p-12">
-        <div className="grid gap-8 lg:grid-cols-[1fr_430px]">
-          <div className="max-w-2xl">
-            <p className="text-sm font-bold uppercase tracking-[0.32em] text-emerald-300">
-              MYPRO - TENNIS
-            </p>
-            <h1 className="mt-4 text-4xl font-black leading-tight text-white md:text-6xl">
-              Votre carrière. Votre circuit. Votre rang mondial.
+    <div className="grid gap-6">
+      <section className="landing-hero relative overflow-hidden rounded-lg border border-white/10 p-5 shadow-glow md:p-8 xl:p-10">
+        <div className="grid items-center gap-8 xl:grid-cols-[1fr_440px]">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center gap-2 rounded-md border border-emerald-300/25 bg-emerald-300/10 px-3 py-2 text-xs font-black uppercase tracking-[0.22em] text-emerald-200">
+              <Sparkles size={15} />
+              Saison persistante · tennis manager MMO
+            </div>
+            <h1 className="mt-5 text-4xl font-black leading-tight text-white md:text-6xl">
+              De non classé à légende du circuit MyPro.
             </h1>
-            <p className="mt-5 max-w-xl text-lg text-slate-200">
-              Créez un joueur, entraînez-le en temps réel, améliorez son académie, défiez le circuit
-              fictif et rejouez chaque match point par point.
+            <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-200">
+              Créez votre joueur, montez les classements FFT, ouvrez des sacs de tennis, construisez
+              votre collection de cartes statistiques et défiez d'autres carrières en ligne.
             </p>
             <div className="mt-7 grid gap-3 sm:flex sm:flex-wrap">
               <Link
-                to="/login"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-400 px-5 py-3 font-bold text-slate-950 sm:w-auto"
+                to="/signup"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-400 px-5 py-3 font-black text-slate-950 transition hover:bg-emerald-300 sm:w-auto"
               >
-                <LogIn size={18} /> Jouer avec le compte démo
+                <UserPlus size={18} /> Commencer l'aventure
               </Link>
               <Link
-                to="/signup"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-white/15 px-5 py-3 font-bold text-white sm:w-auto"
+                to="/login"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-white/15 bg-white/[0.04] px-5 py-3 font-bold text-white transition hover:bg-white/[0.08] sm:w-auto"
               >
-                <UserPlus size={18} /> Créer un compte
+                <LogIn size={18} /> Se connecter
               </Link>
             </div>
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <Metric label="Départ carrière" value="NC" />
+              <Metric label="Énergie" value="10 / jour" />
+              <Metric label="Objectif amateur" value="-15" />
+            </div>
           </div>
-          <div className="court relative aspect-[1.2] rounded-lg">
-            <div className="absolute left-[24%] top-[24%] grid h-14 w-14 place-items-center rounded-full bg-white text-sm font-black text-slate-950">
-              MP
+          <div className="landing-card">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-300">
+                  Votre futur joueur
+                </p>
+                <h2 className="mt-1 text-2xl font-black">Profil complet</h2>
+              </div>
+              <ProfilePicture initials="MP" picture={{ kind: "preset", id: "pp-09" }} />
             </div>
-            <div className="absolute bottom-[22%] right-[23%] grid h-14 w-14 place-items-center rounded-full bg-slate-950 text-sm font-black text-emerald-300">
-              IA
+            <div className="mt-5 grid gap-3">
+              {(["service", "forehand", "speed", "recovery"] as const).map((key, index) => {
+                const values = [34, 28, 31, 26];
+                const visual = statVisual(key);
+                return (
+                  <div key={key} className="stat-card">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <StatIcon statKey={key} />
+                        <div>
+                          <div className="font-black">{statLabels[key]}</div>
+                          <div className="text-xs text-slate-400">Carte {visual.short}</div>
+                        </div>
+                      </div>
+                      <strong>{values[index]}</strong>
+                    </div>
+                    <div className="mt-3 h-2 rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${values[index]}%`, backgroundColor: visual.color }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="absolute left-[48%] top-[48%] h-4 w-4 rounded-full bg-yellow-200 shadow-[0_0_18px_rgba(254,240,138,.9)]" />
+            <div className="mt-5 rounded-md border border-cyan-300/20 bg-cyan-300/10 p-4">
+              <div className="flex items-center gap-3">
+                <TennisBagVisual rarity="Or" />
+                <div>
+                  <p className="font-black">Sac Or de départ</p>
+                  <p className="mt-1 text-sm text-slate-300">
+                    Cartes, argent, cosmétiques et parfois gemmes.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
       <section className="grid gap-4 md:grid-cols-3">
-        {["Progression longue durée", "Matchs serveur", "Architecture multi-sports"].map(
-          (title) => (
-            <article key={title} className="panel p-5">
-              <h2 className="text-lg font-bold">{title}</h2>
-              <p className="mt-2 text-sm text-slate-300">
-                Un socle extensible pour bâtir les futures déclinaisons MyPro sans verrouiller le
-                jeu au tennis.
-              </p>
-            </article>
-          )
-        )}
+        {pillars.map(({ title, body, icon: Icon }) => (
+          <article key={title} className="panel p-5">
+            <div className="mb-4 grid h-11 w-11 place-items-center rounded-md bg-emerald-300/12 text-emerald-200">
+              <Icon size={22} />
+            </div>
+            <h2 className="text-lg font-black">{title}</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-300">{body}</p>
+          </article>
+        ))}
+      </section>
+      <section className="panel p-5">
+        <div className="grid gap-4 md:grid-cols-4">
+          {landingFacts.map(([label, value]) => (
+            <Metric key={label} label={label} value={value} />
+          ))}
+        </div>
       </section>
     </div>
   );
 }
 
 function AuthPage({ mode }: { mode: "login" | "signup" }) {
+  const isLogin = mode === "login";
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState(mode === "login" ? "demo@mypro-tennis.local" : "");
   const [password, setPassword] = useState(mode === "login" ? "demo1234" : "");
@@ -1252,44 +1334,102 @@ function AuthPage({ mode }: { mode: "login" | "signup" }) {
     }
   }
   return (
-    <div className="mx-auto max-w-md panel p-6">
-      <h1 className="text-2xl font-black">{mode === "login" ? "Connexion" : "Inscription"}</h1>
-      <form onSubmit={submit} className="mt-5 grid gap-3">
-        {mode === "signup" ? (
-          <Field
-            placeholder="Nom affiché"
-            value={displayName}
-            onChange={(event) => setDisplayName(event.target.value)}
-          />
-        ) : null}
-        <Field
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-        />
-        <Field
-          type="password"
-          placeholder="Mot de passe"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-        />
-        {error ? (
-          <p className="rounded-md bg-red-500/15 p-3 text-sm text-red-100">{error}</p>
-        ) : null}
-        <Button type="submit">
-          {mode === "login" ? <LogIn size={17} /> : <UserPlus size={17} />}
-          {mode === "login" ? "Entrer dans l'académie" : "Créer le compte"}
-        </Button>
-      </form>
-      <div className="my-5 flex items-center gap-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-        <span className="h-px flex-1 bg-white/10" />
-        ou
-        <span className="h-px flex-1 bg-white/10" />
-      </div>
-      <GoogleButton onClick={startGoogle}>
-        {mode === "login" ? "Continuer avec Google" : "S'inscrire avec Google"}
-      </GoogleButton>
+    <div className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-[1fr_430px]">
+      <section className="panel overflow-hidden p-6">
+        <p className="text-sm font-bold uppercase tracking-[0.24em] text-emerald-300">
+          {isLogin ? "Retour sur le circuit" : "Nouvelle carrière"}
+        </p>
+        <h1 className="mt-2 text-3xl font-black">
+          {isLogin ? "Reprendre votre saison MyPro" : "Créer votre compte joueur"}
+        </h1>
+        <p className="mt-3 text-sm leading-6 text-slate-300">
+          {isLogin
+            ? "Retrouvez votre joueur, vos sacs en attente, votre collection et vos compétitions en cours."
+            : "Votre aventure commence non classé. Choisissez un archétype, ouvrez vos premiers sacs et lancez vos premiers duels."}
+        </p>
+        <form onSubmit={submit} className="mt-5 grid gap-3">
+          {!isLogin ? (
+            <label className="grid gap-2 text-sm font-semibold text-slate-200">
+              Nom affiché
+              <Field
+                placeholder="Exemple : Alex Moreau"
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+              />
+            </label>
+          ) : null}
+          <label className="grid gap-2 text-sm font-semibold text-slate-200">
+            Email
+            <Field
+              type="email"
+              placeholder="vous@exemple.fr"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-semibold text-slate-200">
+            Mot de passe
+            <Field
+              type="password"
+              placeholder="Votre mot de passe"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+          {error ? (
+            <p className="rounded-md bg-red-500/15 p-3 text-sm text-red-100">{error}</p>
+          ) : null}
+          <Button type="submit" className="justify-center">
+            {isLogin ? <LogIn size={17} /> : <UserPlus size={17} />}
+            {isLogin ? "Entrer dans le jeu" : "Démarrer ma carrière"}
+          </Button>
+        </form>
+        <div className="my-5 flex items-center gap-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+          <span className="h-px flex-1 bg-white/10" />
+          ou
+          <span className="h-px flex-1 bg-white/10" />
+        </div>
+        <GoogleButton onClick={startGoogle}>
+          {isLogin ? "Continuer avec Google" : "Créer mon compte avec Google"}
+        </GoogleButton>
+        <div className="mt-5 rounded-md border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-300">
+          {isLogin ? (
+            <>
+              Pas encore de joueur ?{" "}
+              <Link className="font-bold text-emerald-300" to="/signup">
+                Créer une carrière
+              </Link>
+            </>
+          ) : (
+            <>
+              Déjà une carrière ?{" "}
+              <Link className="font-bold text-emerald-300" to="/login">
+                Se connecter
+              </Link>
+            </>
+          )}
+        </div>
+      </section>
+      <aside className="panel p-6">
+        <p className="text-sm font-bold uppercase tracking-[0.24em] text-emerald-300">
+          Inclus au départ
+        </p>
+        <h2 className="mt-2 text-2xl font-black">Votre première saison démarre vite</h2>
+        <div className="mt-5 grid gap-3">
+          {authBenefits.map(([label, value]) => (
+            <Metric key={label} label={label} value={value} />
+          ))}
+        </div>
+        <div className="mt-5 rounded-md border border-emerald-300/20 bg-emerald-300/10 p-4">
+          <div className="flex items-center gap-3">
+            <Trophy className="text-emerald-300" size={24} />
+            <p className="text-sm leading-6 text-emerald-50">
+              Objectif amateur : grimper classement après classement jusqu'à -15 et prouver que
+              votre joueur mérite le circuit professionnel MyPro.
+            </p>
+          </div>
+        </div>
+      </aside>
     </div>
   );
 }
