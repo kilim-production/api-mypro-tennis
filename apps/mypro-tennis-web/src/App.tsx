@@ -19,26 +19,39 @@ import {
   CalendarDays,
   CheckCircle2,
   ChevronRight,
+  Crosshair,
+  Dumbbell,
   Eye,
   FastForward,
+  Flame,
+  Gauge,
   Gem,
+  Hand,
+  HeartPulse,
   History,
   Image,
+  LogOut,
   LogIn,
+  MoveDown,
+  MoveUpRight,
   PackageOpen,
   Pause,
   Play,
+  Repeat2,
   Settings,
   Shield,
   SkipForward,
   Sparkles,
   Swords,
+  Target,
   Trophy,
   Upload,
   UserPlus,
   Users,
   Wifi,
-  X
+  Wind,
+  X,
+  Zap
 } from "lucide-react";
 import {
   Bar,
@@ -126,6 +139,28 @@ const dashboardRadarLabels: Record<(typeof profileStatKeys)[number], string> = {
   strength: "Force",
   recovery: "Récup."
 };
+
+const statVisuals: Record<
+  (typeof profileStatKeys)[number],
+  { Icon: typeof Target; color: string; glow: string; short: string }
+> = {
+  service: { Icon: Target, color: "#5eead4", glow: "rgba(94,234,212,.24)", short: "SV" },
+  return: { Icon: Repeat2, color: "#67e8f9", glow: "rgba(103,232,249,.22)", short: "RT" },
+  forehand: { Icon: Crosshair, color: "#86efac", glow: "rgba(134,239,172,.22)", short: "CD" },
+  backhand: { Icon: MoveUpRight, color: "#a7f3d0", glow: "rgba(167,243,208,.2)", short: "RV" },
+  volley: { Icon: Hand, color: "#fde68a", glow: "rgba(253,230,138,.18)", short: "VO" },
+  smash: { Icon: Flame, color: "#fca5a5", glow: "rgba(252,165,165,.2)", short: "SM" },
+  dropShot: { Icon: MoveDown, color: "#c4b5fd", glow: "rgba(196,181,253,.2)", short: "AM" },
+  stamina: { Icon: Gauge, color: "#93c5fd", glow: "rgba(147,197,253,.2)", short: "EN" },
+  speed: { Icon: Wind, color: "#7dd3fc", glow: "rgba(125,211,252,.22)", short: "VI" },
+  explosiveness: { Icon: Zap, color: "#fef08a", glow: "rgba(254,240,138,.18)", short: "EX" },
+  strength: { Icon: Dumbbell, color: "#fdba74", glow: "rgba(253,186,116,.18)", short: "FO" },
+  recovery: { Icon: HeartPulse, color: "#f9a8d4", glow: "rgba(249,168,212,.18)", short: "RE" }
+};
+
+function statVisual(key: string) {
+  return statVisuals[key as keyof typeof statVisuals] ?? statVisuals.service;
+}
 
 const stat = (player: Player, key: string) => player.stats[key] ?? 0;
 
@@ -778,12 +813,6 @@ function rarityClass(rarity: ChestRarity) {
     .replace(/[\u0300-\u036f]/g, "")}`;
 }
 
-function formatStatBonuses(bonuses: Record<string, number>) {
-  const entries = Object.entries(bonuses).filter(([, value]) => value > 0);
-  if (!entries.length) return "Bonus à révéler";
-  return entries.map(([key, value]) => `${statLabels[key] ?? key} +${value}`).join(", ");
-}
-
 function sortCosmeticsByRarity(items: PlayerCosmeticItem[]) {
   return [...items].sort((a, b) => {
     const rarityDelta = (rarityWeight[b.rarity] ?? 0) - (rarityWeight[a.rarity] ?? 0);
@@ -838,8 +867,15 @@ function RewardModal({ rewards, onClose }: { rewards: ChestRewards; onClose: () 
               key={`${card.statKey}-${index}`}
               className={`reward-card ${card.bonus > 0 ? "reward-card-boost" : ""}`}
             >
-              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Carte stat</div>
-              <div className="mt-1 text-lg font-black">{card.label}</div>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                    Carte stat
+                  </div>
+                  <div className="mt-1 text-lg font-black">{card.label}</div>
+                </div>
+                <StatIcon statKey={card.statKey} />
+              </div>
               <div className="mt-2 text-sm text-emerald-200">+{card.copies} doublon(s)</div>
               <div className="mt-1 text-xs text-slate-300">Palier atteint {card.levelAfter}</div>
               {card.bonus > 0 ? (
@@ -867,8 +903,8 @@ function RewardModal({ rewards, onClose }: { rewards: ChestRewards; onClose: () 
                   Cosmétique {item.rarity}
                 </div>
                 <div className="mt-1 font-black">{item.name}</div>
-                <div className="mt-1 text-sm text-emerald-200">
-                  {formatStatBonuses(item.bonuses)}
+                <div className="mt-3">
+                  <StatBonusPills bonuses={item.bonuses} />
                 </div>
               </div>
             ))}
@@ -958,6 +994,18 @@ function TennisBagSlots() {
                       <Countdown endAt={chest.unlocksAt} doneLabel="Prêt" />
                     )}
                   </div>
+                  <div className="mt-3 grid grid-cols-4 gap-2 rounded-md border border-white/10 bg-slate-950/45 p-2">
+                    <StatIcon statKey="service" size="sm" />
+                    <span className="grid h-8 w-8 place-items-center rounded-md border border-white/10 bg-slate-950/75 text-xs font-black text-emerald-200">
+                      €
+                    </span>
+                    <span className="grid h-8 w-8 place-items-center rounded-md border border-white/10 bg-slate-950/75 text-emerald-200">
+                      <Image size={16} />
+                    </span>
+                    <span className="grid h-8 w-8 place-items-center rounded-md border border-white/10 bg-slate-950/75 text-cyan-200">
+                      <Gem size={16} />
+                    </span>
+                  </div>
                   <div className="mt-3 grid gap-2">
                     <Button
                       disabled={!ready || busy === chest.id}
@@ -1042,6 +1090,24 @@ function Shell({ children }: { children: React.ReactNode }) {
             <div className="text-xl font-black tracking-[0.18em] text-white">MYPRO</div>
             <div className="text-xs font-bold tracking-[0.34em] text-emerald-300">TENNIS</div>
           </Link>
+          <div className="flex items-center gap-2 md:hidden">
+            {user ? (
+              <Button
+                onClick={logout}
+                className="bg-white/10 px-3 py-2 text-xs text-white hover:bg-white/15"
+              >
+                <LogOut size={15} />
+                Sortir
+              </Button>
+            ) : (
+              <Link
+                to="/login"
+                className="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-3 py-2 text-xs font-black text-slate-950"
+              >
+                <LogIn size={15} /> Connexion
+              </Link>
+            )}
+          </div>
           <div className="hidden items-center gap-3 text-sm text-slate-300 md:flex">
             <Bell size={16} />
             <span>{notifications.length} notification(s)</span>
@@ -1055,6 +1121,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             ) : null}
             {user ? (
               <Button onClick={logout} className="bg-white/10 text-white hover:bg-white/15">
+                <LogOut size={16} />
                 Déconnexion
               </Button>
             ) : (
@@ -1119,16 +1186,16 @@ function Landing() {
               Créez un joueur, entraînez-le en temps réel, améliorez son académie, défiez le circuit
               fictif et rejouez chaque match point par point.
             </p>
-            <div className="mt-7 flex flex-wrap gap-3">
+            <div className="mt-7 grid gap-3 sm:flex sm:flex-wrap">
               <Link
                 to="/login"
-                className="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-5 py-3 font-bold text-slate-950"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-400 px-5 py-3 font-bold text-slate-950 sm:w-auto"
               >
                 <LogIn size={18} /> Jouer avec le compte démo
               </Link>
               <Link
                 to="/signup"
-                className="inline-flex items-center gap-2 rounded-md border border-white/15 px-5 py-3 font-bold text-white"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-white/15 px-5 py-3 font-bold text-white sm:w-auto"
               >
                 <UserPlus size={18} /> Créer un compte
               </Link>
@@ -1400,22 +1467,68 @@ function CreatePlayer() {
   );
 }
 
+function StatIcon({ statKey, size = "md" }: { statKey: string; size?: "sm" | "md" | "lg" }) {
+  const visual = statVisual(statKey);
+  const Icon = visual.Icon;
+  const sizeClass = size === "lg" ? "h-12 w-12" : size === "sm" ? "h-8 w-8" : "h-10 w-10";
+  const iconSize = size === "lg" ? 24 : size === "sm" ? 16 : 20;
+  return (
+    <span
+      className={`stat-icon ${sizeClass}`}
+      style={{ color: visual.color, boxShadow: `0 0 24px ${visual.glow}` }}
+      title={statLabels[statKey] ?? statKey}
+    >
+      <Icon size={iconSize} />
+    </span>
+  );
+}
+
+function StatBonusPills({ bonuses }: { bonuses: Record<string, number> }) {
+  const entries = Object.entries(bonuses).filter(([, value]) => value > 0);
+  if (!entries.length) return <span className="text-sm text-slate-400">Bonus à révéler</span>;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {entries.map(([key, value]) => (
+        <span key={key} className="stat-bonus-pill">
+          <StatIcon statKey={key} size="sm" />
+          <span>{statLabels[key] ?? key}</span>
+          <strong>+{value}</strong>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function StatBars({ player }: { player: Player }) {
   return (
-    <div className="grid gap-2">
+    <div className="grid gap-3 md:grid-cols-2">
       {Object.entries(player.stats)
         .slice(0, 12)
-        .map(([key, value]) => (
-          <div key={key}>
-            <div className="mb-1 flex justify-between text-xs text-slate-300">
-              <span>{statLabels[key] ?? key}</span>
-              <span>{Math.round(value)}</span>
+        .map(([key, value]) => {
+          const visual = statVisual(key);
+          return (
+            <div key={key} className="stat-card">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <StatIcon statKey={key} />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-black text-white">
+                      {statLabels[key] ?? key}
+                    </div>
+                    <div className="text-xs text-slate-400">Carte {visual.short}</div>
+                  </div>
+                </div>
+                <strong className="text-xl text-white">{Math.round(value)}</strong>
+              </div>
+              <div className="mt-3 h-2 rounded-full bg-white/[0.08]">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${value}%`, backgroundColor: visual.color }}
+                />
+              </div>
             </div>
-            <div className="h-2 rounded-full bg-white/[0.08]">
-              <div className="h-full rounded-full bg-emerald-300" style={{ width: `${value}%` }} />
-            </div>
-          </div>
-        ))}
+          );
+        })}
     </div>
   );
 }
@@ -1649,6 +1762,10 @@ function PlayerPage() {
   const refresh = useGameStore((state) => state.refresh);
   const [career, setCareer] = useState<CareerProfile | null>(null);
   const [avatarEditorOpen, setAvatarEditorOpen] = useState(false);
+  const topStats = profileStatKeys
+    .map((key) => ({ key, value: stat(player, key) }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 3);
   useEffect(() => void api<CareerProfile>("/players/me/career").then(setCareer), []);
   return (
     <div className="grid gap-5 lg:grid-cols-[330px_1fr]">
@@ -1677,7 +1794,21 @@ function PlayerPage() {
         </div>
       </section>
       <section className="panel p-5">
-        <h2 className="font-bold">Statistiques</h2>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm text-emerald-300">Profil joueur</p>
+            <h2 className="font-bold">Statistiques</h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {topStats.map((item) => (
+              <span key={item.key} className="stat-bonus-pill">
+                <StatIcon statKey={item.key} size="sm" />
+                <span>{statLabels[item.key]}</span>
+                <strong>{Math.round(item.value)}</strong>
+              </span>
+            ))}
+          </div>
+        </div>
         <div className="mt-4">
           <StatBars player={player} />
         </div>
@@ -2136,9 +2267,13 @@ function CollectionPage() {
                   </span>
                 ) : null}
               </div>
-              <p className="mt-3 text-sm text-slate-300">
-                {item ? formatStatBonuses(item.bonuses) : "Équipez un objet depuis l'inventaire."}
-              </p>
+              <div className="mt-3 text-sm text-slate-300">
+                {item ? (
+                  <StatBonusPills bonuses={item.bonuses} />
+                ) : (
+                  "Équipez un objet depuis l'inventaire."
+                )}
+              </div>
               {item ? (
                 <button
                   className="mt-4 rounded-md bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-50"
@@ -2181,13 +2316,18 @@ function CollectionPage() {
             return (
               <div key={card.statKey} className="metric">
                 <div className="flex justify-between gap-3">
-                  <div>
-                    <div className="font-bold">{card.label}</div>
-                    <div className="text-xs text-slate-400">
-                      {card.copies} doublon(s) collecté(s)
+                  <div className="flex min-w-0 items-center gap-3">
+                    <StatIcon statKey={card.statKey} />
+                    <div className="min-w-0">
+                      <div className="truncate font-bold">{card.label}</div>
+                      <div className="text-xs text-slate-400">
+                        {card.copies} doublon(s) collecté(s)
+                      </div>
                     </div>
                   </div>
-                  <div className="text-sm font-black text-emerald-300">+{card.level}</div>
+                  <div className="rounded-md bg-white/[0.08] px-2 py-1 text-sm font-black text-emerald-300">
+                    +{card.level}
+                  </div>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300">
                   <span>Bonus débloqué +{card.level}</span>
@@ -2244,7 +2384,9 @@ function CollectionPage() {
                     </span>
                   ) : null}
                 </div>
-                <p className="mt-3 text-sm text-emerald-100">{formatStatBonuses(item.bonuses)}</p>
+                <div className="mt-3">
+                  <StatBonusPills bonuses={item.bonuses} />
+                </div>
                 <div className="mt-4 grid grid-cols-4 gap-2">
                   {[0, 1, 2, 3].map((slotIndex) => (
                     <button
@@ -2349,7 +2491,9 @@ function CosmeticSlotPicker({
                     </span>
                   ) : null}
                 </div>
-                <p className="mt-3 text-sm text-emerald-100">{formatStatBonuses(item.bonuses)}</p>
+                <div className="mt-3">
+                  <StatBonusPills bonuses={item.bonuses} />
+                </div>
                 <div className="mt-3 text-xs font-bold text-slate-300">
                   {item.equippedSlot === slotIndex
                     ? "Déjà équipé ici"
@@ -3660,8 +3804,11 @@ function MatchStartPage() {
             <div className="mt-5 grid gap-2">
               {["service", "return", "forehand", "backhand"].map((key) => (
                 <div key={key}>
-                  <div className="mb-1 flex justify-between text-xs text-slate-300">
-                    <span>{statLabels[key]}</span>
+                  <div className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-300">
+                    <span className="flex items-center gap-2">
+                      <StatIcon statKey={key} size="sm" />
+                      {statLabels[key]}
+                    </span>
                     <strong>{Math.round(stat(opponent, key))}</strong>
                   </div>
                   <div className="h-2 rounded-full bg-white/10">
@@ -3805,7 +3952,10 @@ function MatchReplayPage() {
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">
               Statistique du point
             </p>
-            <h2 className="mt-1 text-3xl font-black">{statLabel}</h2>
+            <div className="mt-3 flex flex-col items-center gap-2">
+              <StatIcon statKey={statKey} size="lg" />
+              <h2 className="text-3xl font-black">{statLabel}</h2>
+            </div>
             <p className="mt-3 text-sm text-slate-300">{pointComment}</p>
           </div>
           <div>
@@ -3839,7 +3989,10 @@ function MatchReplayPage() {
           <div className="grid place-items-center rounded-md border border-white/10 bg-white/[0.04] text-center">
             <div>
               <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">VS</div>
-              <div className="mt-1 text-2xl font-black">{statLabel}</div>
+              <div className="mx-auto mt-2 w-fit">
+                <StatIcon statKey={statKey} />
+              </div>
+              <div className="mt-2 text-2xl font-black">{statLabel}</div>
             </div>
           </div>
           <PointValueCard
@@ -4004,8 +4157,11 @@ function SimpleMatchPlayerCard({
       <div className="mt-5 grid gap-2">
         {matchStats.map((key) => (
           <div key={key}>
-            <div className="mb-1 flex justify-between text-xs text-slate-300">
-              <span>{statLabels[key]}</span>
+            <div className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-300">
+              <span className="flex items-center gap-2">
+                <StatIcon statKey={key} size="sm" />
+                {statLabels[key]}
+              </span>
               <strong>{Math.round(stat(player, key))}</strong>
             </div>
             <div className="h-2 rounded-full bg-white/10">
@@ -4271,6 +4427,8 @@ function ProfilePage() {
 function SettingsPage() {
   const user = useGameStore((state) => state.user);
   const refresh = useGameStore((state) => state.refresh);
+  const logout = useGameStore((state) => state.logout);
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [message, setMessage] = useState(
     searchParams.get("googleLinked") === "1" ? "Compte Google lié avec succès." : ""
@@ -4290,6 +4448,10 @@ function SettingsPage() {
   useEffect(() => {
     if (searchParams.get("googleLinked") === "1") void refresh();
   }, [refresh, searchParams]);
+  function disconnect() {
+    logout();
+    navigate("/", { replace: true });
+  }
   return (
     <section className="panel p-5">
       <h1 className="text-2xl font-black">Réglages</h1>
@@ -4303,6 +4465,17 @@ function SettingsPage() {
         <Metric label="Google" value={user?.googleLinked ? "Lié" : "Non lié"} />
         <Metric label="PWA" value="Installable" />
         <Metric label="Multijoueur" value="Socket.IO actif" />
+        <div className="metric md:col-span-2">
+          <div className="text-xs text-slate-400">Session</div>
+          <p className="mt-2 text-sm text-slate-300">
+            Fermez la session de ce navigateur. Votre compte, votre joueur et votre progression
+            restent sauvegardés.
+          </p>
+          <Button onClick={disconnect} className="mt-3 bg-white/10 text-white hover:bg-white/15">
+            <LogOut size={17} />
+            Déconnexion
+          </Button>
+        </div>
         {!user?.googleLinked ? (
           <div className="metric md:col-span-2">
             <div className="text-xs text-slate-400">Connexion Google</div>
