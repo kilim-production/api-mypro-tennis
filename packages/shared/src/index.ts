@@ -59,6 +59,36 @@ export const cosmeticEquipSchema = z.object({
   slotIndex: z.number().int().min(0).max(3)
 });
 
+export const fftRankingValues = [
+  "NC",
+  "40/2",
+  "40/1",
+  "40",
+  "30/5",
+  "30/4",
+  "30/3",
+  "30/2",
+  "30/1",
+  "30",
+  "15/5",
+  "15/4",
+  "15/3",
+  "15/2",
+  "15/1",
+  "15",
+  "5/6",
+  "4/6",
+  "3/6",
+  "2/6",
+  "1/6",
+  "0",
+  "-2/6",
+  "-4/6",
+  "-15"
+] as const;
+
+export const fftRankingSchema = z.enum(fftRankingValues);
+
 export const clubCreateSchema = z.object({
   name: z.string().trim().min(3).max(32),
   tag: z
@@ -68,7 +98,13 @@ export const clubCreateSchema = z.object({
     .max(5)
     .regex(/^[a-z0-9]+$/i, "Le sigle accepte uniquement lettres et chiffres.")
     .transform((value) => value.toUpperCase()),
-  description: z.string().trim().max(180).optional().default("")
+  description: z.string().trim().max(280).optional().default(""),
+  minimumRanking: fftRankingSchema.optional().default("NC")
+});
+
+export const clubUpdateSchema = z.object({
+  description: z.string().trim().max(280).default(""),
+  minimumRanking: fftRankingSchema
 });
 
 export const clubJoinRequestSchema = z.object({
@@ -128,4 +164,5 @@ export type PlayerCreationInput = z.infer<typeof playerCreationSchema>;
 export type AvatarUpdateInput = z.infer<typeof avatarUpdateSchema>;
 export type CosmeticEquipInput = z.infer<typeof cosmeticEquipSchema>;
 export type ClubCreateInput = z.infer<typeof clubCreateSchema>;
+export type ClubUpdateInput = z.infer<typeof clubUpdateSchema>;
 export type ClubJoinRequestInput = z.infer<typeof clubJoinRequestSchema>;

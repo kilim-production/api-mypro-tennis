@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@mypro/database";
-import { clubCreateSchema, clubJoinRequestSchema } from "@mypro/shared";
+import { clubCreateSchema, clubJoinRequestSchema, clubUpdateSchema } from "@mypro/shared";
 import { fftRankIndex } from "@mypro/sports-tennis";
 import { requireAuth } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
@@ -59,6 +59,7 @@ function clubSummary(club: {
   name: string;
   tag: string;
   description: string;
+  minimumRanking: string;
   budget: number;
   maxSlots: number;
   createdAt: Date;
@@ -72,6 +73,7 @@ function clubSummary(club: {
     name: club.name,
     tag: club.tag,
     description: club.description,
+    minimumRanking: club.minimumRanking,
     budget: club.budget,
     competitiveLevel,
     maxSlots: club.maxSlots,
@@ -805,6 +807,7 @@ clubsRouter.post("/", requireAuth, validateBody(clubCreateSchema), async (reques
           name: request.body.name,
           tag: request.body.tag,
           description: request.body.description,
+          minimumRanking: request.body.minimumRanking,
           maxSlots: 5,
           presidentId: player.id
         }
@@ -827,6 +830,36 @@ clubsRouter.post("/", requireAuth, validateBody(clubCreateSchema), async (reques
   }
 });
 
+clubsRouter.patch(
+  "/me/settings",
+  requireAuth,
+  validateBody(clubUpdateSchema),
+  async (request, response) => {
+    const player = await currentPlayer(request.session!.userId);
+    if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+    const membership = await prisma.clubMembership.findUnique({
+      where: { playerId: player.id },
+      include: { club: true }
+    });
+    if (!membership?.club)
+      return response.status(404).json({ message: "Vous n'êtes membre d'aucun club." });
+    if (membership.club.presidentId !== player.id)
+      return response
+        .status(403)
+        .json({ message: "Seul le président peut modifier les paramètres du club." });
+
+    const club = await prisma.club.update({
+      where: { id: membership.clubId },
+      data: {
+        description: request.body.description,
+        minimumRanking: request.body.minimumRanking
+      },
+      include: clubInclude
+    });
+    return response.json(clubDetails(club, player.id));
+  }
+);
+
 clubsRouter.post(
   "/:id/join",
   requireAuth,
@@ -846,6 +879,11 @@ clubsRouter.post(
     if (!club) return response.status(404).json({ message: "Club introuvable." });
     if (club.memberships.length >= club.maxSlots)
       return response.status(409).json({ message: "Ce club est complet." });
+    if (fftRankIndex(player.fftRanking) < fftRankIndex(club.minimumRanking)) {
+      return response.status(403).json({
+        message: `Ce club exige le classement ${club.minimumRanking} minimum pour postuler.`
+      });
+    }
     const pendingElsewhere = await prisma.clubJoinRequest.findFirst({
       where: { playerId: player.id, status: "PENDING", clubId: { not: club.id } }
     });
@@ -889,6 +927,11 @@ clubsRouter.post("/requests/:id/accept", requireAuth, async (request, response) 
       .json({ message: "Seul le président du club peut valider cette demande." });
   if (joinRequest.club.memberships.length >= joinRequest.club.maxSlots)
     return response.status(409).json({ message: "Ce club est complet." });
+  if (fftRankIndex(joinRequest.player.fftRanking) < fftRankIndex(joinRequest.club.minimumRanking)) {
+    return response.status(403).json({
+      message: `Ce joueur ne respecte plus le classement minimum ${joinRequest.club.minimumRanking}.`
+    });
+  }
   const existingMembership = await prisma.clubMembership.findUnique({
     where: { playerId: joinRequest.playerId }
   });

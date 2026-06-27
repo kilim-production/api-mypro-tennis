@@ -490,6 +490,7 @@ type ClubListItem = {
   name: string;
   tag: string;
   description: string;
+  minimumRanking: string;
   budget: number;
   competitiveLevel: string;
   maxSlots: number;
@@ -717,6 +718,12 @@ const fftPath = [
   "-4/6",
   "-15"
 ];
+
+function fftIndex(ranking: string) {
+  const index = fftPath.indexOf(ranking);
+  return index < 0 ? 0 : index;
+}
+
 const fftThresholds: Record<string, number> = {
   NC: 0,
   "40/2": 30,
@@ -3695,7 +3702,13 @@ function ClubPage() {
   const refresh = useGameStore((state) => state.refresh);
   const [data, setData] = useState<MyClubData | null>(null);
   const [clubs, setClubs] = useState<ClubListItem[]>([]);
-  const [form, setForm] = useState({ name: "", tag: "", description: "" });
+  const [form, setForm] = useState({
+    name: "",
+    tag: "",
+    description: "",
+    minimumRanking: "NC"
+  });
+  const [settingsForm, setSettingsForm] = useState({ description: "", minimumRanking: "NC" });
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const clubCreationCost = 5000;
@@ -3712,6 +3725,15 @@ function ClubPage() {
 
   useEffect(() => void loadClubData(), []);
 
+  useEffect(() => {
+    if (data?.club) {
+      setSettingsForm({
+        description: data.club.description,
+        minimumRanking: data.club.minimumRanking
+      });
+    }
+  }, [data?.club?.id, data?.club?.description, data?.club?.minimumRanking]);
+
   async function createClub(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
@@ -3722,11 +3744,29 @@ function ClubPage() {
         body: JSON.stringify(form)
       });
       setData({ club, pendingRequest: null });
-      setForm({ name: "", tag: "", description: "" });
+      setForm({ name: "", tag: "", description: "", minimumRanking: "NC" });
       await refresh();
       await loadClubData();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Création impossible.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function updateClubSettings(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage("");
+    setBusy("settings");
+    try {
+      const club = await api<ClubDetails>("/clubs/me/settings", {
+        method: "PATCH",
+        body: JSON.stringify(settingsForm)
+      });
+      setData((current) => ({ club, pendingRequest: current?.pendingRequest ?? null }));
+      await loadClubData();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Modification impossible.");
     } finally {
       setBusy(null);
     }
@@ -3790,10 +3830,11 @@ function ClubPage() {
               </div>
             </div>
           </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
             <Metric label="Président" value={club.president.name} />
             <Metric label="Membres" value={club.memberCount} />
             <Metric label="Places libres" value={club.openSlots} />
+            <Metric label="Classement requis" value={club.minimumRanking} />
             <Metric label="Niveau compétitif" value={club.competitiveLevel} />
             <Metric label="Budget du club" value={`${club.budget.toLocaleString("fr-FR")} €`} />
           </div>
@@ -3806,6 +3847,52 @@ function ClubPage() {
         ) : null}
 
         <TeamChampionshipPanel club={club} />
+
+        {club.isPresident ? (
+          <form className="panel grid gap-4 p-5" onSubmit={updateClubSettings}>
+            <div>
+              <h2 className="text-xl font-black">Paramètres du club</h2>
+              <p className="mt-1 text-sm text-slate-300">
+                Ces informations sont visibles par les joueurs qui cherchent un club.
+              </p>
+            </div>
+            <label className="grid gap-1 text-sm">
+              <span className="text-slate-300">Description du club</span>
+              <textarea
+                className="min-h-24 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 outline-none focus:border-emerald-300"
+                maxLength={280}
+                onChange={(event) =>
+                  setSettingsForm((current) => ({
+                    ...current,
+                    description: event.target.value
+                  }))
+                }
+                placeholder="Ambition, rythme de jeu, profil recherché..."
+                value={settingsForm.description}
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-slate-300">Classement minimum pour rejoindre</span>
+              <select
+                className="rounded-md border border-white/10 bg-slate-950 px-3 py-2"
+                onChange={(event) =>
+                  setSettingsForm((current) => ({
+                    ...current,
+                    minimumRanking: event.target.value
+                  }))
+                }
+                value={settingsForm.minimumRanking}
+              >
+                {fftPath.map((ranking) => (
+                  <option key={ranking} value={ranking}>
+                    {ranking}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button disabled={busy === "settings"}>Enregistrer les paramètres</Button>
+          </form>
+        ) : null}
 
         <section className="grid gap-5 lg:grid-cols-[1fr_360px]">
           <article className="panel p-5">
@@ -3927,13 +4014,29 @@ function ClubPage() {
           <label className="grid gap-1 text-sm">
             <span className="text-slate-300">Description</span>
             <Field
-              maxLength={180}
+              maxLength={280}
               onChange={(event) =>
                 setForm((current) => ({ ...current, description: event.target.value }))
               }
               placeholder="Objectif, niveau recherché, ambiance..."
               value={form.description}
             />
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span className="text-slate-300">Classement minimum pour rejoindre</span>
+            <select
+              className="rounded-md border border-white/10 bg-slate-950 px-3 py-2"
+              onChange={(event) =>
+                setForm((current) => ({ ...current, minimumRanking: event.target.value }))
+              }
+              value={form.minimumRanking}
+            >
+              {fftPath.map((ranking) => (
+                <option key={ranking} value={ranking}>
+                  {ranking}
+                </option>
+              ))}
+            </select>
           </label>
           {!canCreateClub ? (
             <p className="rounded-md border border-amber-300/30 bg-amber-300/10 p-3 text-sm text-amber-100">
@@ -3950,10 +4053,12 @@ function ClubPage() {
           <div className="mt-4 grid gap-3">
             {clubs.length ? (
               clubs.map((club) => {
+                const rankingAllowed = fftIndex(player.fftRanking) >= fftIndex(club.minimumRanking);
                 const disabled =
                   club.openSlots <= 0 ||
                   club.myRequestStatus === "PENDING" ||
                   Boolean(data.pendingRequest) ||
+                  !rankingAllowed ||
                   busy === `join-${club.id}`;
                 return (
                   <div
@@ -3972,6 +4077,9 @@ function ClubPage() {
                         <p className="mt-1 text-sm text-emerald-200">
                           Niveau compétitif : {club.competitiveLevel}
                         </p>
+                        <p className="mt-1 text-sm text-cyan-100">
+                          Classement requis : {club.minimumRanking} minimum
+                        </p>
                         {club.description ? (
                           <p className="mt-2 text-sm text-slate-400">{club.description}</p>
                         ) : null}
@@ -3981,7 +4089,9 @@ function ClubPage() {
                           ? "Complet"
                           : club.myRequestStatus === "PENDING"
                             ? "Demande envoyée"
-                            : "Demander à rejoindre"}
+                            : !rankingAllowed
+                              ? `Requis ${club.minimumRanking}`
+                              : "Demander à rejoindre"}
                       </Button>
                     </div>
                   </div>
