@@ -1273,3 +1273,26 @@ gameRouter.get("/notifications", requireAuth, async (request, response) => {
     })
   );
 });
+
+gameRouter.patch("/notifications/:id/read", requireAuth, async (request, response) => {
+  const notificationId = request.params.id;
+  if (!notificationId) return response.status(400).json({ message: "Notification invalide." });
+  const notification = await prisma.notification.findFirst({
+    where: { id: notificationId, userId: request.session!.userId }
+  });
+  if (!notification) return response.status(404).json({ message: "Notification introuvable." });
+  return response.json(
+    await prisma.notification.update({
+      where: { id: notification.id },
+      data: { readAt: notification.readAt ?? new Date() }
+    })
+  );
+});
+
+gameRouter.post("/notifications/read-all", requireAuth, async (request, response) => {
+  await prisma.notification.updateMany({
+    where: { userId: request.session!.userId, readAt: null },
+    data: { readAt: new Date() }
+  });
+  return response.json({ ok: true });
+});

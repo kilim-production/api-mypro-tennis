@@ -360,6 +360,22 @@ export async function openChest(playerId: string, chestId: string) {
       });
     }
 
+    const readyCards = rewards.cards.filter((card) => card.bonus > 0);
+    const playerOwner = readyCards.length
+      ? await tx.player.findUnique({ where: { id: playerId }, select: { userId: true } })
+      : null;
+    if (playerOwner?.userId && readyCards.length) {
+      const cardList = readyCards.map((card) => `${card.label} +${card.bonus}`).join(", ");
+      await tx.notification.create({
+        data: {
+          userId: playerOwner.userId,
+          title: "Palier de carte atteint",
+          body: `${cardList} prêt à débloquer dans votre collection.`,
+          type: "COLLECTION"
+        }
+      });
+    }
+
     await tx.player.update({
       where: { id: playerId },
       data: {

@@ -68,7 +68,7 @@ import {
   YAxis
 } from "recharts";
 import { API_URL, api, saveToken } from "./api";
-import { useGameStore, type Player } from "./store";
+import { useGameStore, type GameNotification, type Player } from "./store";
 
 const socketUrl = import.meta.env.VITE_SOCKET_URL ?? "http://localhost:4000";
 
@@ -84,6 +84,20 @@ const nav = [
   ["Joueurs en ligne", "/online", Wifi],
   ["Réglages", "/settings", Settings]
 ] as const;
+
+function notificationTarget(notification: GameNotification) {
+  const type = notification.type.toUpperCase();
+  const text = `${notification.title} ${notification.body}`.toLowerCase();
+  if (type === "COLLECTION" || text.includes("collection") || text.includes("carte"))
+    return "/collection";
+  if (type === "CLUB" || text.includes("club")) return "/club";
+  if (type === "DEFI" || type === "DÉFI" || text.includes("défi") || text.includes("match"))
+    return "/matches";
+  if (type === "SAISON" || text.includes("tournoi") || text.includes("championnat"))
+    return "/season";
+  if (type === "TUTORIEL" || text.includes("bienvenue")) return "/dashboard";
+  return "/dashboard";
+}
 
 const statLabels: Record<string, string> = {
   service: "Service",
@@ -1094,8 +1108,106 @@ function GoogleButton({
   );
 }
 
+function NotificationCenter({ compact = false }: { compact?: boolean }) {
+  const notifications = useGameStore((state) => state.notifications);
+  const refresh = useGameStore((state) => state.refresh);
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const unread = notifications.filter((notification) => !notification.readAt);
+
+  async function openNotification(notification: GameNotification) {
+    if (!notification.readAt) {
+      await api(`/notifications/${notification.id}/read`, { method: "PATCH" });
+      await refresh();
+    }
+    setOpen(false);
+    navigate(notificationTarget(notification));
+  }
+
+  async function readAll() {
+    await api("/notifications/read-all", { method: "POST" });
+    await refresh();
+  }
+
+  return (
+    <div className="relative">
+      <button
+        className={`relative inline-flex items-center justify-center gap-2 rounded-md bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 transition hover:bg-white/15 ${
+          compact ? "h-9 w-9 px-0" : ""
+        }`}
+        onClick={() => setOpen((value) => !value)}
+        type="button"
+        aria-label="Notifications"
+      >
+        <Bell size={16} />
+        {!compact ? <span>{unread.length} notification(s)</span> : null}
+        {unread.length ? (
+          <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-emerald-300 px-1 text-[11px] font-black text-slate-950">
+            {unread.length}
+          </span>
+        ) : null}
+      </button>
+      {open ? (
+        <div className="absolute right-0 top-[calc(100%+0.6rem)] z-50 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-lg border border-white/10 bg-slate-950 shadow-2xl shadow-black/50">
+          <div className="flex items-center justify-between gap-3 border-b border-white/10 p-4">
+            <div>
+              <p className="text-sm font-black">Notifications</p>
+              <p className="text-xs text-slate-400">{unread.length} non lue(s)</p>
+            </div>
+            {unread.length ? (
+              <button
+                className="rounded-md bg-white/10 px-3 py-2 text-xs font-bold text-slate-100 hover:bg-white/15"
+                onClick={() => void readAll()}
+                type="button"
+              >
+                Tout lire
+              </button>
+            ) : null}
+          </div>
+          <div className="max-h-[380px] overflow-auto p-2">
+            {notifications.length ? (
+              notifications.map((notification) => (
+                <button
+                  key={notification.id}
+                  className={`grid w-full gap-1 rounded-md p-3 text-left transition hover:bg-white/[0.08] ${
+                    notification.readAt ? "text-slate-400" : "bg-emerald-300/10 text-slate-100"
+                  }`}
+                  onClick={() => void openNotification(notification)}
+                  type="button"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <strong>{notification.title}</strong>
+                    {!notification.readAt ? (
+                      <span className="mt-1 h-2 w-2 rounded-full bg-emerald-300" />
+                    ) : null}
+                  </div>
+                  <span className="text-sm leading-5">{notification.body}</span>
+                  <span className="text-xs text-slate-500">
+                    {new Date(notification.createdAt).toLocaleString("fr-FR")}
+                  </span>
+                </button>
+              ))
+            ) : (
+              <p className="p-4 text-sm text-slate-400">Aucune notification pour le moment.</p>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function Shell({ children }: { children: React.ReactNode }) {
   const { user, player, notifications, logout } = useGameStore();
+  const navBadges = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const notification of notifications) {
+      if (notification.readAt) continue;
+      const target = notificationTarget(notification);
+      counts[target] = (counts[target] ?? 0) + 1;
+    }
+    return counts;
+  }, [notifications]);
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-20 border-b border-white/10 bg-midnight/92 backdrop-blur">
@@ -1106,13 +1218,16 @@ function Shell({ children }: { children: React.ReactNode }) {
           </Link>
           <div className="flex items-center gap-2 md:hidden">
             {user ? (
-              <Button
-                onClick={logout}
-                className="bg-white/10 px-3 py-2 text-xs text-white hover:bg-white/15"
-              >
-                <LogOut size={15} />
-                Sortir
-              </Button>
+              <>
+                <NotificationCenter compact />
+                <Button
+                  onClick={logout}
+                  className="bg-white/10 px-3 py-2 text-xs text-white hover:bg-white/15"
+                >
+                  <LogOut size={15} />
+                  Sortir
+                </Button>
+              </>
             ) : (
               <Link
                 to="/login"
@@ -1123,8 +1238,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             )}
           </div>
           <div className="hidden items-center gap-3 text-sm text-slate-300 md:flex">
-            <Bell size={16} />
-            <span>{notifications.length} notification(s)</span>
+            {user ? <NotificationCenter /> : null}
             {player ? (
               <span className="rounded-md bg-white/[0.08] px-3 py-1">
                 Énergie {player.actionEnergy}/{player.actionEnergyMax}
@@ -1161,7 +1275,12 @@ function Shell({ children }: { children: React.ReactNode }) {
                 }
               >
                 <Icon size={17} />
-                {label}
+                <span className="min-w-0 flex-1">{label}</span>
+                {navBadges[path] ? (
+                  <span className="grid h-5 min-w-5 place-items-center rounded-full bg-emerald-300 px-1 text-[11px] font-black text-slate-950">
+                    {navBadges[path]}
+                  </span>
+                ) : null}
               </NavLink>
             ))}
           </nav>
