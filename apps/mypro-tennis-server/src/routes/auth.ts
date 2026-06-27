@@ -145,13 +145,21 @@ authRouter.post("/login", validateBody(loginSchema), async (request, response) =
 });
 
 authRouter.get("/google/start", async (request, response) => {
-  if (!googleConfigured()) {
+  try {
+    if (!googleConfigured()) {
+      return response.redirect(
+        clientRedirect("/login", { oauthError: "Connexion Google non configurée." })
+      );
+    }
+    const mode = request.query.mode === "signup" ? "signup" : "login";
+    return response.redirect(googleAuthUrl({ mode, nonce: randomUUID() }));
+  } catch (error) {
     return response.redirect(
-      clientRedirect("/login", { oauthError: "Connexion Google non configurée." })
+      clientRedirect("/login", {
+        oauthError: error instanceof Error ? error.message : "Connexion Google impossible."
+      })
     );
   }
-  const mode = request.query.mode === "signup" ? "signup" : "login";
-  return response.redirect(googleAuthUrl({ mode, nonce: randomUUID() }));
 });
 
 authRouter.post("/google/link/start", requireAuth, async (request, response) => {
