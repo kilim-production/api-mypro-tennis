@@ -36,7 +36,8 @@ const clubInclude = {
     where: { status: "PENDING" },
     include: { player: true },
     orderBy: { createdAt: "asc" as const }
-  }
+  },
+  team: true
 };
 
 type ClubWithDetails = Prisma.ClubGetPayload<{ include: typeof clubInclude }>;
@@ -58,16 +59,21 @@ function clubSummary(club: {
   name: string;
   tag: string;
   description: string;
+  budget: number;
   maxSlots: number;
   createdAt: Date;
   president: ClubWithDetails["president"];
   memberships: Array<{ playerId: string }>;
+  team?: { division: string } | null;
 }) {
+  const competitiveLevel = club.team?.division ?? "Non engagé";
   return {
     id: club.id,
     name: club.name,
     tag: club.tag,
     description: club.description,
+    budget: club.budget,
+    competitiveLevel,
     maxSlots: club.maxSlots,
     memberCount: club.memberships.length,
     openSlots: Math.max(0, club.maxSlots - club.memberships.length),

@@ -490,6 +490,8 @@ type ClubListItem = {
   name: string;
   tag: string;
   description: string;
+  budget: number;
+  competitiveLevel: string;
   maxSlots: number;
   memberCount: number;
   openSlots: number;
@@ -3788,10 +3790,12 @@ function ClubPage() {
               </div>
             </div>
           </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <Metric label="Président" value={club.president.name} />
             <Metric label="Membres" value={club.memberCount} />
             <Metric label="Places libres" value={club.openSlots} />
+            <Metric label="Niveau compétitif" value={club.competitiveLevel} />
+            <Metric label="Budget du club" value={`${club.budget.toLocaleString("fr-FR")} €`} />
           </div>
         </section>
 
@@ -3964,6 +3968,9 @@ function ClubPage() {
                         <p className="mt-1 text-sm text-slate-300">
                           Président : {club.president.name} · {club.memberCount}/{club.maxSlots}{" "}
                           membres
+                        </p>
+                        <p className="mt-1 text-sm text-emerald-200">
+                          Niveau compétitif : {club.competitiveLevel}
                         </p>
                         {club.description ? (
                           <p className="mt-2 text-sm text-slate-400">{club.description}</p>

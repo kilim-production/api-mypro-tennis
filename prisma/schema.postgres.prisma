@@ -96,6 +96,7 @@ model Club {
   name         String            @unique
   tag          String            @unique
   description  String            @default("")
+  budget       Int               @default(0)
   maxSlots     Int               @default(5)
   presidentId  String
   president    Player            @relation("ClubPresident", fields: [presidentId], references: [id], onDelete: Restrict)
