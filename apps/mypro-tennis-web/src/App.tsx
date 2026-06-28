@@ -41,6 +41,7 @@ import {
   Pause,
   Play,
   Repeat2,
+  Search,
   Settings,
   Shield,
   SkipForward,
@@ -464,6 +465,10 @@ type MatchListItem = {
 type DuelPool = {
   allowedRankings: string[];
   opponents: Player[];
+};
+type DuelSearch = {
+  allowedRankings: string[];
+  results: Player[];
 };
 type ReplayEvent = {
   index: number;
@@ -4702,6 +4707,9 @@ function ClubPage() {
 
 function MatchStartPage() {
   const [pool, setPool] = useState<DuelPool | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Player[]>([]);
+  const [searching, setSearching] = useState(false);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
@@ -4726,6 +4734,85 @@ function MatchStartPage() {
       await loadPool();
     }
   }
+  async function searchOpponents(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const query = searchQuery.trim();
+    if (query.length < 2) {
+      setSearchResults([]);
+      setMessage("Saisissez au moins 2 caractères pour chercher un joueur.");
+      return;
+    }
+    setMessage("");
+    setSearching(true);
+    try {
+      const data = await api<DuelSearch>(`/matches/duel-search?q=${encodeURIComponent(query)}`);
+      setSearchResults(data.results);
+      if (data.results.length === 0) {
+        setMessage(
+          `Aucun joueur réel trouvé dans votre zone de classement : ${data.allowedRankings.join(
+            " / "
+          )}.`
+        );
+      }
+    } catch (error) {
+      setSearchResults([]);
+      setMessage(error instanceof Error ? error.message : "Recherche impossible.");
+    } finally {
+      setSearching(false);
+    }
+  }
+  function opponentCard(opponent: Player, sourceLabel: string) {
+    return (
+      <article key={`${sourceLabel}-${opponent.id}`} className="panel p-5">
+        <div className="flex items-center gap-4">
+          <ProfilePicture avatar={opponent.avatar} />
+          <div>
+            <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
+              {sourceLabel}
+            </div>
+            <h2 className="text-xl font-black">
+              {opponent.firstName} {opponent.lastName}
+            </h2>
+            <p className="text-sm text-emerald-300">
+              {opponent.nationality} · {opponent.fftRanking}
+            </p>
+          </div>
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <Metric label="Niveau" value={opponent.overall} />
+          <Metric label="Classement" value={opponent.fftRanking} />
+          <Metric label="Victoires" value={opponent.wins} />
+          <Metric label="Défaites" value={opponent.losses} />
+        </div>
+        <div className="mt-5 grid gap-2">
+          {["service", "return", "forehand", "backhand"].map((key) => (
+            <div key={key}>
+              <div className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-300">
+                <span className="flex items-center gap-2">
+                  <StatIcon statKey={key} size="sm" />
+                  {statLabels[key]}
+                </span>
+                <strong>{Math.round(stat(opponent, key))}</strong>
+              </div>
+              <div className="h-2 rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-emerald-300"
+                  style={{ width: `${stat(opponent, key)}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        <Button
+          disabled={loadingId !== null}
+          onClick={() => start(opponent.id)}
+          className="mt-5 w-full"
+        >
+          <Play size={17} /> {loadingId === opponent.id ? "Duel en cours..." : "Affronter"}
+        </Button>
+      </article>
+    );
+  }
   return (
     <div className="grid gap-5">
       <section className="panel p-6">
@@ -4738,6 +4825,9 @@ function MatchStartPage() {
               {pool?.allowedRankings.join(" / ") ?? "..."}. Après chaque duel, un nouveau pool de
               trois profils sera généré.
             </p>
+            <p className="mt-2 text-sm text-slate-400">
+              Un joueur réel ne peut pas être affronté plus de 2 fois par jour en duel.
+            </p>
           </div>
           <Button className="bg-white/10 text-slate-100 hover:bg-white/15" onClick={loadPool}>
             Rafraîchir
@@ -4745,57 +4835,45 @@ function MatchStartPage() {
         </div>
       </section>
       {message ? <div className="panel p-4 text-sm text-amber-100">{message}</div> : null}
+      <section className="panel p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-300">
+              Match entre amis
+            </p>
+            <h2 className="text-2xl font-black">Chercher un joueur réel</h2>
+            <p className="mt-2 text-sm text-slate-300">
+              Recherchez un ami par prénom ou nom. Seuls les joueurs dans votre zone de classement
+              peuvent être défiés.
+            </p>
+          </div>
+        </div>
+        <form className="mt-4 flex flex-col gap-3 sm:flex-row" onSubmit={searchOpponents}>
+          <Field
+            className="flex-1"
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Prénom, nom ou classement"
+            value={searchQuery}
+          />
+          <Button disabled={searching} type="submit">
+            <Search size={17} /> {searching ? "Recherche..." : "Rechercher"}
+          </Button>
+        </form>
+      </section>
+      {searchResults.length > 0 ? (
+        <section className="grid gap-4 lg:grid-cols-3">
+          {searchResults.map((opponent) => opponentCard(opponent, "Joueur réel"))}
+        </section>
+      ) : null}
+      <div>
+        <p className="mb-3 text-sm font-bold uppercase tracking-[0.18em] text-slate-400">
+          Pool automatique
+        </p>
+      </div>
       <section className="grid gap-4 lg:grid-cols-3">
-        {(pool?.opponents ?? []).map((opponent) => (
-          <article key={opponent.id} className="panel p-5">
-            <div className="flex items-center gap-4">
-              <ProfilePicture avatar={opponent.avatar} />
-              <div>
-                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
-                  {opponent.isAi ? "Profil IA" : "Joueur réel"}
-                </div>
-                <h2 className="text-xl font-black">
-                  {opponent.firstName} {opponent.lastName}
-                </h2>
-                <p className="text-sm text-emerald-300">
-                  {opponent.nationality} · {opponent.fftRanking}
-                </p>
-              </div>
-            </div>
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <Metric label="Niveau" value={opponent.overall} />
-              <Metric label="Classement" value={opponent.fftRanking} />
-              <Metric label="Victoires" value={opponent.wins} />
-              <Metric label="Défaites" value={opponent.losses} />
-            </div>
-            <div className="mt-5 grid gap-2">
-              {["service", "return", "forehand", "backhand"].map((key) => (
-                <div key={key}>
-                  <div className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-300">
-                    <span className="flex items-center gap-2">
-                      <StatIcon statKey={key} size="sm" />
-                      {statLabels[key]}
-                    </span>
-                    <strong>{Math.round(stat(opponent, key))}</strong>
-                  </div>
-                  <div className="h-2 rounded-full bg-white/10">
-                    <div
-                      className="h-full rounded-full bg-emerald-300"
-                      style={{ width: `${stat(opponent, key)}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <Button
-              disabled={loadingId !== null}
-              onClick={() => start(opponent.id)}
-              className="mt-5 w-full"
-            >
-              <Play size={17} /> {loadingId === opponent.id ? "Duel en cours..." : "Affronter"}
-            </Button>
-          </article>
-        ))}
+        {(pool?.opponents ?? []).map((opponent) =>
+          opponentCard(opponent, opponent.isAi ? "Profil IA" : "Joueur réel")
+        )}
       </section>
       {!pool ? (
         <section className="panel p-5 text-sm text-slate-300">

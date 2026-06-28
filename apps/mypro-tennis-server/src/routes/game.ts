@@ -367,6 +367,28 @@ async function buildDuelPool(player: {
   return pool.slice(0, 3);
 }
 
+function todayBounds(now = new Date()) {
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { start, end };
+}
+
+async function realDuelCountToday(playerId: string, opponentId: string) {
+  const { start, end } = todayBounds();
+  return prisma.match.count({
+    where: {
+      type: { in: ["Duel amateur", "Duel professionnel"] },
+      playedAt: { gte: start, lt: end },
+      OR: [
+        { playerAId: playerId, playerBId: opponentId },
+        { playerAId: opponentId, playerBId: playerId }
+      ]
+    }
+  });
+}
+
 function buildSeasonBracket(
   type: SeasonCompetitionType,
   player: { fftRanking: string; overall: number }
@@ -1177,6 +1199,36 @@ gameRouter.get("/matches/duel-pool", requireAuth, async (request, response) => {
   });
 });
 
+gameRouter.get("/matches/duel-search", requireAuth, async (request, response) => {
+  const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
+  if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+  const query = String(request.query.q ?? "").trim().toLowerCase();
+  if (query.length < 2) {
+    return response.status(400).json({ message: "Saisissez au moins 2 caractères." });
+  }
+  const allowedRankings = duelRankingPool(player.fftRanking);
+  const candidates = await prisma.player.findMany({
+    where: {
+      id: { not: player.id },
+      isAi: false,
+      fftRanking: { in: allowedRankings }
+    },
+    orderBy: [{ overall: "desc" }, { updatedAt: "desc" }],
+    take: 100
+  });
+  const results = candidates
+    .filter((candidate) =>
+      `${candidate.firstName} ${candidate.lastName} ${candidate.fftRanking}`
+        .toLowerCase()
+        .includes(query)
+    )
+    .slice(0, 10);
+  return response.json({
+    allowedRankings,
+    results: results.map(publicPlayer)
+  });
+});
+
 gameRouter.get("/matches/:id", requireAuth, async (request, response) => {
   const matchId = request.params.id;
   if (!matchId) return response.status(400).json({ message: "Identifiant de match requis." });
@@ -1201,14 +1253,32 @@ gameRouter.post(
     const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
     if (!player) return response.status(404).json({ message: "Joueur introuvable." });
     const pool = await buildDuelPool(player);
-    const opponent = request.body.opponentId
+    let opponent = request.body.opponentId
       ? pool.find((candidate) => candidate.id === request.body.opponentId)
       : pool[0];
+    if (!opponent && request.body.opponentId) {
+      opponent =
+        (await prisma.player.findFirst({
+          where: {
+            id: request.body.opponentId,
+            isAi: false,
+            NOT: { id: player.id }
+          }
+        })) ?? undefined;
+    }
     if (!opponent) return response.status(404).json({ message: "Adversaire introuvable." });
     if (!duelRankingPool(player.fftRanking).includes(opponent.fftRanking as FftRanking)) {
       return response
         .status(403)
-        .json({ message: "Cet adversaire n'est plus disponible dans votre pool de duel." });
+        .json({ message: "Cet adversaire doit être dans votre zone de classement de duel." });
+    }
+    if (!opponent.isAi) {
+      const duelCount = await realDuelCountToday(player.id, opponent.id);
+      if (duelCount >= 2) {
+        return response.status(409).json({
+          message: "Vous avez déjà affronté ce joueur réel 2 fois aujourd'hui."
+        });
+      }
     }
     const matchType = player.proUnlocked ? "Duel professionnel" : "Duel amateur";
     try {
