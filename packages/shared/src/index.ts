@@ -99,12 +99,14 @@ export const clubCreateSchema = z.object({
     .regex(/^[a-z0-9]+$/i, "Le sigle accepte uniquement lettres et chiffres.")
     .transform((value) => value.toUpperCase()),
   description: z.string().trim().max(280).optional().default(""),
-  minimumRanking: fftRankingSchema.optional().default("NC")
+  minimumRanking: fftRankingSchema.optional().default("NC"),
+  duesAmount: z.number().int().min(0).max(50_000).optional().default(0)
 });
 
 export const clubUpdateSchema = z.object({
   description: z.string().trim().max(280).default(""),
-  minimumRanking: fftRankingSchema
+  minimumRanking: fftRankingSchema,
+  duesAmount: z.number().int().min(0).max(50_000).default(0)
 });
 
 export const clubJoinRequestSchema = z.object({

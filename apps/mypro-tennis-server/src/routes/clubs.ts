@@ -9,6 +9,7 @@ import { validateBody } from "../middleware/validate";
 export const clubsRouter = Router();
 const clubCreationCost = 5000;
 const teamSize = 5;
+const duesWindowMs = 7 * 24 * 60 * 60 * 1000;
 const teamChampionshipDivisions = [
   "Départementale 4",
   "Départementale 3",
@@ -60,6 +61,7 @@ function clubSummary(club: {
   tag: string;
   description: string;
   minimumRanking: string;
+  duesAmount: number;
   budget: number;
   maxSlots: number;
   createdAt: Date;
@@ -74,6 +76,7 @@ function clubSummary(club: {
     tag: club.tag,
     description: club.description,
     minimumRanking: club.minimumRanking,
+    duesAmount: club.duesAmount,
     budget: club.budget,
     competitiveLevel,
     maxSlots: club.maxSlots,
@@ -157,6 +160,18 @@ function roundStart(startsAt: Date, round: number) {
   date.setDate(startsAt.getDate() + round);
   date.setHours(18, 30, 0, 0);
   return date;
+}
+
+function duesWindow(startsAt: Date) {
+  return {
+    opensAt: new Date(startsAt.getTime() - duesWindowMs),
+    closesAt: startsAt
+  };
+}
+
+function isDuesWindowOpen(startsAt: Date, now = new Date()) {
+  const window = duesWindow(startsAt);
+  return now.getTime() >= window.opensAt.getTime() && now.getTime() < window.closesAt.getTime();
 }
 
 function nextDivision(division: string) {
@@ -269,6 +284,7 @@ type TeamSinglePlayer = {
   fftRanking: string;
   winPct: number;
   strength: number;
+  isEligible?: boolean;
 };
 
 function simulateSingleScore(winner: "home" | "away", seed: string) {
@@ -319,21 +335,50 @@ async function entryLineup(entry: {
   id: string;
   name: string;
   strength: number;
+  championshipId: string;
   teamId: string | null;
 }) {
   if (!entry.teamId) return aiLineup(entry, entry.id);
-  const members = await prisma.clubTeamMember.findMany({
-    where: { teamId: entry.teamId },
-    include: { player: true },
-    orderBy: { slotIndex: "asc" }
+  const team = await prisma.clubTeam.findUnique({
+    where: { id: entry.teamId },
+    include: {
+      club: { include: { memberships: { include: { player: true } } } }
+    }
   });
-  if (!members.length) return aiLineup(entry, entry.id);
-  return members.map((member) => ({
-    name: `${member.player.firstName} ${member.player.lastName}`,
-    fftRanking: member.player.fftRanking,
-    winPct: winPercentage(member.player),
-    strength: member.player.overall
-  }));
+  if (!team) return aiLineup(entry, entry.id);
+  let eligibleMemberships = team.club.memberships;
+  if (team.club.duesAmount > 0) {
+    const payments = await prisma.clubDuePayment.findMany({
+      where: { clubId: team.clubId, championshipId: entry.championshipId },
+      select: { playerId: true }
+    });
+    const paidPlayerIds = new Set(payments.map((payment) => payment.playerId));
+    eligibleMemberships = eligibleMemberships.filter((membership) =>
+      paidPlayerIds.has(membership.playerId)
+    );
+  }
+  const starters = orderPlayersForSingles(
+    eligibleMemberships.map((membership) => membership.player),
+    `${entry.id}-${entry.championshipId}`
+  )
+    .slice(0, teamSize)
+    .map((player) => ({
+      name: `${player.firstName} ${player.lastName}`,
+      fftRanking: player.fftRanking,
+      winPct: winPercentage(player),
+      strength: player.overall,
+      isEligible: true
+    }));
+  while (starters.length < teamSize) {
+    starters.push({
+      name: `Place non éligible ${starters.length + 1}`,
+      fftRanking: "Cotisation",
+      winPct: 0,
+      strength: 1,
+      isEligible: false
+    });
+  }
+  return starters;
 }
 
 function simulateTeamMeeting(
@@ -554,6 +599,53 @@ async function settleTeamChampionship(championshipId: string) {
   }
 }
 
+async function clubDuesState(params: {
+  club: { id: string; duesAmount: number; memberships: Array<{ playerId: string }> };
+  championship: { id: string; startsAt: Date; status: string } | null;
+  currentPlayerId: string;
+}) {
+  if (!params.championship) {
+    return {
+      amount: params.club.duesAmount,
+      championshipId: null,
+      windowOpensAt: null,
+      windowClosesAt: null,
+      isWindowOpen: false,
+      currentPlayerPaid: params.club.duesAmount === 0,
+      currentPlayerCanPay: false,
+      paidCount: params.club.duesAmount === 0 ? params.club.memberships.length : 0,
+      eligibleCount: params.club.duesAmount === 0 ? params.club.memberships.length : 0,
+      paidPlayerIds: [] as string[]
+    };
+  }
+  const payments =
+    params.club.duesAmount > 0
+      ? await prisma.clubDuePayment.findMany({
+          where: { clubId: params.club.id, championshipId: params.championship.id },
+          select: { playerId: true }
+        })
+      : [];
+  const paidPlayerIds = payments.map((payment) => payment.playerId);
+  const paidSet = new Set(paidPlayerIds);
+  const window = duesWindow(params.championship.startsAt);
+  const windowOpen =
+    params.championship.status === "SCHEDULED" && isDuesWindowOpen(params.championship.startsAt);
+  const currentPlayerPaid =
+    params.club.duesAmount === 0 || paidSet.has(params.currentPlayerId);
+  return {
+    amount: params.club.duesAmount,
+    championshipId: params.championship.id,
+    windowOpensAt: window.opensAt,
+    windowClosesAt: window.closesAt,
+    isWindowOpen: windowOpen,
+    currentPlayerPaid,
+    currentPlayerCanPay: windowOpen && params.club.duesAmount > 0 && !currentPlayerPaid,
+    paidCount: params.club.duesAmount === 0 ? params.club.memberships.length : paidPlayerIds.length,
+    eligibleCount: params.club.duesAmount === 0 ? params.club.memberships.length : paidPlayerIds.length,
+    paidPlayerIds
+  };
+}
+
 clubsRouter.get("/", requireAuth, async (request, response) => {
   const player = await currentPlayer(request.session!.userId);
   if (!player) return response.status(404).json({ message: "Joueur introuvable." });
@@ -676,6 +768,12 @@ clubsRouter.get("/team-championship", requireAuth, async (request, response) => 
     : [];
   const nextMeeting =
     championship?.meetings.find((meeting) => meeting.status === "SCHEDULED") ?? null;
+  const dues = await clubDuesState({
+    club,
+    championship,
+    currentPlayerId: player.id
+  });
+  const paidPlayerIds = new Set(dues.paidPlayerIds);
   return response.json({
     divisions: teamChampionshipDivisions,
     club: clubSummary(club),
@@ -687,6 +785,7 @@ clubsRouter.get("/team-championship", requireAuth, async (request, response) => 
           members: currentTeam.members.map((member) => ({
             id: member.id,
             slotIndex: member.slotIndex,
+            duesPaid: dues.amount === 0 || paidPlayerIds.has(member.player.id),
             player: playerSummary(member.player)
           }))
         }
@@ -713,9 +812,72 @@ clubsRouter.get("/team-championship", requireAuth, async (request, response) => 
           }))
         }
       : null,
+    dues,
     canCreateTeam,
     canStartChampionship: Boolean(team && (!championship || championship.status === "COMPLETED"))
   });
+});
+
+clubsRouter.post("/dues/pay", requireAuth, async (request, response) => {
+  const player = await currentPlayer(request.session!.userId);
+  if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+  const membership = await prisma.clubMembership.findUnique({
+    where: { playerId: player.id },
+    include: { club: { include: { team: true, memberships: { select: { playerId: true } } } } }
+  });
+  if (!membership?.club) return response.status(404).json({ message: "Vous n'avez pas de club." });
+  if (!membership.club.team)
+    return response.status(404).json({ message: "Aucun championnat par équipe n'est planifié." });
+  if (membership.club.duesAmount <= 0)
+    return response.status(400).json({ message: "Ce club n'a pas fixé de cotisation." });
+  const latestEntry = await prisma.teamChampionshipEntry.findFirst({
+    where: { teamId: membership.club.team.id },
+    include: { championship: true },
+    orderBy: { championship: { startsAt: "desc" } }
+  });
+  if (!latestEntry || latestEntry.championship.status === "COMPLETED")
+    return response.status(404).json({ message: "Aucun prochain championnat n'est planifié." });
+  await settleTeamChampionship(latestEntry.championshipId);
+  const championship = await prisma.teamChampionship.findUnique({
+    where: { id: latestEntry.championshipId }
+  });
+  if (!championship || championship.status !== "SCHEDULED")
+    return response.status(409).json({ message: "La cotisation n'est plus ouverte." });
+  if (!isDuesWindowOpen(championship.startsAt))
+    return response.status(403).json({
+      message: "La cotisation ouvre 7 jours avant le début du championnat."
+    });
+  const existing = await prisma.clubDuePayment.findUnique({
+    where: {
+      clubId_playerId_championshipId: {
+        clubId: membership.clubId,
+        playerId: player.id,
+        championshipId: championship.id
+      }
+    }
+  });
+  if (existing) return response.status(409).json({ message: "Cotisation déjà payée." });
+  if (player.budget < membership.club.duesAmount)
+    return response.status(400).json({ message: "Budget insuffisant pour payer la cotisation." });
+  const payment = await prisma.$transaction(async (tx) => {
+    await tx.player.update({
+      where: { id: player.id },
+      data: { budget: { decrement: membership.club.duesAmount } }
+    });
+    await tx.club.update({
+      where: { id: membership.clubId },
+      data: { budget: { increment: membership.club.duesAmount } }
+    });
+    return tx.clubDuePayment.create({
+      data: {
+        clubId: membership.clubId,
+        playerId: player.id,
+        championshipId: championship.id,
+        amount: membership.club.duesAmount
+      }
+    });
+  });
+  return response.status(201).json({ payment });
 });
 
 clubsRouter.post("/team", requireAuth, async (request, response) => {
@@ -808,6 +970,7 @@ clubsRouter.post("/", requireAuth, validateBody(clubCreateSchema), async (reques
           tag: request.body.tag,
           description: request.body.description,
           minimumRanking: request.body.minimumRanking,
+          duesAmount: request.body.duesAmount,
           maxSlots: 5,
           presidentId: player.id
         }
@@ -852,7 +1015,8 @@ clubsRouter.patch(
       where: { id: membership.clubId },
       data: {
         description: request.body.description,
-        minimumRanking: request.body.minimumRanking
+        minimumRanking: request.body.minimumRanking,
+        duesAmount: request.body.duesAmount
       },
       include: clubInclude
     });

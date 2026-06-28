@@ -88,6 +88,7 @@ model Player {
   clubPresidencies         Club[]                   @relation("ClubPresident")
   clubMembership           ClubMembership?
   clubJoinRequests         ClubJoinRequest[]
+  clubDuePayments          ClubDuePayment[]
   clubTeamMemberships      ClubTeamMember[]
 }
 
@@ -97,6 +98,7 @@ model Club {
   tag            String            @unique
   description    String            @default("")
   minimumRanking String            @default("NC")
+  duesAmount     Int               @default(0)
   budget         Int               @default(0)
   maxSlots       Int               @default(5)
   presidentId    String
@@ -106,6 +108,7 @@ model Club {
   memberships    ClubMembership[]
   joinRequests   ClubJoinRequest[]
   team           ClubTeam?
+  duePayments    ClubDuePayment[]
 
   @@index([presidentId])
 }
@@ -137,14 +140,15 @@ model ClubTeamMember {
 }
 
 model TeamChampionship {
-  id        String                    @id @default(cuid())
-  division  String
-  startsAt  DateTime
-  endsAt    DateTime
-  status    String                    @default("SCHEDULED")
-  createdAt DateTime                  @default(now())
-  entries   TeamChampionshipEntry[]
-  meetings  TeamChampionshipMeeting[]
+  id          String                    @id @default(cuid())
+  division    String
+  startsAt    DateTime
+  endsAt      DateTime
+  status      String                    @default("SCHEDULED")
+  createdAt   DateTime                  @default(now())
+  entries     TeamChampionshipEntry[]
+  meetings    TeamChampionshipMeeting[]
+  duePayments ClubDuePayment[]
 
   @@index([division, startsAt])
 }
@@ -207,6 +211,22 @@ model ClubMembership {
 
   @@unique([clubId, playerId])
   @@index([clubId])
+}
+
+model ClubDuePayment {
+  id             String           @id @default(cuid())
+  clubId         String
+  club           Club             @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  playerId       String
+  player         Player           @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  championshipId String
+  championship   TeamChampionship @relation(fields: [championshipId], references: [id], onDelete: Cascade)
+  amount         Int
+  paidAt         DateTime         @default(now())
+
+  @@unique([clubId, playerId, championshipId])
+  @@index([playerId])
+  @@index([championshipId])
 }
 
 model ClubJoinRequest {

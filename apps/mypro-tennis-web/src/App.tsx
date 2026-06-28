@@ -506,6 +506,7 @@ type ClubListItem = {
   tag: string;
   description: string;
   minimumRanking: string;
+  duesAmount: number;
   budget: number;
   competitiveLevel: string;
   maxSlots: number;
@@ -588,7 +589,12 @@ type TeamChampionshipData = {
     id: string;
     name: string;
     division: string;
-    members: Array<{ id: string; slotIndex: number; player: ClubPlayerSummary }>;
+    members: Array<{
+      id: string;
+      slotIndex: number;
+      duesPaid: boolean;
+      player: ClubPlayerSummary;
+    }>;
   } | null;
   championship: {
     id: string;
@@ -600,6 +606,18 @@ type TeamChampionshipData = {
     nextMeeting: TeamChampionshipMeeting | null;
     meetings: TeamChampionshipMeeting[];
   } | null;
+  dues: {
+    amount: number;
+    championshipId: string | null;
+    windowOpensAt: string | null;
+    windowClosesAt: string | null;
+    isWindowOpen: boolean;
+    currentPlayerPaid: boolean;
+    currentPlayerCanPay: boolean;
+    paidCount: number;
+    eligibleCount: number;
+    paidPlayerIds: string[];
+  };
   canCreateTeam: boolean;
   canStartChampionship: boolean;
 };
@@ -3445,6 +3463,7 @@ function ClubPlayerRow({ player, badge }: { player: ClubPlayerSummary; badge?: R
 }
 
 function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
+  const refresh = useGameStore((state) => state.refresh);
   const [data, setData] = useState<TeamChampionshipData | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -3481,6 +3500,21 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
     }
   }
 
+  async function payDues() {
+    setMessage("");
+    setBusy(true);
+    try {
+      await api("/clubs/dues/pay", { method: "POST" });
+      await refresh();
+      await loadTeamChampionship();
+      setMessage("Cotisation payée. Le budget du club a été crédité.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Paiement impossible.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!data)
     return <section className="panel p-5">Championnat par équipe en chargement...</section>;
 
@@ -3492,6 +3526,13 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
   const promotionEnabled = Boolean(championship && championship.division !== highestDivision);
   const relegationEnabled = Boolean(championship && championship.division !== lowestDivision);
   const relegationRank = championship?.standings.length ?? 0;
+  const dues = data.dues;
+  const duesWindowLabel =
+    dues.windowOpensAt && dues.windowClosesAt
+      ? `${new Date(dues.windowOpensAt).toLocaleString("fr-FR")} → ${new Date(
+          dues.windowClosesAt
+        ).toLocaleString("fr-FR")}`
+      : "À partir de 7 jours avant le prochain championnat";
 
   return (
     <section className="panel p-5">
@@ -3526,6 +3567,49 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
         </div>
       ) : null}
 
+      <article className="mt-4 rounded-md border border-white/10 bg-white/[0.04] p-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h3 className="font-black">Cotisation championnat</h3>
+            <p className="mt-1 text-sm text-slate-300">
+              Elle donne accès aux futures infrastructures du club, aux améliorations du club et à
+              l'éligibilité pour la titularisation en championnat par équipe.
+            </p>
+            <p className="mt-2 text-xs text-slate-400">Fenêtre : {duesWindowLabel}</p>
+          </div>
+          <div className="grid gap-2 text-right">
+            <strong className="text-2xl">{dues.amount.toLocaleString("fr-FR")} €</strong>
+            <span className="text-sm text-slate-300">
+              {dues.amount === 0
+                ? "Aucune cotisation"
+                : dues.currentPlayerPaid
+                  ? "Cotisation payée"
+                  : dues.isWindowOpen
+                    ? "Paiement ouvert"
+                    : "Paiement fermé"}
+            </span>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <Metric label="Joueurs à jour" value={`${dues.eligibleCount}/${club.memberCount}`} />
+          <Metric
+            label="Budget club"
+            value={`${(data.club?.budget ?? club.budget).toLocaleString("fr-FR")} €`}
+          />
+          <Metric
+            label="Statut"
+            value={
+              dues.amount === 0 ? "Accès libre" : dues.currentPlayerPaid ? "À jour" : "Non payé"
+            }
+          />
+        </div>
+        {dues.currentPlayerCanPay ? (
+          <Button className="mt-4" disabled={busy} onClick={() => void payDues()}>
+            Payer ma cotisation · {dues.amount.toLocaleString("fr-FR")} €
+          </Button>
+        ) : null}
+      </article>
+
       {!data.team ? (
         <div className="mt-4 rounded-md border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">
           {club.memberCount >= 5
@@ -3538,7 +3622,14 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
         <div className="mt-5 grid gap-5">
           <div className="grid gap-3 sm:grid-cols-4">
             <Metric label="Division" value={data.team.division} />
-            <Metric label="Titulaires" value={`${data.team.members.length}/5`} />
+            <Metric
+              label="Titulaires"
+              value={
+                dues.amount > 0 && championship
+                  ? `${Math.min(dues.eligibleCount, 5)}/5 à jour`
+                  : `${data.team.members.length}/5`
+              }
+            />
             <Metric label="Classement" value={playerStanding ? `${playerStanding.rank}e` : "-"} />
             <Metric label="Points" value={playerStanding?.points ?? 0} />
           </div>
@@ -3551,6 +3642,11 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                 badge={
                   <span className="rounded-md bg-emerald-300/10 px-2 py-1 text-xs font-bold text-emerald-100">
                     N°{member.slotIndex}
+                    {dues.amount > 0 && championship
+                      ? member.duesPaid
+                        ? " · À jour"
+                        : " · Non payé"
+                      : ""}
                   </span>
                 }
               />
@@ -3729,9 +3825,14 @@ function ClubPage() {
     name: "",
     tag: "",
     description: "",
-    minimumRanking: "NC"
+    minimumRanking: "NC",
+    duesAmount: 0
   });
-  const [settingsForm, setSettingsForm] = useState({ description: "", minimumRanking: "NC" });
+  const [settingsForm, setSettingsForm] = useState({
+    description: "",
+    minimumRanking: "NC",
+    duesAmount: 0
+  });
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const clubCreationCost = 5000;
@@ -3752,10 +3853,11 @@ function ClubPage() {
     if (data?.club) {
       setSettingsForm({
         description: data.club.description,
-        minimumRanking: data.club.minimumRanking
+        minimumRanking: data.club.minimumRanking,
+        duesAmount: data.club.duesAmount
       });
     }
-  }, [data?.club?.id, data?.club?.description, data?.club?.minimumRanking]);
+  }, [data?.club?.id, data?.club?.description, data?.club?.minimumRanking, data?.club?.duesAmount]);
 
   async function createClub(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -3767,7 +3869,7 @@ function ClubPage() {
         body: JSON.stringify(form)
       });
       setData({ club, pendingRequest: null });
-      setForm({ name: "", tag: "", description: "", minimumRanking: "NC" });
+      setForm({ name: "", tag: "", description: "", minimumRanking: "NC", duesAmount: 0 });
       await refresh();
       await loadClubData();
     } catch (error) {
@@ -3853,11 +3955,12 @@ function ClubPage() {
               </div>
             </div>
           </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
             <Metric label="Président" value={club.president.name} />
             <Metric label="Membres" value={club.memberCount} />
             <Metric label="Places libres" value={club.openSlots} />
             <Metric label="Classement requis" value={club.minimumRanking} />
+            <Metric label="Cotisation" value={`${club.duesAmount.toLocaleString("fr-FR")} €`} />
             <Metric label="Niveau compétitif" value={club.competitiveLevel} />
             <Metric label="Budget du club" value={`${club.budget.toLocaleString("fr-FR")} €`} />
           </div>
@@ -3912,6 +4015,21 @@ function ClubPage() {
                   </option>
                 ))}
               </select>
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-slate-300">Cotisation par joueur</span>
+              <Field
+                min={0}
+                max={50000}
+                onChange={(event) =>
+                  setSettingsForm((current) => ({
+                    ...current,
+                    duesAmount: Math.max(0, Number(event.target.value) || 0)
+                  }))
+                }
+                type="number"
+                value={settingsForm.duesAmount}
+              />
             </label>
             <Button disabled={busy === "settings"}>Enregistrer les paramètres</Button>
           </form>
@@ -4061,6 +4179,21 @@ function ClubPage() {
               ))}
             </select>
           </label>
+          <label className="grid gap-1 text-sm">
+            <span className="text-slate-300">Cotisation par joueur</span>
+            <Field
+              min={0}
+              max={50000}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  duesAmount: Math.max(0, Number(event.target.value) || 0)
+                }))
+              }
+              type="number"
+              value={form.duesAmount}
+            />
+          </label>
           {!canCreateClub ? (
             <p className="rounded-md border border-amber-300/30 bg-amber-300/10 p-3 text-sm text-amber-100">
               Budget insuffisant pour fonder un club.
@@ -4102,6 +4235,9 @@ function ClubPage() {
                         </p>
                         <p className="mt-1 text-sm text-cyan-100">
                           Classement requis : {club.minimumRanking} minimum
+                        </p>
+                        <p className="mt-1 text-sm text-slate-300">
+                          Cotisation : {club.duesAmount.toLocaleString("fr-FR")} €
                         </p>
                         {club.description ? (
                           <p className="mt-2 text-sm text-slate-400">{club.description}</p>
