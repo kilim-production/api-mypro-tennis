@@ -669,6 +669,10 @@ function complexBuildingForClub(club: ClubDetails): ClubBuilding {
   };
 }
 
+function complexLevelImage(level: number) {
+  return `/visuals/club/complex-level-${level}.jpg`;
+}
+
 function fallbackDuesState(
   club: ClubDetails,
   data?: Pick<TeamChampionshipData, "dues" | "club" | "championship"> | null
@@ -4107,60 +4111,98 @@ function ClubPage() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <article className="rounded-md border border-emerald-300/25 bg-slate-950/70 p-4 shadow-xl shadow-emerald-950/20">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <span className="grid h-12 w-12 place-items-center rounded-md border border-emerald-300/30 bg-emerald-300/10 text-emerald-200">
-                    <Building2 size={24} />
-                  </span>
-                  <div>
-                    <h3 className="text-xl font-black">{complexBuilding.name}</h3>
-                    <p className="text-sm text-slate-300">
-                      Niveau {complexBuilding.currentLevel.level}/{complexBuilding.maxLevel} -{" "}
-                      {complexBuilding.currentLevel.name}
-                    </p>
+          <div className="mt-5 grid gap-4">
+            <article className="overflow-hidden rounded-md border border-emerald-300/25 bg-slate-950/70 shadow-xl shadow-emerald-950/20">
+              <div className="relative min-h-64">
+                <img
+                  alt={`Illustration ${complexBuilding.currentLevel.name}`}
+                  className="absolute inset-0 h-full w-full object-cover"
+                  src={complexLevelImage(complexBuilding.currentLevel.level)}
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/65 to-slate-950/10" />
+                <div className="relative z-10 flex min-h-64 flex-col justify-end p-5">
+                  <div className="flex flex-wrap items-end justify-between gap-4">
+                    <div>
+                      <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-emerald-300/30 bg-emerald-300/15 px-3 py-2 text-sm font-black text-emerald-100">
+                        <Building2 size={18} />
+                        Niveau actuel
+                      </div>
+                      <h3 className="text-3xl font-black">{complexBuilding.name}</h3>
+                      <p className="mt-1 max-w-xl text-sm text-slate-200">
+                        Niveau {complexBuilding.currentLevel.level}/{complexBuilding.maxLevel} -{" "}
+                        {complexBuilding.currentLevel.name}
+                      </p>
+                    </div>
+                    <div className="rounded-md border border-emerald-300/35 bg-slate-950/70 px-4 py-3 text-right backdrop-blur">
+                      <div className="text-xs uppercase tracking-[0.18em] text-emerald-200">
+                        Capacité
+                      </div>
+                      <div className="text-2xl font-black">
+                        {complexBuilding.currentLevel.maxSlots} joueurs
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <span className="rounded-md bg-emerald-300/15 px-2 py-1 text-xs font-black text-emerald-200">
-                  {complexBuilding.currentLevel.maxSlots} slots
-                </span>
               </div>
 
-              <div className="mt-4 grid gap-2">
+              <div className="grid gap-3 p-4 md:grid-cols-5">
                 {complexBuilding.levels.map((level) => {
-                  const isUnlocked = level.level <= complexBuilding.currentLevel.level;
-                  const isNext = level.level === complexBuilding.currentLevel.level + 1;
+                  const isCurrent = level.level === complexBuilding.currentLevel.level;
+                  const isUnlocked = level.level < complexBuilding.currentLevel.level;
+                  const isLocked = level.level > complexBuilding.currentLevel.level;
                   return (
                     <div
-                      className={`rounded-md border p-3 ${
-                        isUnlocked
-                          ? "border-emerald-300/35 bg-emerald-300/10"
-                          : isNext
-                            ? "border-cyan-300/35 bg-cyan-300/10"
-                            : "border-white/10 bg-white/[0.03]"
+                      className={`overflow-hidden rounded-md border bg-white/[0.04] ${
+                        isCurrent
+                          ? "border-emerald-300 shadow-lg shadow-emerald-950/30"
+                          : isUnlocked
+                            ? "border-white/15"
+                            : "border-white/10"
                       }`}
                       key={level.level}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="font-black">
-                            Niveau {level.level} - {level.name}
-                          </p>
-                          <p className="text-sm text-slate-300">
-                            Capacité du club : {level.maxSlots} joueurs
-                          </p>
-                        </div>
-                        <span className="text-sm font-bold text-slate-200">
-                          {level.cost === 0 ? "Débloqué" : `${level.cost.toLocaleString("fr-FR")} €`}
+                      <div className="relative aspect-[16/10] overflow-hidden">
+                        <img
+                          alt={`Complexe niveau ${level.level} - ${level.name}`}
+                          className={`h-full w-full object-cover transition ${
+                            isLocked ? "grayscale opacity-35" : isCurrent ? "" : "opacity-75"
+                          }`}
+                          src={complexLevelImage(level.level)}
+                        />
+                        <div
+                          className={`absolute inset-0 ${
+                            isCurrent
+                              ? "bg-gradient-to-t from-emerald-950/55 to-transparent"
+                              : isLocked
+                                ? "bg-slate-950/55"
+                                : "bg-slate-950/20"
+                          }`}
+                        />
+                        <span
+                          className={`absolute left-2 top-2 rounded-md px-2 py-1 text-xs font-black ${
+                            isCurrent
+                              ? "bg-emerald-300 text-slate-950"
+                              : isLocked
+                                ? "bg-slate-950/75 text-slate-300"
+                                : "bg-white/15 text-slate-100"
+                          }`}
+                        >
+                          Niv. {level.level}
                         </span>
+                      </div>
+                      <div className="p-3">
+                        <p className="text-sm font-black leading-tight">{level.name}</p>
+                        <p className="mt-1 text-xs text-slate-300">{level.maxSlots} joueurs</p>
+                        <p className="mt-2 text-xs font-bold text-slate-200">
+                          {level.cost === 0 ? "Débloqué" : `${level.cost.toLocaleString("fr-FR")} €`}
+                        </p>
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              <div className="mt-4 rounded-md border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-300">
+              <div className="mx-4 rounded-md border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-300">
                 {complexNextLevel ? (
                   <>
                     Prochaine amélioration :{" "}
@@ -4172,7 +4214,7 @@ function ClubPage() {
                 )}
               </div>
 
-              <div className="mt-4">
+              <div className="p-4">
                 {club.isPresident && complexNextLevel ? (
                   <Button
                     className="w-full"
