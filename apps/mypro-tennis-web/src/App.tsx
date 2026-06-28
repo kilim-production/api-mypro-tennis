@@ -506,7 +506,7 @@ type ClubListItem = {
   tag: string;
   description: string;
   minimumRanking: string;
-  duesAmount: number;
+  duesAmount?: number;
   budget: number;
   competitiveLevel: string;
   maxSlots: number;
@@ -592,7 +592,7 @@ type TeamChampionshipData = {
     members: Array<{
       id: string;
       slotIndex: number;
-      duesPaid: boolean;
+      duesPaid?: boolean;
       player: ClubPlayerSummary;
     }>;
   } | null;
@@ -606,7 +606,7 @@ type TeamChampionshipData = {
     nextMeeting: TeamChampionshipMeeting | null;
     meetings: TeamChampionshipMeeting[];
   } | null;
-  dues: {
+  dues?: {
     amount: number;
     championshipId: string | null;
     windowOpensAt: string | null;
@@ -621,6 +621,31 @@ type TeamChampionshipData = {
   canCreateTeam: boolean;
   canStartChampionship: boolean;
 };
+
+function clubDuesAmount(club: Pick<ClubListItem, "duesAmount"> | null | undefined) {
+  return typeof club?.duesAmount === "number" ? club.duesAmount : 0;
+}
+
+function fallbackDuesState(
+  club: ClubDetails,
+  data?: Pick<TeamChampionshipData, "dues" | "club" | "championship"> | null
+) {
+  const amount = data?.dues?.amount ?? clubDuesAmount(data?.club ?? club);
+  return (
+    data?.dues ?? {
+      amount,
+      championshipId: data?.championship?.id ?? null,
+      windowOpensAt: null,
+      windowClosesAt: null,
+      isWindowOpen: false,
+      currentPlayerPaid: amount === 0,
+      currentPlayerCanPay: false,
+      paidCount: amount === 0 ? club.memberCount : 0,
+      eligibleCount: amount === 0 ? club.memberCount : 0,
+      paidPlayerIds: []
+    }
+  );
+}
 type ChestRarity = "Bronze" | "Argent" | "Or" | "Légendaire" | "Mythique";
 const rarityWeight: Record<ChestRarity, number> = {
   Mythique: 5,
@@ -3469,7 +3494,24 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
   const [busy, setBusy] = useState(false);
 
   async function loadTeamChampionship() {
-    setData(await api<TeamChampionshipData>("/clubs/team-championship"));
+    try {
+      setData(await api<TeamChampionshipData>("/clubs/team-championship"));
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Championnat par équipe momentanément indisponible."
+      );
+      setData({
+        divisions: [],
+        club: null,
+        team: null,
+        championship: null,
+        dues: fallbackDuesState(club),
+        canCreateTeam: false,
+        canStartChampionship: false
+      });
+    }
   }
 
   useEffect(() => void loadTeamChampionship(), []);
@@ -3521,12 +3563,12 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
   const championship = data.championship;
   const nextMeeting = championship?.nextMeeting;
   const playerStanding = championship?.standings.find((entry) => entry.isPlayerClub);
-  const lowestDivision = data.divisions[0];
-  const highestDivision = data.divisions[data.divisions.length - 1];
+  const lowestDivision = data.divisions[0] ?? "";
+  const highestDivision = data.divisions[data.divisions.length - 1] ?? "";
   const promotionEnabled = Boolean(championship && championship.division !== highestDivision);
   const relegationEnabled = Boolean(championship && championship.division !== lowestDivision);
   const relegationRank = championship?.standings.length ?? 0;
-  const dues = data.dues;
+  const dues = fallbackDuesState(club, data);
   const duesWindowLabel =
     dues.windowOpensAt && dues.windowClosesAt
       ? `${new Date(dues.windowOpensAt).toLocaleString("fr-FR")} → ${new Date(
@@ -3643,7 +3685,7 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                   <span className="rounded-md bg-emerald-300/10 px-2 py-1 text-xs font-bold text-emerald-100">
                     N°{member.slotIndex}
                     {dues.amount > 0 && championship
-                      ? member.duesPaid
+                      ? (member.duesPaid ?? dues.amount === 0)
                         ? " · À jour"
                         : " · Non payé"
                       : ""}
@@ -3854,7 +3896,7 @@ function ClubPage() {
       setSettingsForm({
         description: data.club.description,
         minimumRanking: data.club.minimumRanking,
-        duesAmount: data.club.duesAmount
+        duesAmount: clubDuesAmount(data.club)
       });
     }
   }, [data?.club?.id, data?.club?.description, data?.club?.minimumRanking, data?.club?.duesAmount]);
@@ -3960,7 +4002,7 @@ function ClubPage() {
             <Metric label="Membres" value={club.memberCount} />
             <Metric label="Places libres" value={club.openSlots} />
             <Metric label="Classement requis" value={club.minimumRanking} />
-            <Metric label="Cotisation" value={`${club.duesAmount.toLocaleString("fr-FR")} €`} />
+            <Metric label="Cotisation" value={`${clubDuesAmount(club).toLocaleString("fr-FR")} €`} />
             <Metric label="Niveau compétitif" value={club.competitiveLevel} />
             <Metric label="Budget du club" value={`${club.budget.toLocaleString("fr-FR")} €`} />
           </div>
@@ -4237,7 +4279,7 @@ function ClubPage() {
                           Classement requis : {club.minimumRanking} minimum
                         </p>
                         <p className="mt-1 text-sm text-slate-300">
-                          Cotisation : {club.duesAmount.toLocaleString("fr-FR")} €
+                          Cotisation : {clubDuesAmount(club).toLocaleString("fr-FR")} €
                         </p>
                         {club.description ? (
                           <p className="mt-2 text-sm text-slate-400">{club.description}</p>
