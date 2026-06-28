@@ -10,6 +10,13 @@ export const clubsRouter = Router();
 const clubCreationCost = 5000;
 const teamSize = 5;
 const duesWindowMs = 7 * 24 * 60 * 60 * 1000;
+const clubComplexLevels = [
+  { level: 1, name: "Club municipal", cost: 0, maxSlots: 5 },
+  { level: 2, name: "Club intercommunal", cost: 10_000, maxSlots: 10 },
+  { level: 3, name: "Club départemental", cost: 50_000, maxSlots: 20 },
+  { level: 4, name: "Club régional", cost: 300_000, maxSlots: 35 },
+  { level: 5, name: "Club de référence nationale", cost: 2_000_000, maxSlots: 50 }
+] as const;
 const teamChampionshipDivisions = [
   "Départementale 4",
   "Départementale 3",
@@ -55,6 +62,29 @@ function playerSummary(player: ClubWithDetails["memberships"][number]["player"])
   };
 }
 
+function clubComplexLevel(level: number) {
+  return (
+    clubComplexLevels.find((definition) => definition.level === level) ?? clubComplexLevels[0]
+  );
+}
+
+function clubBuildings(club: { complexLevel: number }) {
+  const currentLevel = clubComplexLevel(club.complexLevel);
+  const nextLevel = clubComplexLevels.find(
+    (definition) => definition.level === currentLevel.level + 1
+  );
+  return {
+    complex: {
+      id: "complex",
+      name: "Le complexe",
+      currentLevel,
+      nextLevel: nextLevel ?? null,
+      maxLevel: clubComplexLevels.length,
+      levels: clubComplexLevels
+    }
+  };
+}
+
 function clubSummary(club: {
   id: string;
   name: string;
@@ -63,6 +93,7 @@ function clubSummary(club: {
   minimumRanking: string;
   duesAmount: number;
   budget: number;
+  complexLevel: number;
   maxSlots: number;
   createdAt: Date;
   president: ClubWithDetails["president"];
@@ -78,6 +109,8 @@ function clubSummary(club: {
     minimumRanking: club.minimumRanking,
     duesAmount: club.duesAmount,
     budget: club.budget,
+    complexLevel: club.complexLevel,
+    buildings: clubBuildings(club),
     competitiveLevel,
     maxSlots: club.maxSlots,
     memberCount: club.memberships.length,
@@ -971,6 +1004,7 @@ clubsRouter.post("/", requireAuth, validateBody(clubCreateSchema), async (reques
           description: request.body.description,
           minimumRanking: request.body.minimumRanking,
           duesAmount: request.body.duesAmount,
+          complexLevel: 1,
           maxSlots: 5,
           presidentId: player.id
         }
@@ -1023,6 +1057,45 @@ clubsRouter.patch(
     return response.json(clubDetails(club, player.id));
   }
 );
+
+clubsRouter.post("/me/buildings/complex/upgrade", requireAuth, async (request, response) => {
+  const player = await currentPlayer(request.session!.userId);
+  if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+  const membership = await prisma.clubMembership.findUnique({
+    where: { playerId: player.id },
+    include: { club: true }
+  });
+  if (!membership?.club)
+    return response.status(404).json({ message: "Vous n'êtes membre d'aucun club." });
+  if (membership.club.presidentId !== player.id)
+    return response
+      .status(403)
+      .json({ message: "Seul le président peut améliorer les infrastructures du club." });
+
+  const currentLevel = clubComplexLevel(membership.club.complexLevel);
+  const nextLevel = clubComplexLevels.find(
+    (definition) => definition.level === currentLevel.level + 1
+  );
+  if (!nextLevel) {
+    return response.status(409).json({ message: "Le Complexe est déjà au niveau maximum." });
+  }
+  if (membership.club.budget < nextLevel.cost) {
+    return response.status(400).json({
+      message: `Budget du club insuffisant. Amélioration requise : ${nextLevel.cost.toLocaleString("fr-FR")} €.`
+    });
+  }
+
+  const club = await prisma.club.update({
+    where: { id: membership.clubId },
+    data: {
+      budget: { decrement: nextLevel.cost },
+      complexLevel: nextLevel.level,
+      maxSlots: nextLevel.maxSlots
+    },
+    include: clubInclude
+  });
+  return response.json(clubDetails(club, player.id));
+});
 
 clubsRouter.post(
   "/:id/join",

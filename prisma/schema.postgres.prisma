@@ -100,6 +100,7 @@ model Club {
   minimumRanking String            @default("NC")
   duesAmount     Int               @default(0)
   budget         Int               @default(0)
+  complexLevel   Int               @default(1)
   maxSlots       Int               @default(5)
   presidentId    String
   president      Player            @relation("ClubPresident", fields: [presidentId], references: [id], onDelete: Restrict)

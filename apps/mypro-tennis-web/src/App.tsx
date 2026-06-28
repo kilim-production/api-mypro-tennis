@@ -17,6 +17,7 @@ import {
   Activity,
   BarChart3,
   Bell,
+  Building2,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
@@ -500,6 +501,20 @@ type ClubPlayerSummary = {
   worldRank: number;
   avatar: string;
 };
+type ClubBuildingLevel = {
+  level: number;
+  name: string;
+  cost: number;
+  maxSlots: number;
+};
+type ClubBuilding = {
+  id: string;
+  name: string;
+  currentLevel: ClubBuildingLevel;
+  nextLevel: ClubBuildingLevel | null;
+  maxLevel: number;
+  levels: ClubBuildingLevel[];
+};
 type ClubListItem = {
   id: string;
   name: string;
@@ -508,6 +523,10 @@ type ClubListItem = {
   minimumRanking: string;
   duesAmount?: number;
   budget: number;
+  complexLevel: number;
+  buildings?: {
+    complex: ClubBuilding;
+  };
   competitiveLevel: string;
   maxSlots: number;
   memberCount: number;
@@ -624,6 +643,30 @@ type TeamChampionshipData = {
 
 function clubDuesAmount(club: Pick<ClubListItem, "duesAmount"> | null | undefined) {
   return typeof club?.duesAmount === "number" ? club.duesAmount : 0;
+}
+
+const fallbackComplexLevels: ClubBuildingLevel[] = [
+  { level: 1, name: "Club municipal", cost: 0, maxSlots: 5 },
+  { level: 2, name: "Club intercommunal", cost: 10_000, maxSlots: 10 },
+  { level: 3, name: "Club départemental", cost: 50_000, maxSlots: 20 },
+  { level: 4, name: "Club régional", cost: 300_000, maxSlots: 35 },
+  { level: 5, name: "Club de référence nationale", cost: 2_000_000, maxSlots: 50 }
+];
+
+function complexBuildingForClub(club: ClubDetails): ClubBuilding {
+  if (club.buildings?.complex) return club.buildings.complex;
+  const level = Math.min(Math.max(club.complexLevel || 1, 1), fallbackComplexLevels.length);
+  const currentLevel = fallbackComplexLevels.find((definition) => definition.level === level)!;
+  return {
+    id: "complex",
+    name: "Le complexe",
+    currentLevel,
+    nextLevel:
+      fallbackComplexLevels.find((definition) => definition.level === currentLevel.level + 1) ??
+      null,
+    maxLevel: fallbackComplexLevels.length,
+    levels: fallbackComplexLevels
+  };
 }
 
 function fallbackDuesState(
@@ -3877,6 +3920,7 @@ function ClubPage() {
   });
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const clubCreationCost = 5000;
   const canCreateClub = player.budget >= clubCreationCost;
 
@@ -3931,9 +3975,26 @@ function ClubPage() {
         body: JSON.stringify(settingsForm)
       });
       setData((current) => ({ club, pendingRequest: current?.pendingRequest ?? null }));
+      setSettingsOpen(false);
       await loadClubData();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Modification impossible.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function upgradeComplex() {
+    setMessage("");
+    setBusy("complex-upgrade");
+    try {
+      const club = await api<ClubDetails>("/clubs/me/buildings/complex/upgrade", {
+        method: "POST"
+      });
+      setData((current) => ({ club, pendingRequest: current?.pendingRequest ?? null }));
+      await loadClubData();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Amélioration impossible.");
     } finally {
       setBusy(null);
     }
@@ -3975,6 +4036,11 @@ function ClubPage() {
 
   if (data.club) {
     const club = data.club;
+    const complexBuilding = complexBuildingForClub(club);
+    const complexNextLevel = complexBuilding.nextLevel;
+    const canUpgradeComplex = Boolean(
+      club.isPresident && complexNextLevel && club.budget >= complexNextLevel.cost
+    );
     return (
       <div className="grid gap-5">
         <section className="panel p-6">
@@ -3990,10 +4056,23 @@ function ClubPage() {
                 {club.description || "Club joueur de l'univers MyPro Tennis."}
               </p>
             </div>
-            <div className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-4 py-3 text-right">
-              <div className="text-xs uppercase tracking-[0.18em] text-emerald-200">Places</div>
-              <div className="text-2xl font-black">
-                {club.memberCount}/{club.maxSlots}
+            <div className="flex items-start gap-2">
+              {club.isPresident ? (
+                <button
+                  aria-label="Ouvrir les paramètres du club"
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-md border border-white/10 bg-white/[0.06] text-slate-100 transition hover:border-emerald-300/50 hover:bg-emerald-300/10 hover:text-emerald-200"
+                  onClick={() => setSettingsOpen(true)}
+                  title="Paramètres du club"
+                  type="button"
+                >
+                  <Settings size={20} />
+                </button>
+              ) : null}
+              <div className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-4 py-3 text-right">
+                <div className="text-xs uppercase tracking-[0.18em] text-emerald-200">Places</div>
+                <div className="text-2xl font-black">
+                  {club.memberCount}/{club.maxSlots}
+                </div>
               </div>
             </div>
           </div>
@@ -4014,68 +4093,205 @@ function ClubPage() {
           </div>
         ) : null}
 
+        <section className="panel p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.22em] text-emerald-300">
+                Infrastructures
+              </p>
+              <h2 className="mt-1 text-2xl font-black">Développement du club</h2>
+            </div>
+            <div className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-300">
+              Budget disponible :{" "}
+              <span className="font-black text-white">{club.budget.toLocaleString("fr-FR")} €</span>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <article className="rounded-md border border-emerald-300/25 bg-slate-950/70 p-4 shadow-xl shadow-emerald-950/20">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-12 w-12 place-items-center rounded-md border border-emerald-300/30 bg-emerald-300/10 text-emerald-200">
+                    <Building2 size={24} />
+                  </span>
+                  <div>
+                    <h3 className="text-xl font-black">{complexBuilding.name}</h3>
+                    <p className="text-sm text-slate-300">
+                      Niveau {complexBuilding.currentLevel.level}/{complexBuilding.maxLevel} -{" "}
+                      {complexBuilding.currentLevel.name}
+                    </p>
+                  </div>
+                </div>
+                <span className="rounded-md bg-emerald-300/15 px-2 py-1 text-xs font-black text-emerald-200">
+                  {complexBuilding.currentLevel.maxSlots} slots
+                </span>
+              </div>
+
+              <div className="mt-4 grid gap-2">
+                {complexBuilding.levels.map((level) => {
+                  const isUnlocked = level.level <= complexBuilding.currentLevel.level;
+                  const isNext = level.level === complexBuilding.currentLevel.level + 1;
+                  return (
+                    <div
+                      className={`rounded-md border p-3 ${
+                        isUnlocked
+                          ? "border-emerald-300/35 bg-emerald-300/10"
+                          : isNext
+                            ? "border-cyan-300/35 bg-cyan-300/10"
+                            : "border-white/10 bg-white/[0.03]"
+                      }`}
+                      key={level.level}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-black">
+                            Niveau {level.level} - {level.name}
+                          </p>
+                          <p className="text-sm text-slate-300">
+                            Capacité du club : {level.maxSlots} joueurs
+                          </p>
+                        </div>
+                        <span className="text-sm font-bold text-slate-200">
+                          {level.cost === 0 ? "Débloqué" : `${level.cost.toLocaleString("fr-FR")} €`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 rounded-md border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-300">
+                {complexNextLevel ? (
+                  <>
+                    Prochaine amélioration :{" "}
+                    <span className="font-bold text-white">{complexNextLevel.name}</span>,{" "}
+                    {complexNextLevel.maxSlots} slots joueur.
+                  </>
+                ) : (
+                  "Le Complexe est au niveau maximum."
+                )}
+              </div>
+
+              <div className="mt-4">
+                {club.isPresident && complexNextLevel ? (
+                  <Button
+                    className="w-full"
+                    disabled={busy === "complex-upgrade" || !canUpgradeComplex}
+                    onClick={() => void upgradeComplex()}
+                  >
+                    Améliorer pour {complexNextLevel.cost.toLocaleString("fr-FR")} €
+                  </Button>
+                ) : (
+                  <Button className="w-full bg-white/10 text-slate-100 hover:bg-white/15" disabled>
+                    {complexNextLevel ? "Président requis" : "Niveau maximum"}
+                  </Button>
+                )}
+                {club.isPresident && complexNextLevel && !canUpgradeComplex ? (
+                  <p className="mt-2 text-xs text-amber-200">
+                    Budget du club insuffisant pour cette amélioration.
+                  </p>
+                ) : null}
+              </div>
+            </article>
+          </div>
+        </section>
+
         <TeamChampionshipPanel club={club} />
 
-        {club.isPresident ? (
-          <form className="panel grid gap-4 p-5" onSubmit={updateClubSettings}>
-            <div>
-              <h2 className="text-xl font-black">Paramètres du club</h2>
-              <p className="mt-1 text-sm text-slate-300">
-                Ces informations sont visibles par les joueurs qui cherchent un club.
-              </p>
-            </div>
-            <label className="grid gap-1 text-sm">
-              <span className="text-slate-300">Description du club</span>
-              <textarea
-                className="min-h-24 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 outline-none focus:border-emerald-300"
-                maxLength={280}
-                onChange={(event) =>
-                  setSettingsForm((current) => ({
-                    ...current,
-                    description: event.target.value
-                  }))
-                }
-                placeholder="Ambition, rythme de jeu, profil recherché..."
-                value={settingsForm.description}
-              />
-            </label>
-            <label className="grid gap-1 text-sm">
-              <span className="text-slate-300">Classement minimum pour rejoindre</span>
-              <select
-                className="rounded-md border border-white/10 bg-slate-950 px-3 py-2"
-                onChange={(event) =>
-                  setSettingsForm((current) => ({
-                    ...current,
-                    minimumRanking: event.target.value
-                  }))
-                }
-                value={settingsForm.minimumRanking}
-              >
-                {fftPath.map((ranking) => (
-                  <option key={ranking} value={ranking}>
-                    {ranking}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-1 text-sm">
-              <span className="text-slate-300">Cotisation par joueur</span>
-              <Field
-                min={0}
-                max={50000}
-                onChange={(event) =>
-                  setSettingsForm((current) => ({
-                    ...current,
-                    duesAmount: Math.max(0, Number(event.target.value) || 0)
-                  }))
-                }
-                type="number"
-                value={settingsForm.duesAmount}
-              />
-            </label>
-            <Button disabled={busy === "settings"}>Enregistrer les paramètres</Button>
-          </form>
-        ) : null}
+        {club.isPresident && settingsOpen
+          ? createPortal(
+              <div className="fixed inset-0 z-[9999] grid place-items-center overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm">
+                <form
+                  className="panel w-full max-w-2xl p-6 shadow-2xl shadow-black/60"
+                  onSubmit={updateClubSettings}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-bold uppercase tracking-[0.22em] text-emerald-300">
+                        Paramètres
+                      </p>
+                      <h2 className="mt-1 text-2xl font-black">Paramètres du club</h2>
+                      <p className="mt-1 text-sm text-slate-300">
+                        Ces informations sont visibles par les joueurs qui cherchent un club.
+                      </p>
+                    </div>
+                    <button
+                      aria-label="Fermer les paramètres du club"
+                      className="rounded-md bg-white/10 p-2 text-slate-200 hover:bg-white/15"
+                      onClick={() => setSettingsOpen(false)}
+                      type="button"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <div className="mt-5 grid gap-4">
+                    <label className="grid gap-1 text-sm">
+                      <span className="text-slate-300">Description du club</span>
+                      <textarea
+                        className="min-h-28 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 outline-none focus:border-emerald-300"
+                        maxLength={280}
+                        onChange={(event) =>
+                          setSettingsForm((current) => ({
+                            ...current,
+                            description: event.target.value
+                          }))
+                        }
+                        placeholder="Ambition, rythme de jeu, profil recherché..."
+                        value={settingsForm.description}
+                      />
+                    </label>
+                    <label className="grid gap-1 text-sm">
+                      <span className="text-slate-300">Classement minimum pour rejoindre</span>
+                      <select
+                        className="rounded-md border border-white/10 bg-slate-950 px-3 py-2"
+                        onChange={(event) =>
+                          setSettingsForm((current) => ({
+                            ...current,
+                            minimumRanking: event.target.value
+                          }))
+                        }
+                        value={settingsForm.minimumRanking}
+                      >
+                        {fftPath.map((ranking) => (
+                          <option key={ranking} value={ranking}>
+                            {ranking}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="grid gap-1 text-sm">
+                      <span className="text-slate-300">Cotisation par joueur</span>
+                      <Field
+                        min={0}
+                        max={50000}
+                        onChange={(event) =>
+                          setSettingsForm((current) => ({
+                            ...current,
+                            duesAmount: Math.max(0, Number(event.target.value) || 0)
+                          }))
+                        }
+                        type="number"
+                        value={settingsForm.duesAmount}
+                      />
+                    </label>
+                  </div>
+                  <div className="mt-6 flex flex-wrap justify-end gap-2">
+                    <Button
+                      className="bg-white/10 text-slate-100 hover:bg-white/15"
+                      onClick={() => setSettingsOpen(false)}
+                      type="button"
+                    >
+                      Annuler
+                    </Button>
+                    <Button disabled={busy === "settings"} type="submit">
+                      Enregistrer
+                    </Button>
+                  </div>
+                </form>
+              </div>,
+              document.body
+            )
+          : null}
 
         <section className="grid gap-5 lg:grid-cols-[1fr_360px]">
           <article className="panel p-5">
