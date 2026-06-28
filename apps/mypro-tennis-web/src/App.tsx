@@ -36,6 +36,7 @@ import {
   LogIn,
   MoveDown,
   MoveUpRight,
+  MessageCircle,
   PackageOpen,
   Pause,
   Play,
@@ -73,6 +74,7 @@ import { API_URL, api, saveToken } from "./api";
 import { useGameStore, type GameNotification, type Player } from "./store";
 
 const socketUrl = import.meta.env.VITE_SOCKET_URL ?? "http://localhost:4000";
+const discordInviteUrl = import.meta.env.VITE_DISCORD_INVITE_URL ?? "";
 
 const nav = [
   ["Tableau de bord", "/dashboard", Activity],
@@ -84,6 +86,7 @@ const nav = [
   ["Historique", "/matches", History],
   ["Classement", "/rankings", BarChart3],
   ["Joueurs en ligne", "/online", Wifi],
+  ["Communauté", "/community", MessageCircle],
   ["Réglages", "/settings", Settings]
 ] as const;
 
@@ -1413,8 +1416,12 @@ function Shell({ children }: { children: React.ReactNode }) {
         ) : null}
         <main>{children}</main>
       </div>
-      <footer className="mx-auto max-w-7xl px-4 pb-5 text-center text-[11px] font-black uppercase tracking-[0.28em] text-slate-500">
-        KILIM GAMES PRODUCTION
+      <footer className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-3 px-4 pb-5 text-center text-[11px] font-black uppercase tracking-[0.28em] text-slate-500">
+        <span>KILIM GAMES PRODUCTION</span>
+        <span className="text-slate-700">·</span>
+        <Link className="transition hover:text-emerald-300" to="/community">
+          Communauté
+        </Link>
       </footer>
     </div>
   );
@@ -5384,6 +5391,160 @@ function ProfilePage() {
   );
 }
 
+function CommunityPage() {
+  const communitySections = [
+    {
+      title: "Discussion générale",
+      body: "Retrouvez les autres joueurs, échangez sur vos saisons et organisez vos rivalités.",
+      icon: MessageCircle
+    },
+    {
+      title: "Mises à jour",
+      body: "Suivez les nouvelles versions, équilibrages, corrections et prochaines fonctionnalités.",
+      icon: Sparkles
+    },
+    {
+      title: "Rapports de bug",
+      body: "Signalez clairement un problème avec le contexte, la page concernée et ce qui s'est produit.",
+      icon: Crosshair
+    },
+    {
+      title: "Suggestions",
+      body: "Proposez des idées de gameplay, d'économie, de clubs, de compétitions ou d'interface.",
+      icon: Target
+    }
+  ];
+  const newcomerSteps = [
+    {
+      title: "Lire les règles",
+      body: "Le joueur valide les règles du serveur avant d'accéder aux salons principaux.",
+      icon: CheckCircle2
+    },
+    {
+      title: "Choisir son profil",
+      body: "Rôle Joueur, Président de club, Testeur ou Créateur de contenu selon son envie.",
+      icon: UserPlus
+    },
+    {
+      title: "Se présenter",
+      body: "Pseudo, classement en jeu, club actuel et objectif de saison pour lancer les échanges.",
+      icon: Shield
+    },
+    {
+      title: "Trouver le bon salon",
+      body: "Clubs, duels, bugs, suggestions et annonces sont séparés pour garder le serveur lisible.",
+      icon: ChevronRight
+    }
+  ];
+  return (
+    <div className="grid gap-5">
+      <section className="panel overflow-hidden p-0">
+        <div className="relative min-h-72 p-6 md:p-8">
+          <div className="absolute inset-0 bg-[url('/visuals/club/complex-level-5.jpg')] bg-cover bg-center opacity-35" />
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/80 to-slate-950/35" />
+          <div className="relative z-10 max-w-3xl">
+            <div className="inline-flex items-center gap-2 rounded-md border border-emerald-300/25 bg-emerald-300/10 px-3 py-2 text-xs font-black uppercase tracking-[0.22em] text-emerald-200">
+              <MessageCircle size={15} />
+              Communauté MYPRO
+            </div>
+            <h1 className="mt-5 text-4xl font-black leading-tight text-white md:text-5xl">
+              Le club-house des joueurs.
+            </h1>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-200">
+              Rejoignez le Discord communautaire pour discuter, retrouver les mises à jour,
+              signaler un bug, proposer une idée et suivre l'évolution de MYPRO - TENNIS.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              {discordInviteUrl ? (
+                <a
+                  className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-emerald-300"
+                  href={discordInviteUrl}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  <MessageCircle size={17} />
+                  Rejoindre le Discord
+                </a>
+              ) : (
+                <Button disabled>
+                  <MessageCircle size={17} />
+                  Discord bientôt ouvert
+                </Button>
+              )}
+              <Link
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+                to="/club"
+              >
+                <Users size={17} />
+                Retour aux clubs
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2">
+        {communitySections.map(({ title, body, icon: Icon }) => (
+          <article className="panel p-5" key={title}>
+            <div className="flex items-start gap-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-emerald-300/25 bg-emerald-300/10 text-emerald-200">
+                <Icon size={21} />
+              </span>
+              <div>
+                <h2 className="text-lg font-black">{title}</h2>
+                <p className="mt-1 text-sm leading-6 text-slate-300">{body}</p>
+              </div>
+            </div>
+          </article>
+        ))}
+      </section>
+
+      <section className="panel p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.22em] text-emerald-300">
+              Nouveaux arrivants
+            </p>
+            <h2 className="mt-1 text-xl font-black">Parcours d'accueil Discord</h2>
+          </div>
+          <span className="rounded-md border border-emerald-300/25 bg-emerald-300/10 px-3 py-2 text-xs font-black uppercase tracking-[0.18em] text-emerald-100">
+            Onboarding
+          </span>
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-4">
+          {newcomerSteps.map(({ title, body, icon: Icon }, index) => (
+            <article className="rounded-md border border-white/10 bg-white/[0.04] p-4" key={title}>
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-md bg-emerald-300 text-slate-950">
+                  <Icon size={19} />
+                </span>
+                <span className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                  Étape {index + 1}
+                </span>
+              </div>
+              <h3 className="mt-4 font-black">{title}</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-300">{body}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel p-5">
+        <h2 className="text-xl font-black">Structure prévue du serveur</h2>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <Metric label="Accueil" value="#annonces · #règles · #présentations" />
+          <Metric label="Support" value="#bugs · #suggestions · #aide" />
+          <Metric label="Jeu" value="#clubs · #duels · #championnats" />
+        </div>
+        <p className="mt-4 text-sm leading-6 text-slate-300">
+          Le Discord sera le point de rencontre officiel pour suivre la progression du jeu et faire
+          remonter les retours de la communauté.
+        </p>
+      </section>
+    </div>
+  );
+}
+
 function SettingsPage() {
   const user = useGameStore((state) => state.user);
   const refresh = useGameStore((state) => state.refresh);
@@ -5578,6 +5739,7 @@ export function App() {
             </NeedAuth>
           }
         />
+        <Route path="/community" element={<CommunityPage />} />
         <Route path="/profile/:id" element={<ProfilePage />} />
         <Route
           path="/settings"

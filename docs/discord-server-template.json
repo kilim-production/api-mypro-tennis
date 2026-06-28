@@ -1,0 +1,68 @@
+{
+  "serverName": "MYPRO - TENNIS",
+  "description": "Communauté officielle de MYPRO - TENNIS, jeu navigateur et PWA de carrière tennis.",
+  "roles": [
+    { "name": "Kilim Games", "color": "#34D399" },
+    { "name": "Administrateur", "color": "#EF4444" },
+    { "name": "Modérateur", "color": "#38BDF8" },
+    { "name": "Support", "color": "#A78BFA" },
+    { "name": "Testeur", "color": "#FACC15" },
+    { "name": "Créateur de contenu", "color": "#F472B6" },
+    { "name": "Président de club", "color": "#22D3EE" },
+    { "name": "Joueur", "color": "#E5E7EB" },
+    { "name": "Nouveau", "color": "#94A3B8" }
+  ],
+  "categories": [
+    {
+      "name": "Accueil",
+      "channels": ["annonces", "règles", "bienvenue", "présentations", "faq"]
+    },
+    {
+      "name": "Jeu",
+      "channels": [
+        "discussion-générale",
+        "progression-fft",
+        "saison-en-cours",
+        "duels",
+        "classement",
+        "palmarès"
+      ]
+    },
+    {
+      "name": "Clubs",
+      "channels": [
+        "recrutement-clubs",
+        "présidents-de-club",
+        "championnat-par-équipe",
+        "marché-des-joueurs"
+      ]
+    },
+    {
+      "name": "Support et retours",
+      "channels": ["bugs", "suggestions", "équilibrage", "aide"]
+    },
+    {
+      "name": "Développement",
+      "channels": ["journal-des-mises-à-jour", "feuille-de-route", "votes-communauté"]
+    },
+    {
+      "name": "Vocal",
+      "voiceChannels": ["Club-house", "Duel en direct", "Réunion de club", "Support vocal"]
+    }
+  ],
+  "onboarding": {
+    "welcomeChannel": "bienvenue",
+    "rulesChannel": "règles",
+    "presentationChannel": "présentations",
+    "questions": [
+      {
+        "question": "Quel est votre profil ?",
+        "options": ["Joueur", "Président de club", "Testeur", "Créateur de contenu"]
+      },
+      {
+        "question": "Que voulez-vous suivre en priorité ?",
+        "options": ["Mises à jour", "Clubs", "Duels", "Bugs et support", "Suggestions"]
+      }
+    ]
+  }
+}

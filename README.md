@@ -208,6 +208,19 @@ Les tests Vitest couvrent :
 
 ## PWA
 
+## Communauté Discord
+
+La page `/community` prépare le lien vers le Discord officiel MYPRO - TENNIS.
+
+Configuration :
+
+```env
+VITE_DISCORD_INVITE_URL="https://discord.gg/..."
+```
+
+Le plan complet du serveur est documenté dans `docs/community-discord.md`.
+Un template structuré est disponible dans `docs/discord-server-template.json`.
+
 La PWA est configurée avec `vite-plugin-pwa`. Elle fournit :
 
 - manifeste ;
