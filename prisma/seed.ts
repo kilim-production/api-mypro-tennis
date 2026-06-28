@@ -89,6 +89,30 @@ function initials(firstName: string, lastName: string) {
   return `${firstName[0] ?? "M"}${lastName[0] ?? "P"}`.toUpperCase();
 }
 
+const personalPictureIds = [
+  "pp-01",
+  "pp-02",
+  "pp-03",
+  "pp-04",
+  "pp-05",
+  "pp-06",
+  "pp-07",
+  "pp-08",
+  "pp-09",
+  "pp-10"
+] as const;
+
+function avatarForIdentity(firstName: string, lastName: string, index: number) {
+  return JSON.stringify({
+    type: "picture-v1",
+    initials: initials(firstName, lastName),
+    picture: {
+      kind: "preset",
+      id: personalPictureIds[index % personalPictureIds.length] ?? "pp-01"
+    }
+  });
+}
+
 const genericAiFirstNames = firstNames
   .slice(0, 0)
   .concat([
@@ -222,7 +246,7 @@ async function seedAiPlayers() {
           dominantHand: profileIndex % 5 === 0 ? "Gauche" : "Droite",
           backhand: profileIndex % 3 === 0 ? "Une main" : "Deux mains",
           archetype,
-          avatar: initials(firstName, lastName),
+          avatar: avatarForIdentity(firstName, lastName, profileIndex),
           isAi: true,
           stats: JSON.stringify(stats),
           energy: Math.max(45, Math.min(96, 55 + Math.round(overall * 0.35) + (slot % 3) * 3)),

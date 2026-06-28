@@ -208,17 +208,26 @@ type StoredAvatarPayload = {
 const maxProfilePictureBytes = 120 * 1024;
 
 const personalPictures = [
-  { id: "pp-01", label: "Central", colors: ["#34d399", "#0f766e"], mark: "01" },
-  { id: "pp-02", label: "Azur", colors: ["#38bdf8", "#1d4ed8"], mark: "02" },
-  { id: "pp-03", label: "Corail", colors: ["#fb7185", "#be123c"], mark: "03" },
-  { id: "pp-04", label: "Or", colors: ["#facc15", "#92400e"], mark: "04" },
-  { id: "pp-05", label: "Indigo", colors: ["#818cf8", "#312e81"], mark: "05" },
-  { id: "pp-06", label: "Ardoise", colors: ["#cbd5e1", "#334155"], mark: "06" },
-  { id: "pp-07", label: "Menthe", colors: ["#99f6e4", "#0f766e"], mark: "07" },
-  { id: "pp-08", label: "Rubis", colors: ["#fda4af", "#9f1239"], mark: "08" },
-  { id: "pp-09", label: "Nuit", colors: ["#22d3ee", "#020617"], mark: "09" },
-  { id: "pp-10", label: "Blanc", colors: ["#f8fafc", "#64748b"], mark: "10" }
+  { id: "pp-01", label: "Central", image: "/profile-pictures/pp-01.jpg" },
+  { id: "pp-02", label: "Azur", image: "/profile-pictures/pp-02.jpg" },
+  { id: "pp-03", label: "Corail", image: "/profile-pictures/pp-03.jpg" },
+  { id: "pp-04", label: "Or", image: "/profile-pictures/pp-04.jpg" },
+  { id: "pp-05", label: "Indigo", image: "/profile-pictures/pp-05.jpg" },
+  { id: "pp-06", label: "Ardoise", image: "/profile-pictures/pp-06.jpg" },
+  { id: "pp-07", label: "Menthe", image: "/profile-pictures/pp-07.jpg" },
+  { id: "pp-08", label: "Rubis", image: "/profile-pictures/pp-08.jpg" },
+  { id: "pp-09", label: "Nuit", image: "/profile-pictures/pp-09.jpg" },
+  { id: "pp-10", label: "Blanc", image: "/profile-pictures/pp-10.jpg" }
 ] as const;
+
+function presetPictureForSeed(seed: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return personalPictures[(hash >>> 0) % personalPictures.length] ?? personalPictures[0];
+}
 
 function initialsFromName(firstName: string, lastName: string) {
   return `${firstName[0] ?? "M"}${lastName[0] ?? "P"}`.toUpperCase();
@@ -241,8 +250,16 @@ function parseAvatar(avatar: string): PictureAvatarPayload | null {
   return null;
 }
 
+function legacyAvatarPayload(avatar: string): PictureAvatarPayload {
+  return {
+    type: "picture-v1",
+    initials: avatar || "MP",
+    picture: { kind: "preset", id: presetPictureForSeed(avatar || "MP").id }
+  };
+}
+
 function avatarInitials(avatar: string) {
-  return parseAvatar(avatar)?.initials ?? avatar;
+  return parseAvatar(avatar)?.initials ?? legacyAvatarPayload(avatar).initials;
 }
 
 function ProfilePicture({
@@ -256,7 +273,7 @@ function ProfilePicture({
   initials?: string;
   size?: "sm" | "md" | "lg";
 }) {
-  const payload = avatar ? parseAvatar(avatar) : null;
+  const payload = avatar ? (parseAvatar(avatar) ?? legacyAvatarPayload(avatar)) : null;
   const selectedPicture = picture ?? payload?.picture;
   const label = initials ?? payload?.initials ?? (avatar ? avatarInitials(avatar) : "MP");
   const sizeClass =
@@ -277,14 +294,11 @@ function ProfilePicture({
   const preset =
     personalPictures.find((item) => item.id === selectedPicture?.id) ?? personalPictures[0];
   return (
-    <div
+    <img
       className={`profile-picture profile-picture-preset ${sizeClass}`}
-      style={{ background: `linear-gradient(135deg, ${preset.colors[0]}, ${preset.colors[1]})` }}
-      aria-label={`Photo de profil ${label}`}
-    >
-      <span className="profile-picture-mark">{preset.mark}</span>
-      <strong>{label}</strong>
-    </div>
+      src={preset.image}
+      alt={`Photo de profil ${label}`}
+    />
   );
 }
 

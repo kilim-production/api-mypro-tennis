@@ -364,54 +364,18 @@ select {
 }
 
 .profile-picture {
-  display: grid;
-  place-items: center;
   flex-shrink: 0;
   border-radius: 999px;
   border: 2px solid rgba(255, 255, 255, 0.22);
   object-fit: cover;
+  object-position: center;
   box-shadow: 0 16px 32px rgba(0, 0, 0, 0.28);
   overflow: hidden;
+  background: rgba(15, 23, 42, 0.86);
 }
 
 .profile-picture-preset {
-  position: relative;
-  color: #06121e;
-  font-weight: 950;
-  isolation: isolate;
-}
-
-.profile-picture-preset::before {
-  content: "";
-  position: absolute;
-  inset: 14%;
-  border-radius: 999px;
-  border: 2px solid rgba(255, 255, 255, 0.5);
-}
-
-.profile-picture-preset::after {
-  content: "";
-  position: absolute;
-  bottom: 15%;
-  width: 62%;
-  height: 18%;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.32);
-}
-
-.profile-picture-mark {
-  position: absolute;
-  right: 14%;
-  top: 16%;
-  font-size: 0.62rem;
-  font-weight: 900;
-  color: rgba(255, 255, 255, 0.86);
-}
-
-.profile-picture strong {
-  position: relative;
-  z-index: 1;
-  letter-spacing: 0.04em;
+  filter: saturate(1.04) contrast(1.03);
 }
 
 @keyframes bag-open {

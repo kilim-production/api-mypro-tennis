@@ -34,6 +34,18 @@ const archetypes = [
   "Athlète endurant",
   "Joueur complet"
 ];
+const personalPictureIds = [
+  "pp-01",
+  "pp-02",
+  "pp-03",
+  "pp-04",
+  "pp-05",
+  "pp-06",
+  "pp-07",
+  "pp-08",
+  "pp-09",
+  "pp-10"
+] as const;
 const aiFirstNames = [
   "Alex",
   "Noa",
@@ -68,6 +80,16 @@ function aiIdentity(seed: number) {
     firstName: aiFirstNames[Math.abs(seed) % aiFirstNames.length] ?? "Alex",
     lastName: aiLastNames[Math.abs(seed * 7 + 3) % aiLastNames.length] ?? "Nova"
   };
+}
+
+function avatarForIdentity(identity: { firstName: string; lastName: string }, seed: number) {
+  const initials = `${identity.firstName[0] ?? "M"}${identity.lastName[0] ?? "P"}`.toUpperCase();
+  const pictureId = personalPictureIds[Math.abs(seed) % personalPictureIds.length] ?? "pp-01";
+  return encodeJson({
+    type: "picture-v1",
+    initials,
+    picture: { kind: "preset", id: pictureId }
+  });
 }
 
 type SeasonCompetitionType = "daily" | "weekly" | "individual";
@@ -248,7 +270,7 @@ async function getOrCreateSeasonOpponent(
       dominantHand: seed % 2 === 0 ? "Droite" : "Gauche",
       backhand: seed % 3 === 0 ? "Une main" : "Deux mains",
       archetype: archetypes[seed % archetypes.length] ?? "Joueur complet",
-      avatar: `S${seed % 10}`,
+      avatar: avatarForIdentity(identity, seed),
       isAi: true,
       stats: encodeJson(stats),
       overall: calculateOverall(stats),
@@ -305,7 +327,7 @@ async function getOrCreateDuelAiOpponent(params: {
       dominantHand: seedNumber % 2 === 0 ? "Droite" : "Gauche",
       backhand: seedNumber % 3 === 0 ? "Une main" : "Deux mains",
       archetype: archetypes[seedNumber % archetypes.length] ?? "Joueur complet",
-      avatar: `D${params.slot + 1}`,
+      avatar: avatarForIdentity(identity, seedNumber + params.slot),
       isAi: true,
       stats: encodeJson(stats),
       overall: calculateOverall(stats),
