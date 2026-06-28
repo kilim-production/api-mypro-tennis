@@ -559,6 +559,10 @@ type MyClubData = {
     club: Omit<ClubListItem, "myRequestStatus">;
   } | null;
 };
+type ClubLeaveResponse = MyClubData & {
+  refunded: number;
+  message: string;
+};
 type TeamChampionshipEntry = {
   id: string;
   rank?: number;
@@ -3925,6 +3929,8 @@ function ClubPage() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [successorPlayerId, setSuccessorPlayerId] = useState("");
   const clubCreationCost = 5000;
   const canCreateClub = player.budget >= clubCreationCost;
 
@@ -4004,6 +4010,27 @@ function ClubPage() {
     }
   }
 
+  async function leaveClub(nextPresidentId?: string) {
+    setMessage("");
+    setBusy("leave");
+    try {
+      const result = await api<ClubLeaveResponse>("/clubs/me/leave", {
+        method: "POST",
+        body: JSON.stringify(nextPresidentId ? { successorPlayerId: nextPresidentId } : {})
+      });
+      setLeaveOpen(false);
+      setSuccessorPlayerId("");
+      setData({ club: result.club, pendingRequest: result.pendingRequest });
+      setMessage(result.message);
+      await refresh();
+      await loadClubData();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Départ du club impossible.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function joinClub(clubId: string) {
     setMessage("");
     setBusy(`join-${clubId}`);
@@ -4045,6 +4072,8 @@ function ClubPage() {
     const canUpgradeComplex = Boolean(
       club.isPresident && complexNextLevel && club.budget >= complexNextLevel.cost
     );
+    const successorOptions = club.members.filter((member) => member.player.id !== player.id);
+    const selectedSuccessorId = successorPlayerId || successorOptions[0]?.player.id || "";
     return (
       <div className="grid gap-5">
         <section className="panel p-6">
@@ -4061,6 +4090,15 @@ function ClubPage() {
               </p>
             </div>
             <div className="flex items-start gap-2">
+              <button
+                aria-label="Quitter le club"
+                className="inline-flex h-12 w-12 items-center justify-center rounded-md border border-red-300/20 bg-red-300/10 text-red-100 transition hover:border-red-300/50 hover:bg-red-300/15"
+                onClick={() => setLeaveOpen(true)}
+                title="Quitter le club"
+                type="button"
+              >
+                <LogOut size={20} />
+              </button>
               {club.isPresident ? (
                 <button
                   aria-label="Ouvrir les paramètres du club"
@@ -4330,6 +4368,90 @@ function ClubPage() {
                     </Button>
                   </div>
                 </form>
+              </div>,
+              document.body
+            )
+          : null}
+
+        {leaveOpen
+          ? createPortal(
+              <div className="fixed inset-0 z-[9999] grid place-items-center overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm">
+                <div className="panel w-full max-w-xl p-6 shadow-2xl shadow-black/60">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-bold uppercase tracking-[0.22em] text-red-200">
+                        Club
+                      </p>
+                      <h2 className="mt-1 text-2xl font-black">Quitter le club</h2>
+                      <p className="mt-1 text-sm text-slate-300">
+                        Cette action retire votre joueur de l'effectif du club.
+                      </p>
+                    </div>
+                    <button
+                      aria-label="Fermer"
+                      className="rounded-md bg-white/10 p-2 text-slate-200 hover:bg-white/15"
+                      onClick={() => setLeaveOpen(false)}
+                      type="button"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  {club.isPresident && successorOptions.length > 0 ? (
+                    <div className="mt-5 grid gap-3">
+                      <div className="rounded-md border border-amber-300/30 bg-amber-300/10 p-3 text-sm text-amber-100">
+                        Vous êtes président. Pour quitter le club, vous devez désigner un nouveau
+                        président parmi les membres.
+                      </div>
+                      <label className="grid gap-1 text-sm">
+                        <span className="text-slate-300">Nouveau président</span>
+                        <select
+                          className="rounded-md border border-white/10 bg-slate-950 px-3 py-2"
+                          onChange={(event) => setSuccessorPlayerId(event.target.value)}
+                          value={selectedSuccessorId}
+                        >
+                          {successorOptions.map((member) => (
+                            <option key={member.player.id} value={member.player.id}>
+                              {member.player.name} - {member.player.fftRanking}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  ) : club.isPresident ? (
+                    <div className="mt-5 rounded-md border border-emerald-300/30 bg-emerald-300/10 p-3 text-sm text-emerald-100">
+                      Vous êtes le seul joueur du club. Quitter le club revend automatiquement la
+                      structure, supprime le club et vous récupérez 4 000 €.
+                    </div>
+                  ) : (
+                    <div className="mt-5 rounded-md border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-300">
+                      Vous pourrez rejoindre ou créer un autre club après votre départ.
+                    </div>
+                  )}
+
+                  <div className="mt-6 flex flex-wrap justify-end gap-2">
+                    <Button
+                      className="bg-white/10 text-slate-100 hover:bg-white/15"
+                      onClick={() => setLeaveOpen(false)}
+                      type="button"
+                    >
+                      Annuler
+                    </Button>
+                    <Button
+                      className="bg-red-300 text-slate-950 hover:bg-red-200"
+                      disabled={
+                        busy === "leave" ||
+                        (club.isPresident && successorOptions.length > 0 && !selectedSuccessorId)
+                      }
+                      onClick={() => void leaveClub(selectedSuccessorId || undefined)}
+                      type="button"
+                    >
+                      {club.isPresident && successorOptions.length === 0
+                        ? "Revendre et quitter"
+                        : "Quitter le club"}
+                    </Button>
+                  </div>
+                </div>
               </div>,
               document.body
             )

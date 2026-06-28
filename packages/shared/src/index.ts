@@ -113,6 +113,10 @@ export const clubJoinRequestSchema = z.object({
   message: z.string().trim().max(180).optional().default("")
 });
 
+export const clubLeaveSchema = z.object({
+  successorPlayerId: z.string().min(1).optional()
+});
+
 export const playerCreationSchema = z.object({
   firstName: z.string().min(2).max(28),
   lastName: z.string().min(2).max(32),
@@ -168,3 +172,4 @@ export type CosmeticEquipInput = z.infer<typeof cosmeticEquipSchema>;
 export type ClubCreateInput = z.infer<typeof clubCreateSchema>;
 export type ClubUpdateInput = z.infer<typeof clubUpdateSchema>;
 export type ClubJoinRequestInput = z.infer<typeof clubJoinRequestSchema>;
+export type ClubLeaveInput = z.infer<typeof clubLeaveSchema>;

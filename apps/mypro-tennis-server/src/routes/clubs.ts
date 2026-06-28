@@ -1,13 +1,19 @@
 import { Router } from "express";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@mypro/database";
-import { clubCreateSchema, clubJoinRequestSchema, clubUpdateSchema } from "@mypro/shared";
+import {
+  clubCreateSchema,
+  clubJoinRequestSchema,
+  clubLeaveSchema,
+  clubUpdateSchema
+} from "@mypro/shared";
 import { fftRankIndex } from "@mypro/sports-tennis";
 import { requireAuth } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 
 export const clubsRouter = Router();
 const clubCreationCost = 5000;
+const clubResaleRefund = 4000;
 const teamSize = 5;
 const duesWindowMs = 7 * 24 * 60 * 60 * 1000;
 const clubComplexLevels = [
@@ -1096,6 +1102,98 @@ clubsRouter.post("/me/buildings/complex/upgrade", requireAuth, async (request, r
   });
   return response.json(clubDetails(club, player.id));
 });
+
+clubsRouter.post(
+  "/me/leave",
+  requireAuth,
+  validateBody(clubLeaveSchema),
+  async (request, response) => {
+    const player = await currentPlayer(request.session!.userId);
+    if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+    const membership = await prisma.clubMembership.findUnique({
+      where: { playerId: player.id },
+      include: {
+        club: {
+          include: {
+            memberships: { include: { player: true }, orderBy: { joinedAt: "asc" } },
+            team: true
+          }
+        }
+      }
+    });
+    if (!membership?.club)
+      return response.status(404).json({ message: "Vous n'êtes membre d'aucun club." });
+
+    const isPresident = membership.club.presidentId === player.id;
+    const otherMembers = membership.club.memberships.filter((item) => item.playerId !== player.id);
+
+    if (!isPresident) {
+      await prisma.$transaction([
+        prisma.clubTeamMember.deleteMany({ where: { playerId: player.id } }),
+        prisma.clubMembership.delete({ where: { playerId: player.id } })
+      ]);
+      return response.json({
+        club: null,
+        pendingRequest: null,
+        refunded: 0,
+        message: "Vous avez quitté le club."
+      });
+    }
+
+    if (otherMembers.length === 0) {
+      await prisma.$transaction(async (tx) => {
+        await tx.club.delete({ where: { id: membership.clubId } });
+        await tx.player.update({
+          where: { id: player.id },
+          data: { budget: { increment: clubResaleRefund } }
+        });
+      });
+      return response.json({
+        club: null,
+        pendingRequest: null,
+        refunded: clubResaleRefund,
+        message: `Club revendu. ${clubResaleRefund.toLocaleString("fr-FR")} € récupérés.`
+      });
+    }
+
+    const successor = otherMembers.find((item) => item.playerId === request.body.successorPlayerId);
+    if (!successor) {
+      return response.status(400).json({
+        message: "Choisissez un membre du club pour reprendre la présidence avant de partir."
+      });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.club.update({
+        where: { id: membership.clubId },
+        data: { presidentId: successor.playerId }
+      });
+      await tx.clubMembership.update({
+        where: { playerId: successor.playerId },
+        data: { role: "PRESIDENT" }
+      });
+      await tx.clubTeamMember.deleteMany({ where: { playerId: player.id } });
+      await tx.clubMembership.delete({ where: { playerId: player.id } });
+      if (successor.player.userId) {
+        await tx.notification.create({
+          data: {
+            userId: successor.player.userId,
+            title: "Nouvelle présidence de club",
+            body: `Vous êtes désormais président du ${membership.club.name}.`,
+            type: "CLUB"
+          }
+        });
+      }
+    });
+
+    return response.json({
+      club: null,
+      pendingRequest: null,
+      refunded: 0,
+      message: `Vous avez quitté le club. ${successor.player.firstName} ${successor.player.lastName} devient président.`
+    });
+  }
+);
 
 clubsRouter.post(
   "/:id/join",
