@@ -1413,6 +1413,9 @@ function Shell({ children }: { children: React.ReactNode }) {
         ) : null}
         <main>{children}</main>
       </div>
+      <footer className="mx-auto max-w-7xl px-4 pb-5 text-center text-[11px] font-black uppercase tracking-[0.28em] text-slate-500">
+        KILIM GAMES PRODUCTION
+      </footer>
     </div>
   );
 }
