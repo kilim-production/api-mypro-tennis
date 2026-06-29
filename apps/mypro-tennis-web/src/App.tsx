@@ -92,6 +92,14 @@ const nav = [
   ["Réglages", "/settings", Settings]
 ] as const;
 
+const mobileNav = [
+  ["Accueil", "/dashboard", Activity],
+  ["Duel", "/duel", Swords],
+  ["Saison", "/season", Trophy],
+  ["Collection", "/collection", PackageOpen],
+  ["Club", "/club", Users]
+] as const;
+
 function notificationTarget(notification: GameNotification) {
   const type = notification.type.toUpperCase();
   const text = `${notification.title} ${notification.body}`.toLowerCase();
@@ -1397,12 +1405,12 @@ function Shell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <div
-        className={`mx-auto grid max-w-7xl gap-5 px-4 py-5 ${
+        className={`mx-auto grid max-w-7xl gap-4 px-3 py-4 pb-24 sm:px-4 sm:py-5 ${
           showSidebar ? "lg:grid-cols-[250px_1fr]" : ""
         }`}
       >
         {showSidebar ? (
-          <aside className="panel h-fit p-2">
+          <aside className="panel hidden h-fit p-2 lg:block">
             <nav className="grid gap-1">
               {nav.map(([label, path, Icon]) => (
                 <NavLink
@@ -1426,7 +1434,8 @@ function Shell({ children }: { children: React.ReactNode }) {
         ) : null}
         <main>{children}</main>
       </div>
-      <footer className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-3 px-4 pb-5 text-center text-[11px] font-black uppercase tracking-[0.28em] text-slate-500">
+      {showSidebar ? <MobileBottomNav badges={navBadges} /> : null}
+      <footer className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-3 px-4 pb-24 text-center text-[11px] font-black uppercase tracking-[0.28em] text-slate-500 lg:pb-5">
         <span>KILIM GAMES PRODUCTION</span>
         <span className="text-slate-700">·</span>
         <Link className="transition hover:text-emerald-300" to="/community">
@@ -1434,6 +1443,26 @@ function Shell({ children }: { children: React.ReactNode }) {
         </Link>
       </footer>
     </div>
+  );
+}
+
+function MobileBottomNav({ badges }: { badges: Record<string, number> }) {
+  return (
+    <nav className="mobile-bottom-nav lg:hidden" aria-label="Navigation principale">
+      {mobileNav.map(([label, path, Icon]) => (
+        <NavLink
+          key={path}
+          to={path}
+          className={({ isActive }) => `mobile-bottom-link ${isActive ? "is-active" : ""}`}
+        >
+          <span className="relative">
+            <Icon size={21} />
+            {badges[path] ? <span className="mobile-bottom-badge">{badges[path]}</span> : null}
+          </span>
+          <span>{label}</span>
+        </NavLink>
+      ))}
+    </nav>
   );
 }
 
@@ -2070,6 +2099,7 @@ function TutorialModal({ onClose }: { onClose: () => void }) {
 
 function Dashboard() {
   const player = useGameStore((state) => state.player)!;
+  const navigate = useNavigate();
   const [tutorialOpen, setTutorialOpen] = useState(
     () =>
       localStorage.getItem("mypro-tutorial-active") === "1" &&
@@ -2089,80 +2119,145 @@ function Dashboard() {
     setTutorialOpen(true);
   }
   return (
-    <div className="grid gap-5">
-      <section className="panel grid gap-5 p-5 lg:grid-cols-[1fr_430px]">
-        <div>
-          <p className="text-sm text-emerald-300">Carrière active</p>
-          <h1 className="text-3xl font-black">{player.name}</h1>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button className="bg-white/10 text-white hover:bg-white/15" onClick={openTutorial}>
-              <CheckCircle2 size={16} /> Parcours tutoriel
-            </Button>
-          </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <Metric label="Niveau" value={player.overall} />
-            <Metric label="Rang mondial" value={player.worldRank} />
-            <Metric label="Budget" value={`${player.budget} €`} />
-            <Metric label="Cash prize carrière" value={`${player.careerCashPrizeWon} €`} />
-            <Metric label="Points" value={player.rankingPoints} />
-          </div>
-        </div>
-        <div className="min-h-[320px]">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-300">
-              Radar des 12 stats
-            </p>
-            <p className="text-xs text-slate-400">Échelle 0-100</p>
-          </div>
-          <ResponsiveContainer width="100%" height={290}>
-            <RadarChart data={chart} outerRadius="67%">
-              <PolarGrid stroke="#ffffff22" />
-              <PolarAngleAxis dataKey="name" tick={{ fill: "#d6e4ef", fontSize: 11 }} />
-              <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
-              <Tooltip
-                contentStyle={{
-                  background: "#0f172a",
-                  border: "1px solid #1f4f5a",
-                  borderRadius: 8,
-                  color: "#f8fafc"
-                }}
-                formatter={(value) => [`${value}/100`, "Valeur"]}
-                labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName ?? ""}
+    <div className="grid gap-4">
+      <section className="game-hub panel overflow-hidden p-4 sm:p-5">
+        <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
+          <div className="grid gap-4">
+            <div className="flex items-center gap-4">
+              <ProfilePicture avatar={player.avatar} size="md" />
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-300">
+                  Carrière active
+                </p>
+                <h1 className="truncate text-3xl font-black">{player.name}</h1>
+                <p className="text-sm text-slate-300">
+                  {nationalityLabel(player.nationality)} · {player.fftRanking} · Niveau{" "}
+                  {player.overall}
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <GameMiniMetric label="Énergie" value={`${player.actionEnergy}/${player.actionEnergyMax}`} />
+              <GameMiniMetric label="Budget" value={`${player.budget.toLocaleString("fr-FR")} €`} />
+              <GameMiniMetric label="FFT" value={player.fftRanking} />
+              <GameMiniMetric label="Cash prize" value={`${player.careerCashPrizeWon.toLocaleString("fr-FR")} €`} />
+            </div>
+            <div className="grid gap-2 sm:grid-cols-4">
+              <QuickActionButton
+                icon={Swords}
+                label="Duel"
+                detail="1 énergie"
+                onClick={() => navigate("/duel")}
               />
-              <Radar
-                dataKey="value"
-                stroke="#5eead4"
-                strokeWidth={2}
-                fill="#34d399"
-                fillOpacity={0.34}
-                dot={{ r: 3, fill: "#ecfeff", stroke: "#0f766e", strokeWidth: 1 }}
+              <QuickActionButton
+                icon={Trophy}
+                label="Saison"
+                detail="Tournois"
+                onClick={() => navigate("/season")}
               />
-            </RadarChart>
-          </ResponsiveContainer>
+              <QuickActionButton
+                icon={PackageOpen}
+                label="Collection"
+                detail="Cartes"
+                onClick={() => navigate("/collection")}
+              />
+              <QuickActionButton
+                icon={CheckCircle2}
+                label="Tutoriel"
+                detail="Objectifs"
+                onClick={openTutorial}
+              />
+            </div>
+          </div>
+          <div className="min-h-[240px] rounded-md border border-white/10 bg-slate-950/34 p-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-300">
+                Radar des 12 stats
+              </p>
+              <p className="text-xs text-slate-400">0-100</p>
+            </div>
+            <ResponsiveContainer width="100%" height={215}>
+              <RadarChart data={chart} outerRadius="66%">
+                <PolarGrid stroke="#ffffff22" />
+                <PolarAngleAxis dataKey="name" tick={{ fill: "#d6e4ef", fontSize: 10 }} />
+                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
+                <Tooltip
+                  contentStyle={{
+                    background: "#0f172a",
+                    border: "1px solid #1f4f5a",
+                    borderRadius: 8,
+                    color: "#f8fafc"
+                  }}
+                  formatter={(value) => [`${value}/100`, "Valeur"]}
+                  labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName ?? ""}
+                />
+                <Radar
+                  dataKey="value"
+                  stroke="#5eead4"
+                  strokeWidth={2}
+                  fill="#34d399"
+                  fillOpacity={0.34}
+                  dot={{ r: 2, fill: "#ecfeff", stroke: "#0f766e", strokeWidth: 1 }}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </section>
       <TennisBagSlots />
       <CareerPathCard player={player} />
-      <section className="grid gap-5 lg:grid-cols-2">
+      <section className="grid gap-4 lg:grid-cols-2">
         <ActionEnergyCard player={player} />
-        <article className="panel p-5">
-          <h2 className="font-bold">Prochain objectif</h2>
-          <p className="mt-2 text-sm text-slate-300">
-            Lancez un duel pour tester votre progression contre un adversaire au classement juste
-            inférieur.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Link
-              className="rounded-md bg-emerald-400 px-4 py-2 font-semibold text-slate-950"
-              to="/duel"
-            >
-              Lancer un duel
-            </Link>
+        <article className="panel p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm text-emerald-300">Action recommandée</p>
+              <h2 className="text-xl font-black">Trouver un adversaire</h2>
+            </div>
+            <Swords className="text-emerald-200" size={24} />
           </div>
+          <p className="mt-2 text-sm text-slate-300">
+            Le duel est la boucle la plus rapide pour tester vos cartes, votre énergie et vos
+            équipements.
+          </p>
+          <Button className="mt-4 w-full" onClick={() => navigate("/duel")}>
+            Lancer un duel
+          </Button>
         </article>
       </section>
       {tutorialOpen ? <TutorialModal onClose={() => setTutorialOpen(false)} /> : null}
     </div>
+  );
+}
+
+function GameMiniMetric({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="game-mini-metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function QuickActionButton({
+  icon: Icon,
+  label,
+  detail,
+  onClick
+}: {
+  icon: typeof Activity;
+  label: string;
+  detail: string;
+  onClick: () => void;
+}) {
+  return (
+    <button className="quick-action-button" onClick={onClick} type="button">
+      <Icon size={20} />
+      <span>
+        <strong>{label}</strong>
+        <small>{detail}</small>
+      </span>
+    </button>
   );
 }
 
@@ -2181,16 +2276,26 @@ function PlayerPage() {
   const [career, setCareer] = useState<CareerProfile | null>(null);
   const [avatarEditorOpen, setAvatarEditorOpen] = useState(false);
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
+  const [tab, setTab] = useState<"overview" | "stats" | "palmares">("overview");
   const topStats = profileStatKeys
     .map((key) => ({ key, value: stat(player, key) }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 3);
   useEffect(() => void api<CareerProfile>("/players/me/career").then(setCareer), []);
   return (
-    <div className="grid gap-5 lg:grid-cols-[330px_1fr]">
-      <section className="panel p-5">
+    <div className="grid gap-4">
+      <section className="panel p-4 sm:p-5">
         <div className="flex items-start justify-between gap-4">
-          <ProfilePicture avatar={player.avatar} size="lg" />
+          <div className="flex min-w-0 items-center gap-4">
+            <ProfilePicture avatar={player.avatar} size="md" />
+            <div className="min-w-0">
+              <h1 className="truncate text-2xl font-black">{player.name}</h1>
+              <p className="text-sm text-slate-300">
+                {nationalityLabel(player.nationality)} · {player.fftRanking} · Niveau{" "}
+                {player.overall}
+              </p>
+            </div>
+          </div>
           <div className="grid gap-2">
             <button
               className="rounded-md border border-emerald-300/35 bg-emerald-300/10 px-3 py-2 text-sm font-bold text-emerald-100 transition hover:bg-emerald-300/18"
@@ -2208,20 +2313,32 @@ function PlayerPage() {
             </button>
           </div>
         </div>
-        <h1 className="mt-4 text-2xl font-black">{player.name}</h1>
-        <p className="text-slate-300">
-          {nationalityLabel(player.nationality)} · {player.fftRanking} · Niveau {player.overall}
-        </p>
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <Metric label="Victoires" value={player.wins} />
-          <Metric label="Défaites" value={player.losses} />
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <GameMiniMetric label="Victoires" value={player.wins} />
+          <GameMiniMetric label="Défaites" value={player.losses} />
+          <GameMiniMetric label="Titres" value={career?.palmares.titles ?? "..."} />
+          <GameMiniMetric label="Simulation" value={career?.rankingSimulation.simulatedRanking ?? "..."} />
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <Metric label="Titres" value={career?.palmares.titles ?? "..."} />
-          <Metric label="Simulation" value={career?.rankingSimulation.simulatedRanking ?? "..."} />
+        <div className="segmented-tabs mt-4">
+          {[
+            ["overview", "Parcours", player.fftRanking],
+            ["stats", "Stats", `${player.overall}`],
+            ["palmares", "Palmarès", `${career?.palmares.titles ?? 0} titre(s)`]
+          ].map(([value, label, meta]) => (
+            <button
+              key={value}
+              className={tab === value ? "is-active" : ""}
+              onClick={() => setTab(value as typeof tab)}
+              type="button"
+            >
+              <span>{label}</span>
+              <small>{meta}</small>
+            </button>
+          ))}
         </div>
       </section>
-      <section className="panel p-5">
+      {tab === "stats" ? (
+      <section className="panel p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-sm text-emerald-300">Profil joueur</p>
@@ -2241,9 +2358,14 @@ function PlayerPage() {
           <StatBars player={player} />
         </div>
       </section>
-      <CareerPathCard player={player} />
-      <PlayerPalmaresCard career={career} />
-      <RankingSimulationCard career={career} player={player} />
+      ) : null}
+      {tab === "overview" ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <CareerPathCard player={player} />
+          <RankingSimulationCard career={career} player={player} />
+        </div>
+      ) : null}
+      {tab === "palmares" ? <PlayerPalmaresCard career={career} /> : null}
       {avatarEditorOpen ? (
         <AvatarEditorModal
           player={player}
@@ -2737,6 +2859,7 @@ function CollectionPage() {
   const [busyCard, setBusyCard] = useState<string | null>(null);
   const [slotPicker, setSlotPicker] = useState<number | null>(null);
   const [collectionMessage, setCollectionMessage] = useState("");
+  const [tab, setTab] = useState<"equipment" | "cards" | "cosmetics">("equipment");
 
   async function loadCollection() {
     setData(await api<ChestState>("/chests"));
@@ -2795,24 +2918,50 @@ function CollectionPage() {
       (sum, item) => sum + Object.values(item.bonuses).reduce((inner, value) => inner + value, 0),
       0
     );
+  const unlockableCards = (data?.cards ?? []).filter((card) => card.unlockable).length;
 
   return (
-    <div className="grid gap-5">
-      <section className="panel p-5">
+    <div className="grid gap-4">
+      <section className="panel p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-sm text-emerald-300">Inventaire joueur</p>
             <h1 className="text-2xl font-black">Collection</h1>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-md bg-white/[0.08] px-3 py-1 text-sm text-slate-200">
-            <Gem size={15} /> {data?.gems ?? 0} gemmes
+          <div className="flex flex-wrap gap-2">
+            <div className="inline-flex items-center gap-2 rounded-md bg-white/[0.08] px-3 py-1 text-sm text-slate-200">
+              <Gem size={15} /> {data?.gems ?? 0} gemmes
+            </div>
+            {unlockableCards ? (
+              <div className="inline-flex items-center gap-2 rounded-md bg-emerald-300 px-3 py-1 text-sm font-black text-slate-950">
+                <Sparkles size={15} /> {unlockableCards} palier(s)
+              </div>
+            ) : null}
           </div>
+        </div>
+        <div className="segmented-tabs mt-4">
+          {[
+            ["equipment", "Équipement", totalEquipmentBonus ? `+${totalEquipmentBonus}` : "4 slots"],
+            ["cards", "Cartes", unlockableCards ? `${unlockableCards} prêt(s)` : "12 stats"],
+            ["cosmetics", "Objets", `${sortedCosmetics.length}`]
+          ].map(([value, label, meta]) => (
+            <button
+              key={value}
+              className={tab === value ? "is-active" : ""}
+              onClick={() => setTab(value as typeof tab)}
+              type="button"
+            >
+              <span>{label}</span>
+              <small>{meta}</small>
+            </button>
+          ))}
         </div>
       </section>
       {collectionMessage ? (
         <div className="panel p-4 text-sm text-emerald-100">{collectionMessage}</div>
       ) : null}
-      <section className="panel p-5">
+      {tab === "equipment" ? (
+      <section className="panel p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-sm text-emerald-300">Équipement</p>
@@ -2869,7 +3018,9 @@ function CollectionPage() {
           ))}
         </div>
       </section>
-      <section className="panel p-5">
+      ) : null}
+      {tab === "cards" ? (
+      <section className="panel p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm text-emerald-300">Cartes de statistiques</p>
@@ -2929,7 +3080,9 @@ function CollectionPage() {
           })}
         </div>
       </section>
-      <section className="panel p-5">
+      ) : null}
+      {tab === "cosmetics" ? (
+      <section className="panel p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm text-emerald-300">Avatar</p>
@@ -2992,6 +3145,7 @@ function CollectionPage() {
           )}
         </div>
       </section>
+      ) : null}
       {slotPicker !== null ? (
         <CosmeticSlotPicker
           slotIndex={slotPicker}
@@ -3472,8 +3626,8 @@ function SeasonPage() {
   }
   if (!data) return <section className="panel p-5">Chargement de la saison...</section>;
   return (
-    <div className="grid gap-5">
-      <section className="panel p-5">
+    <div className="grid gap-4">
+      <section className="panel p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-300">
@@ -3523,22 +3677,28 @@ function SeasonPage() {
               : "Prochaine inscription"
             : "Disponibilité";
           return (
-            <article key={competition.type} className="panel p-5">
-              <h2 className="text-xl font-black">{competition.title}</h2>
-              <p className="text-emerald-300">
-                {competition.frequency} · {competition.energyCost} énergie
-              </p>
-              <p className="mt-3 min-h-[48px] text-sm text-slate-300">{competition.subtitle}</p>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <Metric
+            <article key={competition.type} className="season-card panel p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-black">{competition.title}</h2>
+                  <p className="text-sm text-emerald-300">
+                    {competition.frequency} · {competition.energyCost} énergie
+                  </p>
+                </div>
+                <div className="rounded-md bg-white/[0.08] px-3 py-2 text-center">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Prix</div>
+                  <div className="text-lg font-black">{entryFee.toLocaleString("fr-FR")} €</div>
+                </div>
+              </div>
+              <p className="mt-3 line-clamp-2 text-sm text-slate-300">{competition.subtitle}</p>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <GameMiniMetric
                   label="Format"
-                  value={competition.type === "individual" ? "Pyramide FFT" : "Tableau 16"}
+                  value={competition.type === "individual" ? "Pyramide" : "Tableau 16"}
                 />
-                <Metric label="Statut" value={statusLabel} />
-                <Metric label="Meilleur" value={competition.rankingRange.best} />
-                <Metric label="Moins bon" value={competition.rankingRange.worst} />
-                <Metric label="Inscription" value={`${entryFee.toLocaleString("fr-FR")} €`} />
-                <Metric label="Cash prize" value={`${cashPrize.toLocaleString("fr-FR")} €`} />
+                <GameMiniMetric label="Statut" value={statusLabel} />
+                <GameMiniMetric label="Zone haute" value={competition.rankingRange.best} />
+                <GameMiniMetric label="Cash prize" value={`${cashPrize.toLocaleString("fr-FR")} €`} />
               </div>
               <div className="mt-4 rounded-md border border-cyan-300/15 bg-cyan-300/10 p-3">
                 <div className="flex items-start justify-between gap-3">
@@ -4936,45 +5096,42 @@ function MatchStartPage() {
     }
   }
   function opponentCard(opponent: Player, sourceLabel: string) {
+    const opponentTopStats = profileStatKeys
+      .map((key) => ({ key, value: stat(opponent, key) }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 3);
     return (
-      <article key={`${sourceLabel}-${opponent.id}`} className="panel p-5">
+      <article key={`${sourceLabel}-${opponent.id}`} className="duel-card panel p-4">
         <div className="flex items-center gap-4">
           <ProfilePicture avatar={opponent.avatar} />
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
               {sourceLabel}
             </div>
-            <h2 className="text-xl font-black">
+            <h2 className="truncate text-xl font-black">
               {opponent.firstName} {opponent.lastName}
             </h2>
             <p className="text-sm text-emerald-300">
               {nationalityLabel(opponent.nationality)} · {opponent.fftRanking}
             </p>
           </div>
+          <div className="rounded-md bg-white/[0.08] px-3 py-2 text-center">
+            <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Niv.</div>
+            <div className="text-xl font-black">{opponent.overall}</div>
+          </div>
         </div>
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <Metric label="Niveau" value={opponent.overall} />
-          <Metric label="Classement" value={opponent.fftRanking} />
-          <Metric label="Victoires" value={opponent.wins} />
-          <Metric label="Défaites" value={opponent.losses} />
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <GameMiniMetric label="Classement" value={opponent.fftRanking} />
+          <GameMiniMetric label="V" value={opponent.wins} />
+          <GameMiniMetric label="D" value={opponent.losses} />
         </div>
-        <div className="mt-5 grid gap-2">
-          {["service", "return", "forehand", "backhand"].map((key) => (
-            <div key={key}>
-              <div className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-300">
-                <span className="flex items-center gap-2">
-                  <StatIcon statKey={key} size="sm" />
-                  {statLabels[key]}
-                </span>
-                <strong>{Math.round(stat(opponent, key))}</strong>
-              </div>
-              <div className="h-2 rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-emerald-300"
-                  style={{ width: `${stat(opponent, key)}%` }}
-                />
-              </div>
-            </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {opponentTopStats.map((item) => (
+            <span key={item.key} className="stat-bonus-pill">
+              <StatIcon statKey={item.key} size="sm" />
+              <span>{statLabels[item.key]}</span>
+              <strong>{Math.round(item.value)}</strong>
+            </span>
           ))}
         </div>
         <Button
@@ -4988,8 +5145,8 @@ function MatchStartPage() {
     );
   }
   return (
-    <div className="grid gap-5">
-      <section className="panel p-6">
+    <div className="grid gap-4">
+      <section className="panel p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-300">Duel</p>
@@ -5009,7 +5166,7 @@ function MatchStartPage() {
         </div>
       </section>
       {message ? <div className="panel p-4 text-sm text-amber-100">{message}</div> : null}
-      <section className="panel p-5">
+      <section className="panel p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-300">
@@ -5039,10 +5196,13 @@ function MatchStartPage() {
           {searchResults.map((opponent) => opponentCard(opponent, "Joueur réel"))}
         </section>
       ) : null}
-      <div>
+      <div className="flex items-center justify-between gap-3">
         <p className="mb-3 text-sm font-bold uppercase tracking-[0.18em] text-slate-400">
           Pool automatique
         </p>
+        <span className="mb-3 rounded-md bg-white/10 px-2 py-1 text-xs font-bold text-slate-300">
+          3 choix
+        </span>
       </div>
       <section className="grid gap-4 lg:grid-cols-3">
         {(pool?.opponents ?? []).map((opponent) =>
@@ -5869,18 +6029,43 @@ function SettingsPage() {
   );
 }
 
+function OrientationGuard() {
+  return (
+    <div className="orientation-guard" role="status" aria-live="polite">
+      <div className="orientation-guard-card">
+        <div className="orientation-phone">
+          <div />
+        </div>
+        <p className="text-sm font-bold uppercase tracking-[0.24em] text-emerald-300">
+          Mode paysage requis
+        </p>
+        <h1>Tournez votre appareil</h1>
+        <p>
+          MYPRO - TENNIS est optimisé comme un jeu mobile horizontal pour garder les statistiques,
+          les duels et les tableaux lisibles.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function App() {
   const { booted, refresh } = useGameStore();
   useEffect(() => void refresh(), [refresh]);
   if (!booted)
     return (
-      <div className="grid min-h-screen place-items-center text-lg font-bold">
-        Chargement de MYPRO - TENNIS...
-      </div>
+      <>
+        <OrientationGuard />
+        <div className="grid min-h-screen place-items-center text-lg font-bold">
+          Chargement de MYPRO - TENNIS...
+        </div>
+      </>
     );
   return (
-    <Shell>
-      <Routes>
+    <>
+      <OrientationGuard />
+      <Shell>
+        <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<AuthPage mode="login" />} />
         <Route path="/signup" element={<AuthPage mode="signup" />} />
@@ -6003,7 +6188,8 @@ export function App() {
             </NeedAuth>
           }
         />
-      </Routes>
-    </Shell>
+        </Routes>
+      </Shell>
+    </>
   );
 }
