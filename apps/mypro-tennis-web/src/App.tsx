@@ -4276,6 +4276,7 @@ function ClubPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [successorPlayerId, setSuccessorPlayerId] = useState("");
+  const [clubTab, setClubTab] = useState<"team" | "infra" | "members" | "requests">("team");
   const clubCreationCost = 5000;
   const canCreateClub = player.budget >= clubCreationCost;
 
@@ -4472,6 +4473,24 @@ function ClubPage() {
             <Metric label="Niveau compétitif" value={club.competitiveLevel} />
             <Metric label="Budget du club" value={`${club.budget.toLocaleString("fr-FR")} €`} />
           </div>
+          <div className="segmented-tabs mt-5">
+            {[
+              ["team", "Championnat", club.competitiveLevel],
+              ["infra", "Complexe", `Niv. ${complexBuilding.currentLevel.level}`],
+              ["members", "Effectif", `${club.memberCount}/${club.maxSlots}`],
+              ["requests", "Demandes", `${club.pendingRequests.length}`]
+            ].map(([value, label, meta]) => (
+              <button
+                key={value}
+                className={clubTab === value ? "is-active" : ""}
+                onClick={() => setClubTab(value as typeof clubTab)}
+                type="button"
+              >
+                <span>{label}</span>
+                <small>{meta}</small>
+              </button>
+            ))}
+          </div>
         </section>
 
         {message ? (
@@ -4480,6 +4499,7 @@ function ClubPage() {
           </div>
         ) : null}
 
+        {clubTab === "infra" ? (
         <section className="panel p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -4620,8 +4640,9 @@ function ClubPage() {
             </article>
           </div>
         </section>
+        ) : null}
 
-        <TeamChampionshipPanel club={club} />
+        {clubTab === "team" ? <TeamChampionshipPanel club={club} /> : null}
 
         {club.isPresident && settingsOpen
           ? createPortal(
@@ -4802,6 +4823,7 @@ function ClubPage() {
             )
           : null}
 
+        {clubTab === "members" ? (
         <section className="grid gap-5 lg:grid-cols-[1fr_360px]">
           <article className="panel p-5">
             <h2 className="text-xl font-black">Effectif du club</h2>
@@ -4820,6 +4842,10 @@ function ClubPage() {
             </div>
           </article>
 
+        </section>
+        ) : null}
+
+        {clubTab === "requests" ? (
           <article className="panel p-5">
             <h2 className="text-xl font-black">Demandes</h2>
             {club.isPresident ? (
@@ -4861,7 +4887,7 @@ function ClubPage() {
               </p>
             )}
           </article>
-        </section>
+        ) : null}
       </div>
     );
   }
