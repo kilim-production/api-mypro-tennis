@@ -998,8 +998,8 @@ function TennisBagVisual({ rarity, opening = false }: { rarity: ChestRarity; ope
 function RewardModal({ rewards, onClose }: { rewards: ChestRewards; onClose: () => void }) {
   const unlockedCards = rewards.cards.filter((card) => card.bonus > 0);
   return createPortal(
-    <div className="fixed inset-0 z-[9999] grid place-items-center overflow-y-auto bg-slate-950/82 p-4 backdrop-blur">
-      <div className="panel relative max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-auto p-6 text-center shadow-2xl shadow-black/60">
+    <div className="game-modal-overlay">
+      <div className="game-modal-panel panel relative max-w-2xl text-center">
         <button
           className="absolute right-4 top-4 rounded-md bg-white/10 p-2 text-slate-200 hover:bg-white/15"
           onClick={onClose}
@@ -2027,8 +2027,8 @@ function TutorialModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/78 px-4 backdrop-blur">
-      <section className="panel w-full max-w-xl p-6">
+    <div className="game-modal-overlay">
+      <section className="game-modal-panel panel max-w-xl">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.24em] text-emerald-300">
@@ -2430,8 +2430,8 @@ function ProfileEditorModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/78 px-4 backdrop-blur">
-      <form className="panel max-h-[92vh] w-full max-w-2xl overflow-auto p-6" onSubmit={save}>
+    <div className="game-modal-overlay">
+      <form className="game-modal-panel panel max-w-2xl" onSubmit={save}>
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.24em] text-emerald-300">
@@ -2579,8 +2579,8 @@ function AvatarEditorModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/78 px-4 backdrop-blur">
-      <section className="panel max-h-[92vh] w-full max-w-2xl overflow-auto p-6">
+    <div className="game-modal-overlay">
+      <section className="game-modal-panel panel max-w-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.24em] text-emerald-300">
@@ -3168,8 +3168,8 @@ function CosmeticSlotPicker({
   onEquip: (item: PlayerCosmeticItem, slotIndex: number) => Promise<void>;
 }) {
   return createPortal(
-    <div className="fixed inset-0 z-[9999] grid place-items-center overflow-y-auto bg-slate-950/82 p-4 backdrop-blur">
-      <section className="panel relative max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-auto p-6 shadow-2xl shadow-black/60">
+    <div className="game-modal-overlay">
+      <section className="game-modal-panel panel relative max-w-3xl">
         <button
           className="absolute right-4 top-4 rounded-md bg-white/10 p-2 text-slate-200 hover:bg-white/15"
           onClick={onClose}
@@ -3246,32 +3246,117 @@ function SeasonEntryDetails({
   player: Player;
   onClose: () => void;
 }) {
+  const [detailTab, setDetailTab] = useState<"summary" | "board">("summary");
   if (!competition.entry) return null;
   const title =
     competition.type === "individual" ? "Parcours du championnat" : "Tableau du tournoi";
+  const entry = competition.entry;
+  const nextRanking =
+    entry.bracket.mode === "pyramide"
+      ? entry.bracket.path?.[entry.currentRound]?.ranking
+      : entry.bracket.opponents?.[entry.currentRound]?.ranking;
+  const playedMatches = entry.matches.length;
+  const wonMatches = entry.matches.filter((match) => match.won).length;
+  const latestMatch = entry.matches.at(-1);
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/78 px-4 backdrop-blur">
-      <div className="panel max-h-[92vh] w-full max-w-6xl overflow-auto p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 pb-4">
+    <div className="game-modal-overlay">
+      <div className="game-modal-panel panel max-w-6xl">
+        <div className="game-modal-header">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-300">
               {competition.title}
             </p>
             <h2 className="text-2xl font-black">{title}</h2>
             <p className="mt-2 text-sm text-slate-300">
-              Inscription payée : {competition.entry.entryFee.toLocaleString("fr-FR")} € · Cash
-              prize : {competition.entry.cashPrize.toLocaleString("fr-FR")} €
+              Inscription payée : {entry.entryFee.toLocaleString("fr-FR")} € · Cash prize :{" "}
+              {entry.cashPrize.toLocaleString("fr-FR")} €
             </p>
           </div>
           <Button onClick={onClose} className="justify-center">
             <X size={16} /> Fermer
           </Button>
         </div>
-        {competition.type === "individual" ? (
-          <ChampionshipJourney entry={competition.entry} />
-        ) : (
-          <TournamentBracket entry={competition.entry} playerRanking={player.fftRanking} />
-        )}
+        <div className="segmented-tabs mt-4">
+          {[
+            ["summary", "Résumé", entry.status.replaceAll("_", " ")],
+            ["board", competition.type === "individual" ? "Parcours" : "Tableau", "Détail"]
+          ].map(([value, label, meta]) => (
+            <button
+              className={detailTab === value ? "is-active" : ""}
+              key={value}
+              onClick={() => setDetailTab(value as "summary" | "board")}
+              type="button"
+            >
+              <span>{label}</span>
+              <small>{meta}</small>
+            </button>
+          ))}
+        </div>
+        {detailTab === "summary" ? (
+          <section className="mt-4 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="rounded-md border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-300">
+                Situation
+              </p>
+              <h3 className="mt-1 text-2xl font-black">
+                {entry.championTitle ?? entry.status.replaceAll("_", " ")}
+              </h3>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <GameMiniMetric
+                  label="Format"
+                  value={competition.type === "individual" ? "Pyramide FFT" : "Tableau 16"}
+                />
+                <GameMiniMetric label="Matchs joués" value={`${playedMatches}`} />
+                <GameMiniMetric label="Victoires" value={`${wonMatches}`} />
+                <GameMiniMetric
+                  label="Prochain rang"
+                  value={nextRanking ?? "Terminé"}
+                />
+              </div>
+            </div>
+            <div className="rounded-md border border-cyan-300/20 bg-cyan-300/10 p-4">
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-cyan-200">
+                Dernier événement
+              </p>
+              {latestMatch ? (
+                <>
+                  <h3 className="mt-1 text-xl font-black">
+                    {latestMatch.won ? "Victoire" : "Défaite"} · {latestMatch.scoreText ?? "Score"}
+                  </h3>
+                  <p className="mt-2 text-sm text-slate-300">
+                    {latestMatch.opponentName ?? "Adversaire"} ·{" "}
+                    {latestMatch.opponentRanking ?? latestMatch.ranking}
+                  </p>
+                  <Link
+                    className="mt-4 inline-flex items-center gap-2 rounded-md bg-emerald-300 px-3 py-2 text-sm font-black text-slate-950"
+                    to={`/match/${latestMatch.matchId}`}
+                  >
+                    <Eye size={16} /> Voir le replay
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <h3 className="mt-1 text-xl font-black">Premier match à venir</h3>
+                  <p className="mt-2 text-sm text-slate-300">
+                    Le prochain adversaire sera généré selon la hiérarchie du classement.
+                  </p>
+                </>
+              )}
+            </div>
+            <div className="lg:col-span-2">
+              <Button className="w-full justify-center" onClick={() => setDetailTab("board")}>
+                {competition.type === "individual" ? "Ouvrir le parcours" : "Ouvrir le tableau"}
+              </Button>
+            </div>
+          </section>
+        ) : null}
+        {detailTab === "board" ? (
+          competition.type === "individual" ? (
+            <ChampionshipJourney entry={entry} />
+          ) : (
+            <TournamentBracket entry={entry} playerRanking={player.fftRanking} />
+          )
+        ) : null}
       </div>
     </div>
   );
@@ -3339,8 +3424,8 @@ function TournamentBracket({
           <div className="text-sm text-slate-300">Classement {completed.winnerRanking}</div>
         </div>
       ) : null}
-      <div className="mt-3 overflow-x-auto pb-1">
-        <div className="grid min-w-[980px] grid-cols-[1.4fr_1fr_1fr_1fr_1fr] gap-3">
+      <div className="bracket-scroll mt-3 overflow-x-auto pb-1">
+        <div className="bracket-grid grid min-w-[980px] grid-cols-[1.4fr_1fr_1fr_1fr_1fr] gap-3">
           <div>
             <BracketColumnTitle label="Branches" />
             <div className="grid gap-2">
@@ -3349,7 +3434,7 @@ function TournamentBracket({
                 return (
                   <div
                     key={index}
-                    className="rounded-md border border-white/10 bg-white/[0.04] p-2"
+                    className="bracket-card rounded-md border border-white/10 bg-white/[0.04] p-2"
                   >
                     <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">
                       Branche {index + 1}
@@ -3388,7 +3473,7 @@ function TournamentBracket({
                     return (
                       <div
                         key={`${round.name}-${matchIndex}`}
-                        className={`rounded-md border p-3 text-sm ${
+                        className={`bracket-card rounded-md border p-3 text-sm ${
                           active
                             ? "border-cyan-300 bg-cyan-300/10"
                             : match.winner
@@ -3448,7 +3533,7 @@ function TournamentBracket({
                   {round.matches.map((match, index) => (
                     <div
                       key={`${round.name}-${index}`}
-                      className={`rounded-md border p-3 text-sm ${match.playedByPlayer ? "border-cyan-300 bg-cyan-300/10" : "border-white/10 bg-white/[0.04]"}`}
+                      className={`bracket-card rounded-md border p-3 text-sm ${match.playedByPlayer ? "border-cyan-300 bg-cyan-300/10" : "border-white/10 bg-white/[0.04]"}`}
                     >
                       <div className="grid gap-1">
                         <div
@@ -3586,6 +3671,7 @@ function BracketColumnTitle({ label }: { label: string }) {
 function SeasonPage() {
   const [data, setData] = useState<SeasonData | null>(null);
   const [message, setMessage] = useState("");
+  const [seasonTab, setSeasonTab] = useState<SeasonCompetition["type"]>("daily");
   const [selectedCompetition, setSelectedCompetition] = useState<SeasonCompetition | null>(null);
   const refresh = useGameStore((state) => state.refresh);
   const navigate = useNavigate();
@@ -3620,6 +3706,9 @@ function SeasonPage() {
     }
   }
   if (!data) return <section className="panel p-5">Chargement de la saison...</section>;
+  const activeCompetition =
+    data.competitions.find((competition) => competition.type === seasonTab) ??
+    data.competitions[0];
   return (
     <div className="grid gap-4">
       <section className="panel p-4 sm:p-5">
@@ -3652,8 +3741,28 @@ function SeasonPage() {
         </div>
       </section>
       {message ? <div className="panel p-4 text-sm text-emerald-100">{message}</div> : null}
-      <section className="grid gap-4 lg:grid-cols-3">
-        {data.competitions.map((competition) => {
+      <div className="segmented-tabs">
+        {data.competitions.map((competition) => (
+          <button
+            className={seasonTab === competition.type ? "is-active" : ""}
+            key={competition.type}
+            onClick={() => setSeasonTab(competition.type)}
+            type="button"
+          >
+            <span>
+              {competition.type === "daily"
+                ? "Journalier"
+                : competition.type === "weekly"
+                  ? "Hebdomadaire"
+                  : "Championnat"}
+            </span>
+            <small>{competition.entry ? "Inscrit" : `${competition.energyCost} énergie`}</small>
+          </button>
+        ))}
+      </div>
+      <section className="grid gap-4">
+        {activeCompetition
+          ? [activeCompetition].map((competition) => {
           const entry = competition.entry;
           const nextRanking =
             entry?.bracket.mode === "pyramide"
@@ -3757,7 +3866,8 @@ function SeasonPage() {
               ) : null}
             </article>
           );
-        })}
+        })
+          : null}
       </section>
       {selectedCompetition ? (
         <SeasonEntryDetails
@@ -4646,9 +4756,9 @@ function ClubPage() {
 
         {club.isPresident && settingsOpen
           ? createPortal(
-              <div className="fixed inset-0 z-[9999] grid place-items-center overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm">
+              <div className="game-modal-overlay">
                 <form
-                  className="panel w-full max-w-2xl p-6 shadow-2xl shadow-black/60"
+                  className="game-modal-panel panel max-w-2xl"
                   onSubmit={updateClubSettings}
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -4741,8 +4851,8 @@ function ClubPage() {
 
         {leaveOpen
           ? createPortal(
-              <div className="fixed inset-0 z-[9999] grid place-items-center overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm">
-                <div className="panel w-full max-w-xl p-6 shadow-2xl shadow-black/60">
+              <div className="game-modal-overlay">
+                <div className="game-modal-panel panel max-w-xl">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-sm font-bold uppercase tracking-[0.22em] text-red-200">
@@ -5505,8 +5615,8 @@ function MatchResultModal({
   onDashboard: () => void;
 }) {
   return createPortal(
-    <div className="fixed inset-0 z-[9999] grid place-items-center bg-slate-950/82 p-4 backdrop-blur">
-      <section className="panel w-full max-w-md p-6 text-center shadow-2xl shadow-black/60">
+    <div className="game-modal-overlay">
+      <section className="game-modal-panel panel max-w-md text-center">
         <p
           className={`text-sm font-bold uppercase tracking-[0.24em] ${won ? "text-emerald-300" : "text-rose-300"}`}
         >

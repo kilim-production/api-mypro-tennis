@@ -423,6 +423,57 @@ select {
   min-width: 0;
 }
 
+.game-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  background: rgba(2, 6, 23, 0.82);
+  padding: 16px;
+  backdrop-filter: blur(10px);
+}
+
+.game-modal-panel {
+  width: min(100%, 72rem);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  padding: 18px;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.52);
+}
+
+.game-modal-header {
+  position: sticky;
+  top: -18px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    linear-gradient(180deg, rgba(2, 6, 23, 0.96), rgba(2, 6, 23, 0.88)),
+    rgba(2, 6, 23, 0.92);
+  margin: -18px -18px 0;
+  padding: 18px;
+  backdrop-filter: blur(12px);
+}
+
+.bracket-scroll {
+  scrollbar-color: rgba(94, 234, 212, 0.7) rgba(15, 23, 42, 0.8);
+  scrollbar-width: thin;
+}
+
+.bracket-grid {
+  align-items: start;
+}
+
+.bracket-card {
+  min-height: 74px;
+}
+
 .replay-control-panel {
   position: sticky;
   top: 72px;
@@ -880,6 +931,36 @@ select {
 }
 
 @media (orientation: landscape) and (max-height: 520px) {
+  .game-modal-overlay {
+    padding: 8px;
+  }
+
+  .game-modal-panel {
+    max-height: calc(100dvh - 16px);
+    padding: 12px;
+  }
+
+  .game-modal-header {
+    top: -12px;
+    margin: -12px -12px 0;
+    padding: 12px;
+  }
+
+  .game-modal-header h2 {
+    font-size: 20px;
+  }
+
+  .bracket-grid {
+    min-width: 840px !important;
+    gap: 8px;
+  }
+
+  .bracket-card {
+    min-height: 62px;
+    padding: 8px;
+    font-size: 12px;
+  }
+
   .replay-control-panel {
     top: 58px;
     padding: 12px;
