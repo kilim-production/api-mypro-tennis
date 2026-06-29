@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "@mypro/database";
-import { avatarUpdateSchema, playerCreationSchema } from "@mypro/shared";
+import { avatarUpdateSchema, playerCreationSchema, playerProfileUpdateSchema } from "@mypro/shared";
 import {
   calculateFftRanking,
   createStatsForArchetype,
@@ -18,6 +18,18 @@ import { encodeJson } from "../services/json";
 import { awardChestForWin } from "../services/chests";
 
 export const playersRouter = Router();
+
+function updateAvatarInitials(avatar: string, initials: string) {
+  try {
+    const parsed = JSON.parse(avatar) as { type?: string; picture?: unknown };
+    if (parsed.type === "picture-v1" && parsed.picture) {
+      return encodeJson({ ...parsed, initials });
+    }
+  } catch {
+    return avatar;
+  }
+  return avatar;
+}
 
 playersRouter.get("/", async (_request, response) => {
   const players = await prisma.player.findMany({ orderBy: { worldRank: "asc" }, take: 100 });
@@ -202,6 +214,33 @@ playersRouter.post(
       return created;
     });
     return response.status(201).json(publicPlayer(player));
+  }
+);
+
+playersRouter.patch(
+  "/me/profile",
+  requireAuth,
+  validateBody(playerProfileUpdateSchema),
+  async (request, response) => {
+    const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
+    if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+
+    const initials =
+      `${request.body.firstName[0] ?? "M"}${request.body.lastName[0] ?? "P"}`.toUpperCase();
+    const updated = await prisma.player.update({
+      where: { id: player.id },
+      data: {
+        firstName: request.body.firstName,
+        lastName: request.body.lastName,
+        nationality: request.body.nationality,
+        gender: request.body.gender,
+        dominantHand: request.body.dominantHand,
+        backhand: request.body.backhand,
+        avatar: updateAvatarInitials(player.avatar, initials)
+      }
+    });
+
+    return response.json(publicPlayer(updated));
   }
 );
 

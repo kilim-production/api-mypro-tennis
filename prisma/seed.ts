@@ -1,4 +1,4 @@
-import bcrypt from "bcryptjs";
+﻿import bcrypt from "bcryptjs";
 import { prisma } from "@mypro/database";
 import { calculateOverall } from "@mypro/core";
 import {
@@ -15,23 +15,23 @@ const archetypes = [
   "Gros service",
   "Relanceur",
   "Frappeur de fond",
-  "Athlète endurant",
+  "AthlÃ¨te endurant",
   "Joueur complet"
 ];
 
 const firstNames = [
   "Camille",
-  "Noé",
+  "NoÃ©",
   "Lina",
   "Sacha",
   "Iris",
   "Malo",
   "Nora",
   "Eden",
-  "Léon",
+  "LÃ©on",
   "Mila",
   "Oscar",
-  "Zoé",
+  "ZoÃ©",
   "Nils",
   "Alya",
   "Hugo",
@@ -39,11 +39,11 @@ const firstNames = [
   "Tao",
   "Romane",
   "Eli",
-  "Maëlys",
+  "MaÃ«lys",
   "Yanis",
   "Clara",
   "Basile",
-  "Léna",
+  "LÃ©na",
   "Adam",
   "June",
   "Robin",
@@ -61,8 +61,8 @@ const lastNames = [
   "Serrano",
   "Delaune",
   "Okafor",
-  "Massé",
-  "Bergström",
+  "MassÃ©",
+  "BergstrÃ¶m",
   "Valcourt",
   "Mercier",
   "Noval",
@@ -192,7 +192,7 @@ function tournamentSchedule(start: Date, entrantCount: number) {
     slots.push({
       court: `Court ${1 + (index % 4)}`,
       round:
-        index < 8 ? "Huitièmes" : index < 12 ? "Quarts" : index < 14 ? "Demi-finales" : "Finale",
+        index < 8 ? "HuitiÃ¨mes" : index < 12 ? "Quarts" : index < 14 ? "Demi-finales" : "Finale",
       startsAt: matchTime.toISOString()
     });
   }
@@ -217,8 +217,8 @@ async function seedDemoAccount() {
   const passwordHash = await bcrypt.hash("demo1234", 12);
   await prisma.user.upsert({
     where: { email: demoEmail },
-    update: { passwordHash, displayName: "Compte Démo" },
-    create: { email: demoEmail, passwordHash, displayName: "Compte Démo" }
+    update: { passwordHash, displayName: "Compte DÃ©mo" },
+    create: { email: demoEmail, passwordHash, displayName: "Compte DÃ©mo" }
   });
 }
 
@@ -239,9 +239,7 @@ async function seedAiPlayers() {
           id: `ai-${ranking.replace("/", "_").replace("-", "neg")}-${slot + 1}`,
           firstName,
           lastName,
-          nationality:
-            ["France", "Espagne", "Japon", "Canada", "Italie", "Suède"][profileIndex % 6] ??
-            "France",
+          nationality: ["FR", "ES", "JP", "CA", "IT", "SE"][profileIndex % 6] ?? "FR",
           gender: profileIndex % 2 === 0 ? "Femme" : "Homme",
           dominantHand: profileIndex % 5 === 0 ? "Gauche" : "Droite",
           backhand: profileIndex % 3 === 0 ? "Une main" : "Deux mains",
@@ -263,7 +261,7 @@ async function seedAiPlayers() {
           fftRanking: ranking,
           fftRankingValidated: ranking === "-15",
           amateurPoints: requiredPoints,
-          careerStage: ["-2/6", "-4/6", "-15"].includes(ranking) ? "Pré-pro" : "Amateur",
+          careerStage: ["-2/6", "-4/6", "-15"].includes(ranking) ? "PrÃ©-pro" : "Amateur",
           proUnlocked: false,
           recentForm: Math.max(35, Math.min(88, 45 + Math.round(overall * 0.35) + slot)),
           wins: Math.max(0, Math.round(requiredPoints / 120) + slot),
@@ -297,7 +295,7 @@ async function seedTournaments(aiPlayers: Awaited<ReturnType<typeof seedAiPlayer
         schedule: JSON.stringify(tournamentSchedule(startsAt, entrants.length)),
         bracket: JSON.stringify({
           entrants,
-          rounds: ["Huitièmes", "Quarts", "Demi-finales", "Finale"]
+          rounds: ["HuitiÃ¨mes", "Quarts", "Demi-finales", "Finale"]
         })
       },
       create: {
@@ -317,7 +315,7 @@ async function seedTournaments(aiPlayers: Awaited<ReturnType<typeof seedAiPlayer
         recommendedLevel: tournament.recommendedLevel,
         bracket: JSON.stringify({
           entrants,
-          rounds: ["Huitièmes", "Quarts", "Demi-finales", "Finale"]
+          rounds: ["HuitiÃ¨mes", "Quarts", "Demi-finales", "Finale"]
         })
       }
     });
@@ -330,7 +328,7 @@ async function main() {
   const aiPlayers = await seedAiPlayers();
   await seedTournaments(aiPlayers);
   console.log(
-    "Données réinitialisées : compte démo sans joueur, pyramide IA complète et tournois prêts."
+    "DonnÃ©es rÃ©initialisÃ©es : compte dÃ©mo sans joueur, pyramide IA complÃ¨te et tournois prÃªts."
   );
 }
 

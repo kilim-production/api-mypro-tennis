@@ -272,7 +272,7 @@ async function getOrCreateSeasonOpponent(
     data: {
       firstName: identity.firstName,
       lastName: identity.lastName,
-      nationality: "FRA",
+      nationality: "FR",
       gender: "Homme",
       dominantHand: seed % 2 === 0 ? "Droite" : "Gauche",
       backhand: seed % 3 === 0 ? "Une main" : "Deux mains",
@@ -329,7 +329,7 @@ async function getOrCreateDuelAiOpponent(params: {
     data: {
       firstName: identity.firstName,
       lastName: identity.lastName,
-      nationality: ["FRA", "BEL", "SUI", "ESP", "ITA"][params.slot % 5] ?? "FRA",
+      nationality: ["FR", "BE", "CH", "ES", "IT"][params.slot % 5] ?? "FR",
       gender: "Homme",
       dominantHand: seedNumber % 2 === 0 ? "Droite" : "Gauche",
       backhand: seedNumber % 3 === 0 ? "Une main" : "Deux mains",

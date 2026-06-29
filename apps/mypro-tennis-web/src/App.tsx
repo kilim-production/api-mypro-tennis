@@ -71,6 +71,7 @@ import {
   XAxis,
   YAxis
 } from "recharts";
+import { countries, countryLabel, normalizeCountryCode } from "@mypro/shared";
 import { API_URL, api, saveToken } from "./api";
 import { useGameStore, type GameNotification, type Player } from "./store";
 
@@ -183,6 +184,10 @@ function statVisual(key: string) {
 }
 
 const stat = (player: Player, key: string) => player.stats[key] ?? 0;
+
+function nationalityLabel(value: string) {
+  return countryLabel(value);
+}
 
 const landingFacts: Array<[string, string]> = [
   ["Saison", "30 jours réels"],
@@ -1717,8 +1722,7 @@ function GoogleOAuthCallback() {
 function CreatePlayer() {
   const textFields = [
     ["firstName", "Prénom"],
-    ["lastName", "Nom"],
-    ["nationality", "Nationalité"]
+    ["lastName", "Nom"]
   ] as const;
   const selectFields = [
     ["gender", "Sexe", ["Femme", "Homme"]],
@@ -1733,7 +1737,7 @@ function CreatePlayer() {
   const [form, setForm] = useState({
     firstName: "Alex",
     lastName: "Moreau",
-    nationality: "France",
+    nationality: "FR",
     gender: "Femme",
     dominantHand: "Droite",
     backhand: "Deux mains",
@@ -1793,6 +1797,20 @@ function CreatePlayer() {
             />
           </label>
         ))}
+        <label className="grid gap-2 text-sm font-semibold text-slate-200">
+          <span>Nationalité</span>
+          <select
+            className="rounded-md border border-white/10 bg-slate-950 px-3 py-2"
+            value={form.nationality}
+            onChange={(event) => setForm({ ...form, nationality: event.target.value })}
+          >
+            {countries.map((country) => (
+              <option key={country.code} value={country.code}>
+                {country.label}
+              </option>
+            ))}
+          </select>
+        </label>
         {selectFields.map(([key, label, values]) => (
           <label key={key} className="grid gap-2 text-sm font-semibold text-slate-200">
             <span>{label}</span>
@@ -2162,6 +2180,7 @@ function PlayerPage() {
   const refresh = useGameStore((state) => state.refresh);
   const [career, setCareer] = useState<CareerProfile | null>(null);
   const [avatarEditorOpen, setAvatarEditorOpen] = useState(false);
+  const [profileEditorOpen, setProfileEditorOpen] = useState(false);
   const topStats = profileStatKeys
     .map((key) => ({ key, value: stat(player, key) }))
     .sort((a, b) => b.value - a.value)
@@ -2172,17 +2191,26 @@ function PlayerPage() {
       <section className="panel p-5">
         <div className="flex items-start justify-between gap-4">
           <ProfilePicture avatar={player.avatar} size="lg" />
-          <button
-            className="rounded-md border border-emerald-300/35 bg-emerald-300/10 px-3 py-2 text-sm font-bold text-emerald-100 transition hover:bg-emerald-300/18"
-            onClick={() => setAvatarEditorOpen(true)}
-            type="button"
-          >
-            Modifier
-          </button>
+          <div className="grid gap-2">
+            <button
+              className="rounded-md border border-emerald-300/35 bg-emerald-300/10 px-3 py-2 text-sm font-bold text-emerald-100 transition hover:bg-emerald-300/18"
+              onClick={() => setProfileEditorOpen(true)}
+              type="button"
+            >
+              Profil
+            </button>
+            <button
+              className="rounded-md border border-white/10 bg-white/[0.06] px-3 py-2 text-sm font-bold text-slate-100 transition hover:bg-white/[0.1]"
+              onClick={() => setAvatarEditorOpen(true)}
+              type="button"
+            >
+              Photo
+            </button>
+          </div>
         </div>
         <h1 className="mt-4 text-2xl font-black">{player.name}</h1>
         <p className="text-slate-300">
-          {player.nationality} · {player.fftRanking} · Niveau {player.overall}
+          {nationalityLabel(player.nationality)} · {player.fftRanking} · Niveau {player.overall}
         </p>
         <div className="mt-4 grid grid-cols-2 gap-3">
           <Metric label="Victoires" value={player.wins} />
@@ -2226,6 +2254,151 @@ function PlayerPage() {
           }}
         />
       ) : null}
+      {profileEditorOpen ? (
+        <ProfileEditorModal
+          player={player}
+          onClose={() => setProfileEditorOpen(false)}
+          onSaved={async () => {
+            await refresh();
+            setProfileEditorOpen(false);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ProfileEditorModal({
+  player,
+  onClose,
+  onSaved
+}: {
+  player: Player;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const [form, setForm] = useState<{
+    firstName: string;
+    lastName: string;
+    nationality: string;
+    gender: string;
+    dominantHand: string;
+    backhand: string;
+  }>({
+    firstName: player.firstName,
+    lastName: player.lastName,
+    nationality: normalizeCountryCode(player.nationality) ?? "FR",
+    gender: player.gender,
+    dominantHand: player.dominantHand,
+    backhand: player.backhand
+  });
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function save(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      await api<Player>("/players/me/profile", {
+        method: "PATCH",
+        body: JSON.stringify(form)
+      });
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Profil impossible à enregistrer.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/78 px-4 backdrop-blur">
+      <form className="panel max-h-[92vh] w-full max-w-2xl overflow-auto p-6" onSubmit={save}>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.24em] text-emerald-300">
+              Identité joueur
+            </p>
+            <h2 className="mt-1 text-2xl font-black">Modifier le profil</h2>
+            <p className="mt-1 text-sm text-slate-300">
+              Ces informations sont visibles dans les duels, le classement et votre profil public.
+            </p>
+          </div>
+          <button
+            className="rounded-md bg-white/10 p-2 text-slate-200 hover:bg-white/15"
+            onClick={onClose}
+            aria-label="Fermer"
+            type="button"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <label className="grid gap-2 text-sm font-semibold text-slate-200">
+            <span>Prénom</span>
+            <Field
+              value={form.firstName}
+              onChange={(event) => setForm({ ...form, firstName: event.target.value })}
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-semibold text-slate-200">
+            <span>Nom</span>
+            <Field
+              value={form.lastName}
+              onChange={(event) => setForm({ ...form, lastName: event.target.value })}
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-semibold text-slate-200 md:col-span-2">
+            <span>Nationalité</span>
+            <select
+              className="rounded-md border border-white/10 bg-slate-950 px-3 py-2"
+              value={form.nationality}
+              onChange={(event) => setForm({ ...form, nationality: event.target.value })}
+            >
+              {countries.map((country) => (
+                <option key={country.code} value={country.code}>
+                  {country.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {[
+            ["gender", "Sexe", ["Femme", "Homme"]],
+            ["dominantHand", "Main dominante", ["Droite", "Gauche"]],
+            ["backhand", "Revers", ["Une main", "Deux mains"]]
+          ].map(([key, label, values]) => (
+            <label key={key as string} className="grid gap-2 text-sm font-semibold text-slate-200">
+              <span>{label as string}</span>
+              <select
+                className="rounded-md border border-white/10 bg-slate-950 px-3 py-2"
+                value={form[key as keyof typeof form]}
+                onChange={(event) => setForm({ ...form, [key as string]: event.target.value })}
+              >
+                {(values as string[]).map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </select>
+            </label>
+          ))}
+        </div>
+
+        {error ? (
+          <p className="mt-4 rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+            {error}
+          </p>
+        ) : null}
+
+        <div className="mt-6 flex flex-wrap justify-end gap-3">
+          <Button className="bg-white/10 text-white hover:bg-white/15" onClick={onClose} type="button">
+            Annuler
+          </Button>
+          <Button type="submit" disabled={saving}>
+            {saving ? "Enregistrement..." : "Enregistrer"}
+          </Button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -3516,7 +3689,7 @@ function RankingsPage() {
                     {player.name}
                   </Link>
                 </td>
-                <td>{player.nationality}</td>
+                <td>{nationalityLabel(player.nationality)}</td>
                 <td>{player.overall}</td>
                 <td>{player.rankingPoints}</td>
                 <td>
@@ -3544,7 +3717,8 @@ function ClubPlayerRow({ player, badge }: { player: ClubPlayerSummary; badge?: R
             {player.name}
           </Link>
           <p className="text-sm text-slate-300">
-            {player.nationality} · {player.fftRanking} · Niveau {player.overall}
+            {nationalityLabel(player.nationality)} · {player.fftRanking} · Niveau{" "}
+            {player.overall}
           </p>
         </div>
       </div>
@@ -4774,7 +4948,7 @@ function MatchStartPage() {
               {opponent.firstName} {opponent.lastName}
             </h2>
             <p className="text-sm text-emerald-300">
-              {opponent.nationality} · {opponent.fftRanking}
+              {nationalityLabel(opponent.nationality)} · {opponent.fftRanking}
             </p>
           </div>
         </div>
@@ -5195,7 +5369,8 @@ function SimpleMatchPlayerCard({
             {player.firstName} {player.lastName}
           </h2>
           <p className="text-sm text-slate-300">
-            {player.nationality} · {player.fftRanking} · Niveau {player.overall}
+            {nationalityLabel(player.nationality)} · {player.fftRanking} · Niveau{" "}
+            {player.overall}
           </p>
         </div>
       </div>
@@ -5447,7 +5622,8 @@ function ProfilePage() {
     <section className="panel p-5">
       <h1 className="text-2xl font-black">{player.name}</h1>
       <p className="text-emerald-300">
-        {player.nationality} · Rang {player.worldRank} · Niveau {player.overall}
+        {nationalityLabel(player.nationality)} · Rang {player.worldRank} · Niveau{" "}
+        {player.overall}
       </p>
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <StatBars player={player} />

@@ -1,4 +1,15 @@
 import { z } from "zod";
+import { countryCodes, normalizeCountryCode } from "./countries";
+
+export {
+  countries,
+  countryCodes,
+  countryFlag,
+  countryLabel,
+  countryName,
+  normalizeCountryCode,
+  type CountryCode
+} from "./countries";
 
 const personalPictureIds = [
   "pp-01",
@@ -117,10 +128,15 @@ export const clubLeaveSchema = z.object({
   successorPlayerId: z.string().min(1).optional()
 });
 
+export const countryCodeSchema = z.preprocess(
+  (value) => (typeof value === "string" ? normalizeCountryCode(value) ?? value : value),
+  z.enum(countryCodes)
+);
+
 export const playerCreationSchema = z.object({
   firstName: z.string().min(2).max(28),
   lastName: z.string().min(2).max(32),
-  nationality: z.string().min(2).max(32),
+  nationality: countryCodeSchema,
   gender: z.enum(["Femme", "Homme"]),
   dominantHand: z.enum(["Droite", "Gauche"]),
   backhand: z.enum(["Une main", "Deux mains"]),
@@ -132,6 +148,15 @@ export const playerCreationSchema = z.object({
     "Joueur complet"
   ]),
   avatarPicture: avatarPictureSchema.optional()
+});
+
+export const playerProfileUpdateSchema = z.object({
+  firstName: z.string().min(2).max(28),
+  lastName: z.string().min(2).max(32),
+  nationality: countryCodeSchema,
+  gender: z.enum(["Femme", "Homme"]),
+  dominantHand: z.enum(["Droite", "Gauche"]),
+  backhand: z.enum(["Une main", "Deux mains"])
 });
 
 export const trainingStartSchema = z.object({
@@ -167,6 +192,7 @@ export const challengeSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 export type SignupInput = z.infer<typeof signupSchema>;
 export type PlayerCreationInput = z.infer<typeof playerCreationSchema>;
+export type PlayerProfileUpdateInput = z.infer<typeof playerProfileUpdateSchema>;
 export type AvatarUpdateInput = z.infer<typeof avatarUpdateSchema>;
 export type CosmeticEquipInput = z.infer<typeof cosmeticEquipSchema>;
 export type ClubCreateInput = z.infer<typeof clubCreateSchema>;

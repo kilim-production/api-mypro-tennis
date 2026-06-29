@@ -5,6 +5,7 @@ import {
   cosmeticEquipSchema,
   loginSchema,
   playerCreationSchema,
+  playerProfileUpdateSchema,
   trainingStartSchema
 } from "./index";
 
@@ -14,8 +15,7 @@ describe("validations partagees", () => {
   });
 
   it("valide une creation de joueur realiste", () => {
-    expect(
-      playerCreationSchema.safeParse({
+    const result = playerCreationSchema.safeParse({
         firstName: "Alex",
         lastName: "Moreau",
         nationality: "France",
@@ -24,8 +24,9 @@ describe("validations partagees", () => {
         backhand: "Deux mains",
         archetype: "Joueur complet",
         avatarPicture: { kind: "preset", id: "pp-01" }
-      }).success
-    ).toBe(true);
+      });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.nationality).toBe("FR");
   });
 
   it("accepte une photo de profil importee compacte", () => {
@@ -112,6 +113,19 @@ describe("validations partagees", () => {
         archetype: "Joueur complet"
       }).success
     ).toBe(false);
+  });
+
+  it("valide une modification de profil joueur", () => {
+    const result = playerProfileUpdateSchema.safeParse({
+      firstName: "Lina",
+      lastName: "Moreau",
+      nationality: "Espagne",
+      gender: "Femme",
+      dominantHand: "Gauche",
+      backhand: "Une main"
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.nationality).toBe("ES");
   });
 
   it("refuse un entrainement sans identifiant", () => {

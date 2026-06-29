@@ -7,6 +7,10 @@ export type Player = {
   firstName: string;
   lastName: string;
   nationality: string;
+  gender: string;
+  dominantHand: string;
+  backhand: string;
+  archetype: string;
   avatar: string;
   isAi: boolean;
   stats: Record<string, number>;
