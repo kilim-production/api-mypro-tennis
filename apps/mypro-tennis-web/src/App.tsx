@@ -1588,7 +1588,7 @@ function Landing() {
           </article>
         ))}
       </section>
-      <section className="panel p-5">
+      <section className="replay-control-panel panel p-5">
         <div className="grid gap-4 md:grid-cols-4">
           {landingFacts.map(([label, value]) => (
             <Metric key={label} label={label} value={value} />
@@ -5267,12 +5267,14 @@ function MatchReplayPage() {
   const navigate = useNavigate();
   const player = useGameStore((state) => state.player);
   const [match, setMatch] = useState<MatchReplay | null>(null);
+  const [replayTab, setReplayTab] = useState<"live" | "calc" | "feed">("live");
   const [index, setIndex] = useState(0);
   const [speed, setSpeed] = useState(1);
   const [playing, setPlaying] = useState(true);
   const [resultDismissed, setResultDismissed] = useState(false);
   useEffect(() => {
     setIndex(0);
+    setReplayTab("live");
     setPlaying(true);
     setResultDismissed(false);
     void api<MatchReplay>(`/matches/${id}`).then(setMatch);
@@ -5353,8 +5355,26 @@ function MatchReplayPage() {
         <div className="mt-5 h-2 rounded-full bg-white/10">
           <div className="h-full rounded-full bg-emerald-300" style={{ width: `${progress}%` }} />
         </div>
+        <div className="segmented-tabs mt-4">
+          {[
+            ["live", "Match", `Point ${index + 1}`],
+            ["calc", "Calcul", statLabel],
+            ["feed", "Fil", `${Math.min(index + 1, events.length)} pts`]
+          ].map(([value, label, meta]) => (
+            <button
+              className={replayTab === value ? "is-active" : ""}
+              key={value}
+              onClick={() => setReplayTab(value as "live" | "calc" | "feed")}
+              type="button"
+            >
+              <span>{label}</span>
+              <small>{meta}</small>
+            </button>
+          ))}
+        </div>
       </section>
 
+      {replayTab === "live" ? (
       <section className="grid gap-5 xl:grid-cols-[1fr_340px_1fr]">
         <SimpleMatchPlayerCard player={a} side="left" active={event.winnerId === a.id} compact />
         <div className="match-center-panel panel grid content-between gap-4 p-4 text-center">
@@ -5390,7 +5410,9 @@ function MatchReplayPage() {
         </div>
         <SimpleMatchPlayerCard player={b} side="right" active={event.winnerId === b.id} compact />
       </section>
+      ) : null}
 
+      {replayTab === "calc" ? (
       <section className="panel p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -5427,7 +5449,9 @@ function MatchReplayPage() {
           />
         </div>
       </section>
+      ) : null}
 
+      {replayTab === "feed" ? (
       <section className="panel p-5">
         <h2 className="font-black">Fil des points</h2>
         <div className="mt-4 grid max-h-[360px] gap-2 overflow-auto">
@@ -5453,6 +5477,7 @@ function MatchReplayPage() {
             })}
         </div>
       </section>
+      ) : null}
       {finalReached && !resultDismissed ? (
         <MatchResultModal
           won={userWon}

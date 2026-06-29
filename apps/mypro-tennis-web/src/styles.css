@@ -423,6 +423,12 @@ select {
   min-width: 0;
 }
 
+.replay-control-panel {
+  position: sticky;
+  top: 72px;
+  z-index: 18;
+}
+
 .orientation-guard {
   display: none;
 }
@@ -874,6 +880,19 @@ select {
 }
 
 @media (orientation: landscape) and (max-height: 520px) {
+  .replay-control-panel {
+    top: 58px;
+    padding: 12px;
+  }
+
+  .replay-control-panel h1 {
+    font-size: 20px;
+  }
+
+  .replay-control-panel .segmented-tabs button {
+    min-height: 48px;
+  }
+
   .match-player-card {
     padding: 12px;
   }
