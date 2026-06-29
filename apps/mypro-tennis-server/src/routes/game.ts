@@ -238,11 +238,18 @@ async function getOrCreateSeasonOpponent(
   targetRanking: FftRanking,
   targetOverall: number,
   seed: number,
-  excludePlayerId: string
+  excludePlayerId: string,
+  options: { excludeDailyLimitedRealOpponents?: boolean } = {}
 ) {
+  const excludedIds = [
+    excludePlayerId,
+    ...(options.excludeDailyLimitedRealOpponents
+      ? Array.from(await realOpponentIdsAtDailyLimit(excludePlayerId))
+      : [])
+  ];
   const realPlayer = await prisma.player.findFirst({
     where: {
-      id: { not: excludePlayerId },
+      id: { notIn: excludedIds },
       isAi: false,
       fftRanking: targetRanking,
       overall: { gte: targetOverall - 8, lte: targetOverall + 8 }
@@ -347,10 +354,11 @@ async function buildDuelPool(player: {
   losses: number;
 }) {
   const allowedRankings = duelRankingPool(player.fftRanking);
+  const dailyLimitedRealOpponentIds = await realOpponentIdsAtDailyLimit(player.id);
   const seed = duelPoolSeed(player);
   const realCandidates = await prisma.player.findMany({
     where: {
-      id: { not: player.id },
+      id: { notIn: [player.id, ...dailyLimitedRealOpponentIds] },
       isAi: false,
       fftRanking: { in: allowedRankings }
     }
@@ -375,11 +383,10 @@ function todayBounds(now = new Date()) {
   return { start, end };
 }
 
-async function realDuelCountToday(playerId: string, opponentId: string) {
+async function realOpponentMatchCountToday(playerId: string, opponentId: string) {
   const { start, end } = todayBounds();
   return prisma.match.count({
     where: {
-      type: { in: ["Duel amateur", "Duel professionnel"] },
       playedAt: { gte: start, lt: end },
       OR: [
         { playerAId: playerId, playerBId: opponentId },
@@ -387,6 +394,34 @@ async function realDuelCountToday(playerId: string, opponentId: string) {
       ]
     }
   });
+}
+
+async function realOpponentIdsAtDailyLimit(playerId: string) {
+  const { start, end } = todayBounds();
+  const matches = await prisma.match.findMany({
+    where: {
+      playedAt: { gte: start, lt: end },
+      OR: [{ playerAId: playerId }, { playerBId: playerId }]
+    },
+    select: {
+      playerAId: true,
+      playerBId: true,
+      playerA: { select: { isAi: true } },
+      playerB: { select: { isAi: true } }
+    }
+  });
+  const counts = new Map<string, number>();
+  for (const match of matches) {
+    const opponentId = match.playerAId === playerId ? match.playerBId : match.playerAId;
+    const opponentIsAi = match.playerAId === playerId ? match.playerB.isAi : match.playerA.isAi;
+    if (opponentIsAi) continue;
+    counts.set(opponentId, (counts.get(opponentId) ?? 0) + 1);
+  }
+  return new Set(
+    Array.from(counts.entries())
+      .filter(([, count]) => count >= 2)
+      .map(([opponentId]) => opponentId)
+  );
 }
 
 function buildSeasonBracket(
@@ -1053,7 +1088,10 @@ gameRouter.post("/season/entries/:id/play", requireAuth, async (request, respons
     next.ranking,
     next.targetOverall,
     entry.currentRound + entry.id.length,
-    player.id
+    player.id,
+    {
+      excludeDailyLimitedRealOpponents: ["daily", "weekly"].includes(entry.competitionType)
+    }
   );
   const definition =
     seasonDefinitions[entry.competitionType as SeasonCompetitionType] ?? seasonDefinitions.daily;
@@ -1207,9 +1245,10 @@ gameRouter.get("/matches/duel-search", requireAuth, async (request, response) =>
     return response.status(400).json({ message: "Saisissez au moins 2 caractères." });
   }
   const allowedRankings = duelRankingPool(player.fftRanking);
+  const dailyLimitedRealOpponentIds = await realOpponentIdsAtDailyLimit(player.id);
   const candidates = await prisma.player.findMany({
     where: {
-      id: { not: player.id },
+      id: { notIn: [player.id, ...dailyLimitedRealOpponentIds] },
       isAi: false,
       fftRanking: { in: allowedRankings }
     },
@@ -1273,8 +1312,8 @@ gameRouter.post(
         .json({ message: "Cet adversaire doit être dans votre zone de classement de duel." });
     }
     if (!opponent.isAi) {
-      const duelCount = await realDuelCountToday(player.id, opponent.id);
-      if (duelCount >= 2) {
+      const matchCount = await realOpponentMatchCountToday(player.id, opponent.id);
+      if (matchCount >= 2) {
         return response.status(409).json({
           message: "Vous avez déjà affronté ce joueur réel 2 fois aujourd'hui."
         });
