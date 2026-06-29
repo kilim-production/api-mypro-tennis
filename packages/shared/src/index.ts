@@ -8,6 +8,7 @@ export {
   countryLabel,
   countryName,
   normalizeCountryCode,
+  type Country,
   type CountryCode
 } from "./countries";
 

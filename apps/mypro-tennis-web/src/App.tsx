@@ -71,7 +71,7 @@ import {
   XAxis,
   YAxis
 } from "recharts";
-import { countries, countryLabel, normalizeCountryCode } from "@mypro/shared";
+import { countries, countryLabel, normalizeCountryCode, type Country } from "@mypro/shared";
 import { API_URL, api, saveToken } from "./api";
 import { useGameStore, type GameNotification, type Player } from "./store";
 
@@ -1804,7 +1804,7 @@ function CreatePlayer() {
             value={form.nationality}
             onChange={(event) => setForm({ ...form, nationality: event.target.value })}
           >
-            {countries.map((country) => (
+            {countries.map((country: Country) => (
               <option key={country.code} value={country.code}>
                 {country.label}
               </option>
@@ -2357,7 +2357,7 @@ function ProfileEditorModal({
               value={form.nationality}
               onChange={(event) => setForm({ ...form, nationality: event.target.value })}
             >
-              {countries.map((country) => (
+              {countries.map((country: Country) => (
                 <option key={country.code} value={country.code}>
                   {country.label}
                 </option>

@@ -14,7 +14,7 @@
     "dev:server": "npm run dev -w @mypro/tennis-server",
     "api:build": "npm run db:generate && npm run typecheck",
     "api:start": "node scripts/start-api.mjs",
-    "build:netlify": "npm run build -w @mypro/tennis-web",
+    "build:netlify": "npm run build -w @mypro/shared && npm run build -w @mypro/tennis-web",
     "build": "npm run build --workspaces",
     "test": "vitest run",
     "lint": "eslint .",

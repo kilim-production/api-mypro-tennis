@@ -338,3 +338,5 @@ export const countries = countryCodes
     label: countryLabel(code)
   }))
   .sort((left, right) => left.name.localeCompare(right.name, "fr"));
+
+export type Country = (typeof countries)[number];

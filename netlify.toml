@@ -1,5 +1,5 @@
 [build]
-  command = "npm run build -w @mypro/tennis-web"
+  command = "npm run build -w @mypro/shared && npm run build -w @mypro/tennis-web"
   publish = "apps/mypro-tennis-web/dist"
 
 [build.environment]
