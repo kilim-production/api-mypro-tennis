@@ -58,18 +58,13 @@ import {
   Zap
 } from "lucide-react";
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
   PolarAngleAxis,
   PolarGrid,
   PolarRadiusAxis,
   Radar,
   RadarChart,
   ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis
+  Tooltip
 } from "recharts";
 import { countries, countryLabel, normalizeCountryCode, type Country } from "@mypro/shared";
 import { API_URL, api, saveToken } from "./api";
@@ -3823,44 +3818,45 @@ function TournamentsPage() {
 function RankingsPage() {
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
   useEffect(() => void api<RankedPlayer[]>("/rankings").then(setPlayers), []);
+  const podium = players.slice(0, 3);
   return (
-    <section className="panel overflow-hidden">
-      <div className="p-5">
-        <h1 className="text-2xl font-black">Classement mondial fictif</h1>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-white/5 text-slate-300">
-            <tr>
-              <th className="p-3">Rang</th>
-              <th>Joueur</th>
-              <th>Nat.</th>
-              <th>Niveau</th>
-              <th>Points</th>
-              <th>Bilan</th>
-            </tr>
-          </thead>
-          <tbody>
-            {players.map((player) => (
-              <tr key={player.id} className="border-t border-white/[0.08]">
-                <td className="p-3 font-bold">{player.rank}</td>
-                <td>
-                  <Link to={`/profile/${player.id}`} className="text-emerald-300">
-                    {player.name}
-                  </Link>
-                </td>
-                <td>{nationalityLabel(player.nationality)}</td>
-                <td>{player.overall}</td>
-                <td>{player.rankingPoints}</td>
-                <td>
-                  {player.wins}V · {player.losses}D
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
+    <div className="grid gap-4">
+      <section className="panel p-4 sm:p-5">
+        <p className="text-sm font-bold uppercase tracking-[0.22em] text-emerald-300">
+          Classement
+        </p>
+        <h1 className="mt-1 text-2xl font-black">Top mondial MyPro</h1>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {podium.map((player) => (
+            <Link className="ranking-podium-card" key={player.id} to={`/profile/${player.id}`}>
+              <div className="ranking-rank">#{player.rank}</div>
+              <ProfilePicture avatar={player.avatar} size="sm" />
+              <div className="min-w-0">
+                <h2>{player.name}</h2>
+                <p>
+                  {nationalityLabel(player.nationality)} · Niveau {player.overall}
+                </p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+      <section className="ranking-list">
+        {players.map((player) => (
+          <Link className="ranking-row-card" key={player.id} to={`/profile/${player.id}`}>
+            <div className="ranking-row-rank">{player.rank}</div>
+            <ProfilePicture avatar={player.avatar} size="sm" />
+            <div className="min-w-0 flex-1">
+              <h2>{player.name}</h2>
+              <p>{nationalityLabel(player.nationality)}</p>
+            </div>
+            <GameMiniMetric label="Niveau" value={player.overall} />
+            <GameMiniMetric label="Points" value={player.rankingPoints} />
+            <GameMiniMetric label="Bilan" value={`${player.wins}V/${player.losses}D`} />
+          </Link>
+        ))}
+      </section>
+    </div>
   );
 }
 
@@ -5312,8 +5308,8 @@ function MatchReplayPage() {
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[1fr_340px_1fr]">
-        <SimpleMatchPlayerCard player={a} side="left" active={event.winnerId === a.id} />
-        <div className="panel grid content-between gap-5 p-5 text-center">
+        <SimpleMatchPlayerCard player={a} side="left" active={event.winnerId === a.id} compact />
+        <div className="match-center-panel panel grid content-between gap-4 p-4 text-center">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
               Point {index + 1}/{events.length}
@@ -5344,7 +5340,7 @@ function MatchReplayPage() {
             </div>
           </div>
         </div>
-        <SimpleMatchPlayerCard player={b} side="right" active={event.winnerId === b.id} />
+        <SimpleMatchPlayerCard player={b} side="right" active={event.winnerId === b.id} compact />
       </section>
 
       <section className="panel p-5">
@@ -5499,24 +5495,23 @@ function repairMatchText(value: string) {
 function SimpleMatchPlayerCard({
   player,
   side,
-  active
+  active,
+  compact = false
 }: {
   player: Player;
   side: "left" | "right";
   active: boolean;
+  compact?: boolean;
 }) {
-  const matchStats = [
-    "service",
-    "return",
-    "forehand",
-    "backhand",
-    "stamina",
-    "speed",
-    "strength",
-    "recovery"
-  ];
+  const matchStats = compact
+    ? profileStatKeys
+        .map((key) => ({ key, value: stat(player, key) }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 4)
+        .map((item) => item.key)
+    : ["service", "return", "forehand", "backhand", "stamina", "speed", "strength", "recovery"];
   return (
-    <article className={`panel p-5 ${active ? "ring-2 ring-emerald-300" : ""}`}>
+    <article className={`match-player-card panel p-4 ${active ? "ring-2 ring-emerald-300" : ""}`}>
       <div
         className={`flex items-center gap-4 ${side === "right" ? "flex-row-reverse text-right" : ""}`}
       >
@@ -5722,21 +5717,35 @@ function MatchesPage() {
   const [matches, setMatches] = useState<MatchListItem[]>([]);
   useEffect(() => void api<MatchListItem[]>("/matches").then(setMatches), []);
   return (
-    <section className="panel p-5">
-      <h1 className="text-2xl font-black">Historique des matchs</h1>
+    <section className="panel p-4 sm:p-5">
+      <p className="text-sm font-bold uppercase tracking-[0.22em] text-emerald-300">Matchs</p>
+      <h1 className="mt-1 text-2xl font-black">Historique</h1>
       <div className="mt-4 grid gap-3">
         {matches.map((match) => (
           <Link
             key={match.id}
             to={`/match/${match.id}`}
-            className="grid gap-2 rounded-md border border-white/10 bg-white/5 p-4 md:grid-cols-[1fr_130px_120px]"
+            className="match-history-card"
           >
-            <span>
-              {match.playerA.firstName} {match.playerA.lastName} vs {match.playerB.firstName}{" "}
-              {match.playerB.lastName}
-            </span>
-            <span className="text-emerald-300">{match.scoreText}</span>
-            <span>{match.type}</span>
+            <div className="flex min-w-0 items-center gap-3">
+              <ProfilePicture avatar={match.playerA.avatar} size="sm" />
+              <div className="min-w-0">
+                <strong>
+                  {match.playerA.firstName} {match.playerA.lastName}
+                </strong>
+                <p>{match.playerA.fftRanking}</p>
+              </div>
+            </div>
+            <div className="match-score-pill">{match.scoreText}</div>
+            <div className="flex min-w-0 items-center gap-3 md:flex-row-reverse md:text-right">
+              <ProfilePicture avatar={match.playerB.avatar} size="sm" />
+              <div className="min-w-0">
+                <strong>
+                  {match.playerB.firstName} {match.playerB.lastName}
+                </strong>
+                <p>{match.type}</p>
+              </div>
+            </div>
           </Link>
         ))}
       </div>
@@ -5756,13 +5765,18 @@ function OnlinePage() {
     };
   }, []);
   return (
-    <section className="panel p-5">
-      <h1 className="text-2xl font-black">Joueurs en ligne</h1>
-      <div className="mt-4 grid gap-3">
+    <section className="panel p-4 sm:p-5">
+      <p className="text-sm font-bold uppercase tracking-[0.22em] text-emerald-300">Présence</p>
+      <h1 className="mt-1 text-2xl font-black">Joueurs en ligne</h1>
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {online.length ? (
           online.map((user) => (
-            <div key={user.userId} className="rounded-md bg-white/5 p-3">
-              {user.displayName} · connecté
+            <div key={user.userId} className="online-player-card">
+              <span className="online-dot" />
+              <div>
+                <strong>{user.displayName}</strong>
+                <p>Connecté maintenant</p>
+              </div>
             </div>
           ))
         ) : (
@@ -5778,30 +5792,45 @@ function ProfilePage() {
   const [player, setPlayer] = useState<Player | null>(null);
   useEffect(() => void api<Player>(`/players/${id}`).then(setPlayer), [id]);
   if (!player) return <div className="panel p-5">Profil en chargement...</div>;
+  const topStats = profileStatKeys
+    .map((key) => ({ key, value: stat(player, key) }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 4);
   return (
-    <section className="panel p-5">
-      <h1 className="text-2xl font-black">{player.name}</h1>
-      <p className="text-emerald-300">
-        {nationalityLabel(player.nationality)} · Rang {player.worldRank} · Niveau{" "}
-        {player.overall}
-      </p>
-      <div className="mt-5 grid gap-5 lg:grid-cols-2">
-        <StatBars player={player} />
-        <ResponsiveContainer height={260}>
-          <BarChart
-            data={Object.entries(player.stats)
-              .slice(0, 8)
-              .map(([name, value]) => ({ name: statLabels[name], value }))}
-          >
-            <CartesianGrid stroke="#ffffff16" />
-            <XAxis dataKey="name" hide />
-            <YAxis />
-            <Tooltip />
-            <Bar dataKey="value" fill="#20c47a" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </section>
+    <div className="grid gap-4">
+      <section className="panel p-4 sm:p-5">
+        <div className="flex items-center gap-4">
+          <ProfilePicture avatar={player.avatar} size="md" />
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-black">{player.name}</h1>
+            <p className="text-sm text-emerald-300">
+              {nationalityLabel(player.nationality)} · Rang {player.worldRank} · Niveau{" "}
+              {player.overall}
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
+          <GameMiniMetric label="Classement" value={player.fftRanking} />
+          <GameMiniMetric label="Niveau" value={player.overall} />
+          <GameMiniMetric label="Victoires" value={player.wins} />
+          <GameMiniMetric label="Défaites" value={player.losses} />
+        </div>
+      </section>
+      <section className="panel p-4 sm:p-5">
+        <div className="flex flex-wrap gap-2">
+          {topStats.map((item) => (
+            <span key={item.key} className="stat-bonus-pill">
+              <StatIcon statKey={item.key} size="sm" />
+              <span>{statLabels[item.key]}</span>
+              <strong>{Math.round(item.value)}</strong>
+            </span>
+          ))}
+        </div>
+        <div className="mt-4">
+          <StatBars player={player} />
+        </div>
+      </section>
+    </div>
   );
 }
 
