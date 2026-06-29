@@ -5063,6 +5063,7 @@ function ClubPage() {
 
 function MatchStartPage() {
   const [pool, setPool] = useState<DuelPool | null>(null);
+  const [duelTab, setDuelTab] = useState<"pool" | "friends">("pool");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Player[]>([]);
   const [searching, setSearching] = useState(false);
@@ -5186,56 +5187,77 @@ function MatchStartPage() {
             Rafraîchir
           </Button>
         </div>
+        <div className="segmented-tabs mt-4">
+          {[
+            ["pool", "Pool automatique", "3 choix"],
+            ["friends", "Match entre amis", "Recherche"]
+          ].map(([value, label, meta]) => (
+            <button
+              className={duelTab === value ? "is-active" : ""}
+              key={value}
+              onClick={() => setDuelTab(value as "pool" | "friends")}
+              type="button"
+            >
+              <span>{label}</span>
+              <small>{meta}</small>
+            </button>
+          ))}
+        </div>
       </section>
       {message ? <div className="panel p-4 text-sm text-amber-100">{message}</div> : null}
-      <section className="panel p-4 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-300">
-              Match entre amis
+      {duelTab === "friends" ? (
+        <>
+          <section className="panel p-4 sm:p-5">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-300">
+                Match entre amis
+              </p>
+              <h2 className="text-2xl font-black">Chercher un joueur réel</h2>
+              <p className="mt-2 text-sm text-slate-300">
+                Recherchez un ami par prénom ou nom. Seuls les joueurs dans votre zone de
+                classement peuvent être défiés.
+              </p>
+            </div>
+            <form className="mt-4 flex flex-col gap-3 sm:flex-row" onSubmit={searchOpponents}>
+              <Field
+                className="flex-1"
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Prénom, nom ou classement"
+                value={searchQuery}
+              />
+              <Button disabled={searching} type="submit">
+                <Search size={17} /> {searching ? "Recherche..." : "Rechercher"}
+              </Button>
+            </form>
+          </section>
+          {searchResults.length > 0 ? (
+            <section className="grid gap-4 lg:grid-cols-3">
+              {searchResults.map((opponent) => opponentCard(opponent, "Joueur réel"))}
+            </section>
+          ) : null}
+        </>
+      ) : (
+        <>
+          <div className="flex items-center justify-between gap-3">
+            <p className="mb-3 text-sm font-bold uppercase tracking-[0.18em] text-slate-400">
+              Pool automatique
             </p>
-            <h2 className="text-2xl font-black">Chercher un joueur réel</h2>
-            <p className="mt-2 text-sm text-slate-300">
-              Recherchez un ami par prénom ou nom. Seuls les joueurs dans votre zone de classement
-              peuvent être défiés.
-            </p>
+            <span className="mb-3 rounded-md bg-white/10 px-2 py-1 text-xs font-bold text-slate-300">
+              Un joueur réel disparaît après 2 duels/jour
+            </span>
           </div>
-        </div>
-        <form className="mt-4 flex flex-col gap-3 sm:flex-row" onSubmit={searchOpponents}>
-          <Field
-            className="flex-1"
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Prénom, nom ou classement"
-            value={searchQuery}
-          />
-          <Button disabled={searching} type="submit">
-            <Search size={17} /> {searching ? "Recherche..." : "Rechercher"}
-          </Button>
-        </form>
-      </section>
-      {searchResults.length > 0 ? (
-        <section className="grid gap-4 lg:grid-cols-3">
-          {searchResults.map((opponent) => opponentCard(opponent, "Joueur réel"))}
-        </section>
-      ) : null}
-      <div className="flex items-center justify-between gap-3">
-        <p className="mb-3 text-sm font-bold uppercase tracking-[0.18em] text-slate-400">
-          Pool automatique
-        </p>
-        <span className="mb-3 rounded-md bg-white/10 px-2 py-1 text-xs font-bold text-slate-300">
-          3 choix
-        </span>
-      </div>
-      <section className="grid gap-4 lg:grid-cols-3">
-        {(pool?.opponents ?? []).map((opponent) =>
-          opponentCard(opponent, opponent.isAi ? "Profil IA" : "Joueur réel")
-        )}
-      </section>
-      {!pool ? (
-        <section className="panel p-5 text-sm text-slate-300">
-          Chargement des adversaires...
-        </section>
-      ) : null}
+          <section className="grid gap-4 lg:grid-cols-3">
+            {(pool?.opponents ?? []).map((opponent) =>
+              opponentCard(opponent, opponent.isAi ? "Profil IA" : "Joueur réel")
+            )}
+          </section>
+          {!pool ? (
+            <section className="panel p-5 text-sm text-slate-300">
+              Chargement des adversaires...
+            </section>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }
@@ -5861,6 +5883,9 @@ function ProfilePage() {
 }
 
 function CommunityPage() {
+  const [communityTab, setCommunityTab] = useState<"discord" | "onboarding" | "structure">(
+    "discord"
+  );
   const communitySections = [
     {
       title: "Discussion générale",
@@ -5908,7 +5933,7 @@ function CommunityPage() {
   return (
     <div className="grid gap-5">
       <section className="panel overflow-hidden p-0">
-        <div className="relative min-h-72 p-6 md:p-8">
+        <div className="relative min-h-60 p-6 md:p-8">
           <div className="absolute inset-0 bg-[url('/visuals/club/complex-level-5.jpg')] bg-cover bg-center opacity-35" />
           <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/80 to-slate-950/35" />
           <div className="relative z-10 max-w-3xl">
@@ -5952,64 +5977,90 @@ function CommunityPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2">
-        {communitySections.map(({ title, body, icon: Icon }) => (
-          <article className="panel p-5" key={title}>
-            <div className="flex items-start gap-3">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-emerald-300/25 bg-emerald-300/10 text-emerald-200">
-                <Icon size={21} />
-              </span>
-              <div>
-                <h2 className="text-lg font-black">{title}</h2>
-                <p className="mt-1 text-sm leading-6 text-slate-300">{body}</p>
-              </div>
-            </div>
-          </article>
+      <div className="segmented-tabs">
+        {[
+          ["discord", "Salons", "Échanger"],
+          ["onboarding", "Accueil", "Débuter"],
+          ["structure", "Structure", "Organisation"]
+        ].map(([value, label, meta]) => (
+          <button
+            className={communityTab === value ? "is-active" : ""}
+            key={value}
+            onClick={() =>
+              setCommunityTab(value as "discord" | "onboarding" | "structure")
+            }
+            type="button"
+          >
+            <span>{label}</span>
+            <small>{meta}</small>
+          </button>
         ))}
-      </section>
+      </div>
 
-      <section className="panel p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.22em] text-emerald-300">
-              Nouveaux arrivants
-            </p>
-            <h2 className="mt-1 text-xl font-black">Parcours d'accueil Discord</h2>
-          </div>
-          <span className="rounded-md border border-emerald-300/25 bg-emerald-300/10 px-3 py-2 text-xs font-black uppercase tracking-[0.18em] text-emerald-100">
-            Onboarding
-          </span>
-        </div>
-        <div className="mt-5 grid gap-3 md:grid-cols-4">
-          {newcomerSteps.map(({ title, body, icon: Icon }, index) => (
-            <article className="rounded-md border border-white/10 bg-white/[0.04] p-4" key={title}>
-              <div className="flex items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center rounded-md bg-emerald-300 text-slate-950">
-                  <Icon size={19} />
+      {communityTab === "discord" ? (
+        <section className="grid gap-4 md:grid-cols-2">
+          {communitySections.map(({ title, body, icon: Icon }) => (
+            <article className="panel p-5" key={title}>
+              <div className="flex items-start gap-3">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-emerald-300/25 bg-emerald-300/10 text-emerald-200">
+                  <Icon size={21} />
                 </span>
-                <span className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-                  Étape {index + 1}
-                </span>
+                <div>
+                  <h2 className="text-lg font-black">{title}</h2>
+                  <p className="mt-1 text-sm leading-6 text-slate-300">{body}</p>
+                </div>
               </div>
-              <h3 className="mt-4 font-black">{title}</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-300">{body}</p>
             </article>
           ))}
-        </div>
-      </section>
+        </section>
+      ) : null}
 
-      <section className="panel p-5">
-        <h2 className="text-xl font-black">Structure prévue du serveur</h2>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <Metric label="Accueil" value="#annonces · #règles · #présentations" />
-          <Metric label="Support" value="#bugs · #suggestions · #aide" />
-          <Metric label="Jeu" value="#clubs · #duels · #championnats" />
-        </div>
-        <p className="mt-4 text-sm leading-6 text-slate-300">
-          Le Discord sera le point de rencontre officiel pour suivre la progression du jeu et faire
-          remonter les retours de la communauté.
-        </p>
-      </section>
+      {communityTab === "onboarding" ? (
+        <section className="panel p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.22em] text-emerald-300">
+                Nouveaux arrivants
+              </p>
+              <h2 className="mt-1 text-xl font-black">Parcours d'accueil Discord</h2>
+            </div>
+            <span className="rounded-md border border-emerald-300/25 bg-emerald-300/10 px-3 py-2 text-xs font-black uppercase tracking-[0.18em] text-emerald-100">
+              Onboarding
+            </span>
+          </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-4">
+            {newcomerSteps.map(({ title, body, icon: Icon }, index) => (
+              <article className="rounded-md border border-white/10 bg-white/[0.04] p-4" key={title}>
+                <div className="flex items-center gap-3">
+                  <span className="grid h-10 w-10 place-items-center rounded-md bg-emerald-300 text-slate-950">
+                    <Icon size={19} />
+                  </span>
+                  <span className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                    Étape {index + 1}
+                  </span>
+                </div>
+                <h3 className="mt-4 font-black">{title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-300">{body}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {communityTab === "structure" ? (
+        <section className="panel p-5">
+          <h2 className="text-xl font-black">Structure prévue du serveur</h2>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <Metric label="Accueil" value="#annonces · #règles · #présentations" />
+            <Metric label="Support" value="#bugs · #suggestions · #aide" />
+            <Metric label="Jeu" value="#clubs · #duels · #championnats" />
+          </div>
+          <p className="mt-4 text-sm leading-6 text-slate-300">
+            Le Discord sera le point de rencontre officiel pour suivre la progression du jeu et
+            faire remonter les retours de la communauté.
+          </p>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -6043,42 +6094,84 @@ function SettingsPage() {
     navigate("/", { replace: true });
   }
   return (
-    <section className="panel p-5">
-      <h1 className="text-2xl font-black">Réglages</h1>
-      {message ? (
-        <div className="mt-4 rounded-md border border-emerald-300/30 bg-emerald-300/10 p-3 text-sm text-emerald-100">
-          {message}
-        </div>
-      ) : null}
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <Metric label="Compte" value={user?.email ?? "Invité"} />
-        <Metric label="Google" value={user?.googleLinked ? "Lié" : "Non lié"} />
-        <Metric label="PWA" value="Installable" />
-        <Metric label="Multijoueur" value="Socket.IO actif" />
-        <div className="metric md:col-span-2">
-          <div className="text-xs text-slate-400">Session</div>
-          <p className="mt-2 text-sm text-slate-300">
-            Fermez la session de ce navigateur. Votre compte, votre joueur et votre progression
-            restent sauvegardés.
-          </p>
-          <Button onClick={disconnect} className="mt-3 bg-white/10 text-white hover:bg-white/15">
+    <section className="grid gap-4">
+      <div className="game-hub panel p-5">
+        <p className="text-sm font-bold uppercase tracking-[0.22em] text-emerald-300">
+          Réglages
+        </p>
+        <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-black">Compte et session</h1>
+            <p className="mt-2 max-w-xl text-sm text-slate-300">
+              Gérez la connexion, la liaison Google et les paramètres installables du jeu.
+            </p>
+          </div>
+          <Button onClick={disconnect} className="bg-red-300 text-slate-950 hover:bg-red-200">
             <LogOut size={17} />
             Déconnexion
           </Button>
         </div>
+      </div>
+      {message ? (
+        <div className="rounded-md border border-emerald-300/30 bg-emerald-300/10 p-3 text-sm text-emerald-100">
+          {message}
+        </div>
+      ) : null}
+      <div className="grid gap-3 md:grid-cols-4">
+        <GameMiniMetric label="Compte" value={user?.email ?? "Invité"} />
+        <GameMiniMetric label="Google" value={user?.googleLinked ? "Lié" : "Non lié"} />
+        <GameMiniMetric label="Application" value="PWA installable" />
+        <GameMiniMetric label="Multijoueur" value="Socket.IO actif" />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
         {!user?.googleLinked ? (
-          <div className="metric md:col-span-2">
-            <div className="text-xs text-slate-400">Connexion Google</div>
-            <p className="mt-2 text-sm text-slate-300">
-              Liez votre compte existant pour pouvoir vous connecter ensuite avec Google.
-            </p>
+          <div className="panel p-5">
+            <div className="flex items-start gap-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-emerald-300/25 bg-emerald-300/10 text-emerald-200">
+                <LogIn size={21} />
+              </span>
+              <div>
+                <h2 className="text-xl font-black">Connexion Google</h2>
+                <p className="mt-1 text-sm leading-6 text-slate-300">
+                  Liez votre compte existant pour pouvoir vous connecter ensuite avec Google.
+                </p>
+              </div>
+            </div>
             <div className="mt-3 max-w-xs">
               <GoogleButton disabled={busy} onClick={linkGoogle}>
                 Lier mon compte Google
               </GoogleButton>
             </div>
           </div>
-        ) : null}
+        ) : (
+          <div className="panel p-5">
+            <div className="flex items-start gap-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-emerald-300/25 bg-emerald-300/10 text-emerald-200">
+                <CheckCircle2 size={21} />
+              </span>
+              <div>
+                <h2 className="text-xl font-black">Compte Google lié</h2>
+                <p className="mt-1 text-sm leading-6 text-slate-300">
+                  Votre compte peut se reconnecter avec Google depuis n'importe quel navigateur.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="panel p-5">
+          <div className="flex items-start gap-3">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-cyan-300/25 bg-cyan-300/10 text-cyan-100">
+              <Upload size={21} />
+            </span>
+            <div>
+              <h2 className="text-xl font-black">Application installable</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-300">
+                Installez MYPRO - TENNIS depuis le navigateur pour retrouver une expérience proche
+                d'une application mobile.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );
