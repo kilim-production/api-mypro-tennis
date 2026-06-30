@@ -1204,7 +1204,7 @@ function Button(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       {...props}
-      className={`inline-flex items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300 disabled:opacity-50 ${props.className ?? ""}`}
+      className={`game-button inline-flex items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300 disabled:opacity-50 ${props.className ?? ""}`}
     />
   );
 }
@@ -1213,7 +1213,7 @@ function Field(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 outline-none focus:border-emerald-300"
+      className="game-field w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 outline-none focus:border-emerald-300"
     />
   );
 }
@@ -1346,7 +1346,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   }, [notifications]);
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-midnight/92 backdrop-blur">
+      <header className="app-header sticky top-0 z-20 border-b border-white/10 bg-midnight/92 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
           <Link to="/" className="leading-none">
             <div className="text-xl font-black tracking-[0.18em] text-white">MYPRO</div>
@@ -1355,6 +1355,16 @@ function Shell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2 md:hidden">
             {user ? (
               <>
+                {player ? (
+                  <div className="mobile-resource-strip">
+                    <span>
+                      <Zap size={13} /> {player.actionEnergy}/{player.actionEnergyMax}
+                    </span>
+                    <span>
+                      <Gem size={13} /> {player.gems}
+                    </span>
+                  </div>
+                ) : null}
                 <NotificationCenter compact />
                 <Button
                   onClick={logout}
@@ -1400,7 +1410,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <div
-        className={`mx-auto grid max-w-7xl gap-4 px-3 py-4 pb-24 sm:px-4 sm:py-5 ${
+        className={`app-shell-content mx-auto grid max-w-7xl gap-4 px-3 py-4 pb-24 sm:px-4 sm:py-5 ${
           showSidebar ? "lg:grid-cols-[250px_1fr]" : ""
         }`}
       >
@@ -1427,10 +1437,10 @@ function Shell({ children }: { children: React.ReactNode }) {
             </nav>
           </aside>
         ) : null}
-        <main>{children}</main>
+        <main className="min-w-0">{children}</main>
       </div>
       {showSidebar ? <MobileBottomNav badges={navBadges} /> : null}
-      <footer className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-3 px-4 pb-24 text-center text-[11px] font-black uppercase tracking-[0.28em] text-slate-500 lg:pb-5">
+      <footer className="app-footer mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-3 px-4 pb-24 text-center text-[11px] font-black uppercase tracking-[0.28em] text-slate-500 lg:pb-5">
         <span>KILIM GAMES PRODUCTION</span>
         <span className="text-slate-700">·</span>
         <Link className="transition hover:text-emerald-300" to="/community">
@@ -1758,6 +1768,7 @@ function CreatePlayer() {
       ["Gros service", "Relanceur", "Frappeur de fond", "Athlète endurant", "Joueur complet"]
     ]
   ] as const;
+  const [creationStep, setCreationStep] = useState<"identity" | "photo">("identity");
   const [form, setForm] = useState({
     firstName: "Alex",
     lastName: "Moreau",
@@ -1810,45 +1821,83 @@ function CreatePlayer() {
   }
   return (
     <section className="panel p-6">
-      <h1 className="text-2xl font-black">Création du joueur</h1>
-      <form onSubmit={submit} className="mt-5 grid gap-4 md:grid-cols-2">
-        {textFields.map(([key, label]) => (
-          <label key={key} className="grid gap-2 text-sm font-semibold text-slate-200">
-            <span>{label}</span>
-            <Field
-              value={form[key]}
-              onChange={(event) => setForm({ ...form, [key]: event.target.value })}
-            />
-          </label>
-        ))}
-        <label className="grid gap-2 text-sm font-semibold text-slate-200">
-          <span>Nationalité</span>
-          <select
-            className="rounded-md border border-white/10 bg-slate-950 px-3 py-2"
-            value={form.nationality}
-            onChange={(event) => setForm({ ...form, nationality: event.target.value })}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-bold uppercase tracking-[0.22em] text-emerald-300">
+            Nouvelle carrière
+          </p>
+          <h1 className="mt-1 text-2xl font-black">Création du joueur</h1>
+        </div>
+        <div className="rounded-md border border-emerald-300/25 bg-emerald-300/10 px-3 py-2 text-sm font-black text-emerald-100">
+          Départ NC · Niveau 0
+        </div>
+      </div>
+      <div className="segmented-tabs mt-5">
+        {[
+          ["identity", "Identité", "Profil"],
+          ["photo", "Photo", "Avatar"]
+        ].map(([value, label, meta]) => (
+          <button
+            className={creationStep === value ? "is-active" : ""}
+            key={value}
+            onClick={() => setCreationStep(value as "identity" | "photo")}
+            type="button"
           >
-            {countries.map((country: Country) => (
-              <option key={country.code} value={country.code}>
-                {country.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        {selectFields.map(([key, label, values]) => (
-          <label key={key} className="grid gap-2 text-sm font-semibold text-slate-200">
             <span>{label}</span>
-            <select
-              className="rounded-md border border-white/10 bg-slate-950 px-3 py-2"
-              value={form[key] as string}
-              onChange={(event) => setForm({ ...form, [key]: event.target.value })}
-            >
-              {values.map((value) => (
-                <option key={value}>{value}</option>
-              ))}
-            </select>
-          </label>
+            <small>{meta}</small>
+          </button>
         ))}
+      </div>
+      <form onSubmit={submit} className="mt-5 grid gap-4 md:grid-cols-2">
+        {creationStep === "identity" ? (
+          <>
+            {textFields.map(([key, label]) => (
+              <label key={key} className="grid gap-2 text-sm font-semibold text-slate-200">
+                <span>{label}</span>
+                <Field
+                  value={form[key]}
+                  onChange={(event) => setForm({ ...form, [key]: event.target.value })}
+                />
+              </label>
+            ))}
+            <label className="grid gap-2 text-sm font-semibold text-slate-200">
+              <span>Nationalité</span>
+              <select
+                className="rounded-md border border-white/10 bg-slate-950 px-3 py-2"
+                value={form.nationality}
+                onChange={(event) => setForm({ ...form, nationality: event.target.value })}
+              >
+                {countries.map((country: Country) => (
+                  <option key={country.code} value={country.code}>
+                    {country.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {selectFields.map(([key, label, values]) => (
+              <label key={key} className="grid gap-2 text-sm font-semibold text-slate-200">
+                <span>{label}</span>
+                <select
+                  className="rounded-md border border-white/10 bg-slate-950 px-3 py-2"
+                  value={form[key] as string}
+                  onChange={(event) => setForm({ ...form, [key]: event.target.value })}
+                >
+                  {values.map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </select>
+              </label>
+            ))}
+            <Button
+              className="md:col-span-2"
+              onClick={() => setCreationStep("photo")}
+              type="button"
+            >
+              Continuer vers la photo <ChevronRight size={16} />
+            </Button>
+          </>
+        ) : null}
+        {creationStep === "photo" ? (
         <section className="rounded-md border border-white/10 bg-white/[0.04] p-4 md:col-span-2">
           <div className="grid gap-5 lg:grid-cols-[180px_1fr]">
             <div>
@@ -1901,9 +1950,21 @@ function CreatePlayer() {
             </div>
           </div>
         </section>
-        <Button type="submit" className="md:col-span-2">
-          <Shield size={17} /> Lancer la carrière
-        </Button>
+        ) : null}
+        {creationStep === "photo" ? (
+          <div className="grid gap-3 md:col-span-2 md:grid-cols-2">
+            <Button
+              className="bg-white/10 text-white hover:bg-white/15"
+              onClick={() => setCreationStep("identity")}
+              type="button"
+            >
+              Retour à l'identité
+            </Button>
+            <Button type="submit">
+              <Shield size={17} /> Lancer la carrière
+            </Button>
+          </div>
+        ) : null}
       </form>
     </section>
   );
@@ -4416,6 +4477,7 @@ function ClubPage() {
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [successorPlayerId, setSuccessorPlayerId] = useState("");
   const [clubTab, setClubTab] = useState<"team" | "infra" | "members" | "requests">("team");
+  const [clubDiscoveryTab, setClubDiscoveryTab] = useState<"create" | "join">("join");
   const clubCreationCost = 5000;
   const canCreateClub = player.budget >= clubCreationCost;
 
@@ -5051,9 +5113,26 @@ function ClubPage() {
             {message}
           </div>
         ) : null}
+        <div className="segmented-tabs mt-5">
+          {[
+            ["join", "Rejoindre", `${clubs.length} clubs`],
+            ["create", "Créer", `${clubCreationCost.toLocaleString("fr-FR")} €`]
+          ].map(([value, label, meta]) => (
+            <button
+              className={clubDiscoveryTab === value ? "is-active" : ""}
+              key={value}
+              onClick={() => setClubDiscoveryTab(value as "create" | "join")}
+              type="button"
+            >
+              <span>{label}</span>
+              <small>{meta}</small>
+            </button>
+          ))}
+        </div>
       </section>
 
-      <section className="grid gap-5 lg:grid-cols-[380px_1fr]">
+      <section className="grid gap-5">
+        {clubDiscoveryTab === "create" ? (
         <form className="panel grid gap-4 p-5" onSubmit={createClub}>
           <div>
             <h2 className="text-xl font-black">Créer un club</h2>
@@ -5135,7 +5214,9 @@ function ClubPage() {
             Créer le club · {clubCreationCost.toLocaleString("fr-FR")} €
           </Button>
         </form>
+        ) : null}
 
+        {clubDiscoveryTab === "join" ? (
         <article className="panel p-5">
           <h2 className="text-xl font-black">Clubs disponibles</h2>
           <div className="mt-4 grid gap-3">
@@ -5195,6 +5276,7 @@ function ClubPage() {
             )}
           </div>
         </article>
+        ) : null}
       </section>
     </div>
   );

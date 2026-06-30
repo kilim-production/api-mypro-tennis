@@ -38,6 +38,39 @@ select {
   font: inherit;
 }
 
+button,
+a,
+.game-button,
+.quick-action-button,
+.mobile-bottom-link,
+.segmented-tabs button {
+  -webkit-tap-highlight-color: rgba(94, 234, 212, 0.18);
+  touch-action: manipulation;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.game-field:focus-visible {
+  outline: 2px solid rgba(94, 234, 212, 0.92);
+  outline-offset: 3px;
+}
+
+button:disabled,
+.game-button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.22);
+}
+
+.game-button:active,
+.quick-action-button:active,
+.mobile-bottom-link:active,
+.segmented-tabs button:active {
+  transform: translateY(1px) scale(0.99);
+}
+
 .panel {
   @apply rounded-lg border border-white/10 shadow-glow backdrop-blur;
   background: rgba(2, 6, 23, 0.76);
@@ -100,6 +133,25 @@ select {
   background: #67e8f9;
   color: #020617;
   font-size: 10px;
+  font-weight: 900;
+}
+
+.mobile-resource-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mobile-resource-strip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0 8px;
+  color: #e2e8f0;
+  font-size: 11px;
   font-weight: 900;
 }
 
@@ -909,6 +961,10 @@ select {
   .stat-bonus-pill {
     max-width: 100%;
   }
+
+  .mobile-resource-strip span:nth-child(2) {
+    display: none;
+  }
 }
 
 @media (max-width: 900px) {
@@ -931,6 +987,108 @@ select {
 }
 
 @media (orientation: landscape) and (max-height: 520px) {
+  .app-header > div {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .app-shell-content {
+    padding-top: 10px;
+    padding-bottom: 78px;
+  }
+
+  .app-footer {
+    padding-bottom: 76px;
+  }
+
+  .mobile-bottom-nav {
+    padding: 5px;
+  }
+
+  .mobile-bottom-link {
+    min-height: 46px;
+  }
+
+  .mobile-bottom-link svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .mobile-resource-strip span {
+    min-height: 28px;
+    padding: 0 7px;
+  }
+
+  .panel {
+    border-radius: 8px;
+  }
+
+  .game-mini-metric {
+    min-height: 46px;
+    padding: 8px;
+  }
+
+  .game-mini-metric span {
+    font-size: 10px;
+  }
+
+  .game-mini-metric strong {
+    font-size: 16px;
+  }
+
+  .metric {
+    padding: 9px;
+  }
+
+  .quick-action-button {
+    min-height: 50px;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .quick-action-button strong {
+    font-size: 13px;
+  }
+
+  .quick-action-button small {
+    font-size: 10px;
+  }
+
+  .segmented-tabs {
+    gap: 6px;
+    padding: 5px;
+  }
+
+  .segmented-tabs button {
+    min-height: 52px;
+  }
+
+  .segmented-tabs span {
+    font-size: 12px;
+  }
+
+  .duel-card,
+  .season-card {
+    padding: 12px;
+  }
+
+  .stat-card {
+    padding: 9px;
+  }
+
+  .stat-card .stat-icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  .bag-slot {
+    padding: 10px;
+  }
+
+  .tennis-bag {
+    height: 82px;
+  }
+
   .game-modal-overlay {
     padding: 8px;
   }
@@ -990,6 +1148,17 @@ select {
   .match-center-panel {
     gap: 12px;
     padding: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
 
