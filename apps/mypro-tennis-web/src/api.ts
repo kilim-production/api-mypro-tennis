@@ -1,5 +1,15 @@
 export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
 
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 export type ApiState = {
   token: string | null;
   setToken: (token: string | null) => void;
@@ -16,7 +26,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     }
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.message ?? "Action impossible.");
+  if (!response.ok) throw new ApiError(payload.message ?? "Action impossible.", response.status);
   return payload as T;
 }
 

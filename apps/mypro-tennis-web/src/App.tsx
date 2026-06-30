@@ -1483,6 +1483,14 @@ function NeedPlayer({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function HomeRoute() {
+  const user = useGameStore((state) => state.user);
+  const player = useGameStore((state) => state.player);
+  if (user && player) return <Navigate to="/dashboard" replace />;
+  if (user) return <Navigate to="/create-player" replace />;
+  return <Landing />;
+}
+
 function Landing() {
   const pillars = [
     {
@@ -6460,7 +6468,7 @@ export function App() {
       <OrientationGuard />
       <Shell>
         <Routes>
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={<HomeRoute />} />
         <Route path="/login" element={<AuthPage mode="login" />} />
         <Route path="/signup" element={<AuthPage mode="signup" />} />
         <Route path="/oauth/google" element={<GoogleOAuthCallback />} />

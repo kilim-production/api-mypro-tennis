@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { api, clearToken, saveToken } from "./api";
+import { ApiError, api, clearToken, saveToken } from "./api";
 
 export type Player = {
   id: string;
@@ -59,10 +59,43 @@ type State = {
   logout: () => void;
 };
 
+const sessionCacheKey = "mypro-session-cache";
+
+type SessionCache = {
+  user: User | null;
+  player: Player | null;
+  notifications: GameNotification[];
+};
+
+function readSessionCache(): SessionCache {
+  try {
+    const raw = localStorage.getItem(sessionCacheKey);
+    if (!raw) return { user: null, player: null, notifications: [] };
+    const parsed = JSON.parse(raw) as Partial<SessionCache>;
+    return {
+      user: parsed.user ?? null,
+      player: parsed.player ?? null,
+      notifications: parsed.notifications ?? []
+    };
+  } catch {
+    return { user: null, player: null, notifications: [] };
+  }
+}
+
+function saveSessionCache(cache: SessionCache) {
+  localStorage.setItem(sessionCacheKey, JSON.stringify(cache));
+}
+
+function clearSessionCache() {
+  localStorage.removeItem(sessionCacheKey);
+}
+
+const cachedSession = readSessionCache();
+
 export const useGameStore = create<State>((set) => ({
-  user: null,
-  player: null,
-  notifications: [],
+  user: cachedSession.user,
+  player: cachedSession.player,
+  notifications: cachedSession.notifications,
   booted: false,
   async login(email, password) {
     const data = await api<{ token: string; user: User; player: Player | null }>("/auth/login", {
@@ -70,6 +103,7 @@ export const useGameStore = create<State>((set) => ({
       body: JSON.stringify({ email, password })
     });
     saveToken(data.token);
+    saveSessionCache({ user: data.user, player: data.player, notifications: [] });
     set({ user: data.user, player: data.player, booted: true });
   },
   async signup(displayName, email, password) {
@@ -78,11 +112,13 @@ export const useGameStore = create<State>((set) => ({
       body: JSON.stringify({ displayName, email, password })
     });
     saveToken(data.token);
+    saveSessionCache({ user: data.user, player: null, notifications: [] });
     set({ user: data.user, player: null, booted: true });
   },
   async refresh() {
     if (!localStorage.getItem("mypro-token")) {
-      set({ booted: true });
+      clearSessionCache();
+      set({ user: null, player: null, notifications: [], booted: true });
       return;
     }
     try {
@@ -97,13 +133,30 @@ export const useGameStore = create<State>((set) => ({
         notifications: data.notifications,
         booted: true
       });
-    } catch {
-      clearToken();
-      set({ user: null, player: null, booted: true });
+      saveSessionCache({
+        user: data.user,
+        player: data.player,
+        notifications: data.notifications
+      });
+    } catch (error) {
+      if (error instanceof ApiError && [401, 403].includes(error.status)) {
+        clearToken();
+        clearSessionCache();
+        set({ user: null, player: null, notifications: [], booted: true });
+        return;
+      }
+      const fallback = readSessionCache();
+      set({
+        user: fallback.user,
+        player: fallback.player,
+        notifications: fallback.notifications,
+        booted: true
+      });
     }
   },
   logout() {
     clearToken();
+    clearSessionCache();
     set({ user: null, player: null, notifications: [] });
   }
 }));
