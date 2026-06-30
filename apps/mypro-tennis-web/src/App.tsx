@@ -3998,6 +3998,7 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
   const [data, setData] = useState<TeamChampionshipData | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [teamView, setTeamView] = useState<"team" | "standings" | "schedule">("team");
 
   async function loadTeamChampionship() {
     try {
@@ -4182,6 +4183,25 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
             <Metric label="Points" value={playerStanding?.points ?? 0} />
           </div>
 
+          <div className="segmented-tabs">
+            {[
+              ["team", "Équipe", `${data.team.members.length}/5`],
+              ["standings", "Classement", playerStanding ? `${playerStanding.rank}e` : "-"],
+              ["schedule", "Calendrier", nextMeeting ? `J${nextMeeting.round}` : "Saison"]
+            ].map(([value, label, meta]) => (
+              <button
+                className={teamView === value ? "is-active" : ""}
+                key={value}
+                onClick={() => setTeamView(value as "team" | "standings" | "schedule")}
+                type="button"
+              >
+                <span>{label}</span>
+                <small>{meta}</small>
+              </button>
+            ))}
+          </div>
+
+          {teamView === "team" ? (
           <div className="grid gap-3 md:grid-cols-5">
             {data.team.members.map((member) => (
               <ClubPlayerRow
@@ -4200,10 +4220,15 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
               />
             ))}
           </div>
+          ) : null}
 
-          {championship ? (
-            <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
-              <article className="rounded-md border border-white/10 bg-white/[0.04] p-4">
+          {teamView !== "team" && championship ? (
+            <div className="grid gap-5">
+              <article
+                className={`rounded-md border border-white/10 bg-white/[0.04] p-4 ${
+                  teamView === "standings" ? "" : "hidden"
+                }`}
+              >
                 <h3 className="font-black">Classement de la division</h3>
                 <p className="mt-1 text-sm text-slate-300">
                   Du {new Date(championship.startsAt).toLocaleString("fr-FR")} au{" "}
@@ -4279,7 +4304,11 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                 </div>
               </article>
 
-              <article className="rounded-md border border-white/10 bg-white/[0.04] p-4">
+              <article
+                className={`rounded-md border border-white/10 bg-white/[0.04] p-4 ${
+                  teamView === "schedule" ? "" : "hidden"
+                }`}
+              >
                 <h3 className="font-black">Calendrier des rencontres</h3>
                 <div className="mt-4 grid max-h-[520px] gap-2 overflow-y-auto pr-1">
                   {championship.meetings.map((meeting) => {
@@ -4353,11 +4382,11 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                 </div>
               </article>
             </div>
-          ) : (
+          ) : teamView !== "team" ? (
             <div className="rounded-md border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">
               Aucun championnat planifié. Le président peut inscrire l'équipe au prochain cycle.
             </div>
-          )}
+          ) : null}
         </div>
       )}
     </section>
