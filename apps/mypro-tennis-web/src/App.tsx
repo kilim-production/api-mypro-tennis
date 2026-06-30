@@ -29,11 +29,13 @@ import {
   Gauge,
   Gem,
   Hand,
+  HelpCircle,
   HeartPulse,
   History,
   Image,
   LogOut,
   LogIn,
+  Menu,
   MoveDown,
   MoveUpRight,
   MessageCircle,
@@ -83,8 +85,7 @@ const nav = [
   ["Historique", "/matches", History],
   ["Classement", "/rankings", BarChart3],
   ["Joueurs en ligne", "/online", Wifi],
-  ["Communauté", "/community", MessageCircle],
-  ["Réglages", "/settings", Settings]
+  ["Communauté", "/community", MessageCircle]
 ] as const;
 
 const mobileNav = [
@@ -1334,7 +1335,9 @@ function NotificationCenter({ compact = false }: { compact?: boolean }) {
 function Shell({ children }: { children: React.ReactNode }) {
   const { user, player, notifications, logout } = useGameStore();
   const location = useLocation();
-  const showSidebar = user && !["/", "/login", "/signup", "/oauth/google"].includes(location.pathname);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const showGameNav = user && !["/", "/login", "/signup", "/oauth/google"].includes(location.pathname);
   const navBadges = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const notification of notifications) {
@@ -1344,6 +1347,26 @@ function Shell({ children }: { children: React.ReactNode }) {
     }
     return counts;
   }, [notifications]);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!player) return;
+    if (
+      localStorage.getItem("mypro-tutorial-active") === "1" &&
+      localStorage.getItem("mypro-tutorial-done") !== "1"
+    ) {
+      setTutorialOpen(true);
+    }
+  }, [location.pathname, player]);
+
+  function openTutorial() {
+    localStorage.setItem("mypro-tutorial-active", "1");
+    setTutorialOpen(true);
+  }
+
   return (
     <div className="min-h-screen">
       <header className="app-header sticky top-0 z-20 border-b border-white/10 bg-midnight/92 backdrop-blur">
@@ -1352,9 +1375,20 @@ function Shell({ children }: { children: React.ReactNode }) {
             <div className="text-xl font-black tracking-[0.18em] text-white">MYPRO</div>
             <div className="text-xs font-bold tracking-[0.34em] text-emerald-300">TENNIS</div>
           </Link>
-          <div className="flex items-center gap-2 md:hidden">
+          <div className="header-actions">
             {user ? (
               <>
+                {showGameNav ? (
+                  <button
+                    type="button"
+                    className="header-icon-button"
+                    aria-label="Ouvrir le menu"
+                    title="Menu"
+                    onClick={() => setMenuOpen(true)}
+                  >
+                    <Menu size={18} />
+                  </button>
+                ) : null}
                 {player ? (
                   <div className="mobile-resource-strip">
                     <span>
@@ -1366,12 +1400,33 @@ function Shell({ children }: { children: React.ReactNode }) {
                   </div>
                 ) : null}
                 <NotificationCenter compact />
+                {player && showGameNav ? (
+                  <button
+                    type="button"
+                    className="header-icon-button"
+                    aria-label="Ouvrir le tutoriel"
+                    title="Tutoriel"
+                    onClick={openTutorial}
+                  >
+                    <HelpCircle size={18} />
+                  </button>
+                ) : null}
+                {showGameNav ? (
+                  <Link
+                    to="/settings"
+                    className="header-icon-button"
+                    aria-label="Réglages"
+                    title="Réglages"
+                  >
+                    <Settings size={18} />
+                  </Link>
+                ) : null}
                 <Button
                   onClick={logout}
-                  className="bg-white/10 px-3 py-2 text-xs text-white hover:bg-white/15"
+                  className="hidden bg-white/10 px-3 py-2 text-xs text-white hover:bg-white/15 sm:inline-flex"
                 >
                   <LogOut size={15} />
-                  Sortir
+                  Déconnexion
                 </Button>
               </>
             ) : (
@@ -1383,63 +1438,12 @@ function Shell({ children }: { children: React.ReactNode }) {
               </Link>
             )}
           </div>
-          <div className="hidden items-center gap-3 text-sm text-slate-300 md:flex">
-            {user ? <NotificationCenter /> : null}
-            {player ? (
-              <span className="rounded-md bg-white/[0.08] px-3 py-1">
-                Énergie {player.actionEnergy}/{player.actionEnergyMax}
-              </span>
-            ) : null}
-            {player ? (
-              <span className="rounded-md bg-white/[0.08] px-3 py-1">{player.gems} gemmes</span>
-            ) : null}
-            {user ? (
-              <Button onClick={logout} className="bg-white/10 text-white hover:bg-white/15">
-                <LogOut size={16} />
-                Déconnexion
-              </Button>
-            ) : (
-              <Link
-                to="/login"
-                className="rounded-md bg-emerald-400 px-4 py-2 font-semibold text-slate-950"
-              >
-                Connexion
-              </Link>
-            )}
-          </div>
         </div>
       </header>
-      <div
-        className={`app-shell-content mx-auto grid max-w-7xl gap-4 px-3 py-4 pb-24 sm:px-4 sm:py-5 ${
-          showSidebar ? "lg:grid-cols-[250px_1fr]" : ""
-        }`}
-      >
-        {showSidebar ? (
-          <aside className="panel hidden h-fit p-2 lg:block">
-            <nav className="grid gap-1">
-              {nav.map(([label, path, Icon]) => (
-                <NavLink
-                  key={path}
-                  to={path}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${isActive ? "bg-emerald-400 text-slate-950" : "text-slate-300 hover:bg-white/[0.08] hover:text-white"}`
-                  }
-                >
-                  <Icon size={17} />
-                  <span className="min-w-0 flex-1">{label}</span>
-                  {navBadges[path] ? (
-                    <span className="grid h-5 min-w-5 place-items-center rounded-full bg-emerald-300 px-1 text-[11px] font-black text-slate-950">
-                      {navBadges[path]}
-                    </span>
-                  ) : null}
-                </NavLink>
-              ))}
-            </nav>
-          </aside>
-        ) : null}
+      <div className="app-shell-content mx-auto grid max-w-7xl gap-4 px-3 py-4 pb-24 sm:px-4 sm:py-5">
         <main className="min-w-0">{children}</main>
       </div>
-      {showSidebar ? <MobileBottomNav badges={navBadges} /> : null}
+      {showGameNav ? <MobileBottomNav badges={navBadges} /> : null}
       <footer className="app-footer mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-3 px-4 pb-24 text-center text-[11px] font-black uppercase tracking-[0.28em] text-slate-500 lg:pb-5">
         <span>KILIM GAMES PRODUCTION</span>
         <span className="text-slate-700">·</span>
@@ -1447,6 +1451,51 @@ function Shell({ children }: { children: React.ReactNode }) {
           Communauté
         </Link>
       </footer>
+      {showGameNav && menuOpen
+        ? createPortal(
+            <div className="game-modal-overlay header-menu-overlay" onClick={() => setMenuOpen(false)}>
+              <nav className="panel header-menu-panel" onClick={(event) => event.stopPropagation()}>
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-300">
+                      Navigation
+                    </p>
+                    <h2 className="text-2xl font-black">Menu du jeu</h2>
+                  </div>
+                  <button
+                    type="button"
+                    className="header-icon-button"
+                    aria-label="Fermer le menu"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                <div className="grid gap-2">
+                  {nav.map(([label, path, Icon]) => (
+                    <NavLink
+                      key={path}
+                      to={path}
+                      className={({ isActive }) =>
+                        `header-menu-link ${isActive ? "is-active" : ""}`
+                      }
+                    >
+                      <Icon size={18} />
+                      <span className="min-w-0 flex-1">{label}</span>
+                      {navBadges[path] ? (
+                        <span className="grid h-6 min-w-6 place-items-center rounded-full bg-cyan-300 px-1 text-xs font-black text-slate-950">
+                          {navBadges[path]}
+                        </span>
+                      ) : null}
+                    </NavLink>
+                  ))}
+                </div>
+              </nav>
+            </div>,
+            document.body
+          )
+        : null}
+      {tutorialOpen && player ? <TutorialModal onClose={() => setTutorialOpen(false)} /> : null}
     </div>
   );
 }
@@ -2164,11 +2213,6 @@ function TutorialModal({ onClose }: { onClose: () => void }) {
 function Dashboard() {
   const player = useGameStore((state) => state.player)!;
   const navigate = useNavigate();
-  const [tutorialOpen, setTutorialOpen] = useState(
-    () =>
-      localStorage.getItem("mypro-tutorial-active") === "1" &&
-      localStorage.getItem("mypro-tutorial-done") !== "1"
-  );
   const chart = useMemo(
     () =>
       profileStatKeys.map((key) => ({
@@ -2178,10 +2222,6 @@ function Dashboard() {
       })),
     [player]
   );
-  function openTutorial() {
-    localStorage.setItem("mypro-tutorial-active", "1");
-    setTutorialOpen(true);
-  }
   return (
     <div className="grid gap-4">
       <section className="game-hub panel overflow-hidden p-4 sm:p-5">
@@ -2208,16 +2248,16 @@ function Dashboard() {
             </div>
             <div className="grid gap-2 sm:grid-cols-4">
               <QuickActionButton
+                icon={Shield}
+                label="Mon joueur"
+                detail="Fiche"
+                onClick={() => navigate("/player")}
+              />
+              <QuickActionButton
                 icon={Swords}
                 label="Duel"
                 detail="1 énergie"
                 onClick={() => navigate("/duel")}
-              />
-              <QuickActionButton
-                icon={Trophy}
-                label="Saison"
-                detail="Tournois"
-                onClick={() => navigate("/season")}
               />
               <QuickActionButton
                 icon={PackageOpen}
@@ -2226,10 +2266,10 @@ function Dashboard() {
                 onClick={() => navigate("/collection")}
               />
               <QuickActionButton
-                icon={CheckCircle2}
-                label="Tutoriel"
-                detail="Objectifs"
-                onClick={openTutorial}
+                icon={Trophy}
+                label="Saison"
+                detail="Tournois"
+                onClick={() => navigate("/season")}
               />
             </div>
           </div>
@@ -2289,7 +2329,6 @@ function Dashboard() {
           </Button>
         </article>
       </section>
-      {tutorialOpen ? <TutorialModal onClose={() => setTutorialOpen(false)} /> : null}
     </div>
   );
 }
