@@ -366,7 +366,13 @@ async function buildDuelPool(player: {
   const sortedRealCandidates = [...realCandidates].sort(
     (left, right) => seededRatio(`${seed}-${right.id}`) - seededRatio(`${seed}-${left.id}`)
   );
-  const pool = sortedRealCandidates.slice(0, 3);
+  const aiRanking = allowedRankings.includes(player.fftRanking as FftRanking)
+    ? (player.fftRanking as FftRanking)
+    : (allowedRankings[0] ?? "NC");
+  const pool = [
+    await getOrCreateDuelAiOpponent({ player, ranking: aiRanking, seed, slot: 0 }),
+    ...sortedRealCandidates.slice(0, 2)
+  ];
   while (pool.length < 3) {
     const ranking =
       allowedRankings[pool.length % allowedRankings.length] ?? (player.fftRanking as FftRanking);
