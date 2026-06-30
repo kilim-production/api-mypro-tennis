@@ -1,0 +1,1 @@
+ALTER TABLE "PlayerCosmetic" ADD COLUMN "upgradeLevel" INTEGER NOT NULL DEFAULT 0;

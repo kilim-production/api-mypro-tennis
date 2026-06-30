@@ -18,7 +18,7 @@ import {
   speedUpChest,
   unlockStatCardBonus
 } from "../services/chests";
-import { equipCosmetic, unequipCosmetic } from "../services/equipment";
+import { equipCosmetic, unequipCosmetic, upgradeCosmetic } from "../services/equipment";
 import { createServerMatch } from "../services/matches";
 import { publicPlayer } from "../services/playerMapper";
 import { decodeJson, encodeJson } from "../services/json";
@@ -921,6 +921,21 @@ gameRouter.post("/cosmetics/:id/unequip", requireAuth, async (request, response)
   } catch (error) {
     return response.status(409).json({
       message: error instanceof Error ? error.message : "Retrait impossible."
+    });
+  }
+});
+
+gameRouter.post("/cosmetics/:id/upgrade", requireAuth, async (request, response) => {
+  const cosmeticId = request.params.id;
+  if (!cosmeticId) return response.status(400).json({ message: "Objet cosmétique requis." });
+  const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
+  if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+  try {
+    const cosmetic = await upgradeCosmetic(player.id, cosmeticId);
+    return response.json(cosmetic);
+  } catch (error) {
+    return response.status(409).json({
+      message: error instanceof Error ? error.message : "Amélioration impossible."
     });
   }
 });

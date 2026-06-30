@@ -764,6 +764,9 @@ type PlayerCosmeticItem = {
   name: string;
   rarity: ChestRarity;
   bonuses: Record<string, number>;
+  upgradeLevel: number;
+  nextUpgradeCost: number | null;
+  canUpgrade: boolean;
   equippedSlot: number | null;
   ownedAt: string;
 };
@@ -984,6 +987,28 @@ function sortCosmeticsByRarity(items: PlayerCosmeticItem[]) {
     if (a.equippedSlot === null && b.equippedSlot !== null) return 1;
     return a.name.localeCompare(b.name, "fr");
   });
+}
+
+function CosmeticUpgradeMeta({ item }: { item: PlayerCosmeticItem }) {
+  return (
+    <div className="mt-3 rounded-md border border-white/10 bg-slate-950/35 p-2 text-xs text-slate-300">
+      <div className="flex items-center justify-between gap-2">
+        <span>Niveau d'amélioration</span>
+        <strong className="text-emerald-200">{item.upgradeLevel}/3</strong>
+      </div>
+      <div className="mt-2 h-2 rounded-full bg-white/[0.08]">
+        <div
+          className="h-full rounded-full bg-cyan-300"
+          style={{ width: `${(item.upgradeLevel / 3) * 100}%` }}
+        />
+      </div>
+      <div className="mt-2">
+        {item.nextUpgradeCost
+          ? `Prochain niveau : ${item.nextUpgradeCost.toLocaleString("fr-FR")} €`
+          : "Niveau maximum atteint"}
+      </div>
+    </div>
+  );
 }
 
 function TennisBagVisual({ rarity, opening = false }: { rarity: ChestRarity; opening?: boolean }) {
@@ -2963,6 +2988,7 @@ function CollectionPage() {
   const [data, setData] = useState<ChestState | null>(null);
   const refreshPlayer = useGameStore((state) => state.refresh);
   const [busyCosmetic, setBusyCosmetic] = useState<string | null>(null);
+  const [busyUpgrade, setBusyUpgrade] = useState<string | null>(null);
   const [busyCard, setBusyCard] = useState<string | null>(null);
   const [slotPicker, setSlotPicker] = useState<number | null>(null);
   const [collectionMessage, setCollectionMessage] = useState("");
@@ -2997,6 +3023,21 @@ function CollectionPage() {
       await refreshPlayer();
     } finally {
       setBusyCosmetic(null);
+    }
+  }
+
+  async function upgradeItem(item: PlayerCosmeticItem) {
+    setBusyUpgrade(item.id);
+    setCollectionMessage("");
+    try {
+      await api(`/cosmetics/${item.id}/upgrade`, { method: "POST" });
+      await loadCollection();
+      await refreshPlayer();
+      setCollectionMessage(`${item.name} amélioré au niveau ${item.upgradeLevel + 1}.`);
+    } catch (error) {
+      setCollectionMessage(error instanceof Error ? error.message : "Amélioration impossible.");
+    } finally {
+      setBusyUpgrade(null);
     }
   }
 
@@ -3098,20 +3139,36 @@ function CollectionPage() {
               </div>
               <div className="mt-3 text-sm text-slate-300">
                 {item ? (
-                  <StatBonusPills bonuses={item.bonuses} />
+                  <>
+                    <StatBonusPills bonuses={item.bonuses} />
+                    <CosmeticUpgradeMeta item={item} />
+                  </>
                 ) : (
                   "Équipez un objet depuis l'inventaire."
                 )}
               </div>
               {item ? (
-                <button
-                  className="mt-4 rounded-md bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-50"
-                  onClick={() => unequip(item)}
-                  disabled={busyCosmetic === item.id}
-                  type="button"
-                >
-                  Retirer
-                </button>
+                <div className="mt-4 grid gap-2">
+                  {item.canUpgrade && item.nextUpgradeCost ? (
+                    <Button
+                      className="w-full"
+                      onClick={() => upgradeItem(item)}
+                      disabled={busyUpgrade === item.id}
+                    >
+                      {busyUpgrade === item.id
+                        ? "Amélioration..."
+                        : `Améliorer · ${item.nextUpgradeCost.toLocaleString("fr-FR")} €`}
+                    </Button>
+                  ) : null}
+                  <button
+                    className="rounded-md bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-50"
+                    onClick={() => unequip(item)}
+                    disabled={busyCosmetic === item.id}
+                    type="button"
+                  >
+                    Retirer
+                  </button>
+                </div>
               ) : (
                 <button
                   className="mt-4 rounded-md border border-emerald-300/40 bg-emerald-300/10 px-3 py-2 text-sm font-bold text-emerald-100 transition hover:bg-emerald-300/18"
@@ -3220,6 +3277,18 @@ function CollectionPage() {
                 <div className="mt-3">
                   <StatBonusPills bonuses={item.bonuses} />
                 </div>
+                <CosmeticUpgradeMeta item={item} />
+                {item.canUpgrade && item.nextUpgradeCost ? (
+                  <Button
+                    className="mt-3 w-full"
+                    onClick={() => upgradeItem(item)}
+                    disabled={busyUpgrade === item.id}
+                  >
+                    {busyUpgrade === item.id
+                      ? "Amélioration..."
+                      : `Améliorer · ${item.nextUpgradeCost.toLocaleString("fr-FR")} €`}
+                  </Button>
+                ) : null}
                 <div className="mt-4 grid grid-cols-4 gap-2">
                   {[0, 1, 2, 3].map((slotIndex) => (
                     <button
@@ -3328,6 +3397,7 @@ function CosmeticSlotPicker({
                 <div className="mt-3">
                   <StatBonusPills bonuses={item.bonuses} />
                 </div>
+                <CosmeticUpgradeMeta item={item} />
                 <div className="mt-3 text-xs font-bold text-slate-300">
                   {item.equippedSlot === slotIndex
                     ? "Déjà équipé ici"

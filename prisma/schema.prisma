@@ -284,6 +284,7 @@ model PlayerCosmetic {
   name         String
   rarity       String
   bonuses      String   @default("{}")
+  upgradeLevel Int      @default(0)
   equippedSlot Int?
   ownedAt      DateTime @default(now())
 

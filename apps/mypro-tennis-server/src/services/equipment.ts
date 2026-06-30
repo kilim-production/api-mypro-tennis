@@ -19,6 +19,10 @@ const equipmentStatKeys = [
   "recovery"
 ] as const;
 
+type CosmeticBonusSource = Pick<PlayerCosmetic, "bonuses" | "cosmeticId" | "rarity"> & {
+  upgradeLevel?: number;
+};
+
 function hashSeed(seed: string) {
   let hash = 2166136261;
   for (let index = 0; index < seed.length; index += 1) {
@@ -45,6 +49,22 @@ export function cosmeticBonusPoints(rarity: string) {
   return 1;
 }
 
+export function cosmeticUpgradeBaseCost(rarity: string) {
+  const key = rarity
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  if (key.includes("mythique")) return 5000;
+  if (key.includes("legendaire") || key.includes("gendaire")) return 4000;
+  if (key === "or") return 3000;
+  if (key === "argent") return 2000;
+  return 1000;
+}
+
+export function cosmeticUpgradeCost(rarity: string, levelToUnlock: number) {
+  return cosmeticUpgradeBaseCost(rarity) * Math.max(1, Math.min(3, levelToUnlock));
+}
+
 export function generateCosmeticBonuses(cosmeticId: string, rarity: string) {
   const points = cosmeticBonusPoints(rarity);
   const bonuses: Partial<TennisStats> = {};
@@ -63,29 +83,37 @@ export function generateCosmeticBonuses(cosmeticId: string, rarity: string) {
   return bonuses;
 }
 
-export function cosmeticPublicPayload(cosmetic: PlayerCosmetic) {
+function effectiveCosmeticBonuses(cosmetic: CosmeticBonusSource) {
   const stored = decodeJson<Partial<TennisStats>>(cosmetic.bonuses);
-  const bonuses = Object.keys(stored).length
+  const baseBonuses = Object.keys(stored).length
     ? stored
     : generateCosmeticBonuses(cosmetic.cosmeticId, cosmetic.rarity);
+  const upgradeLevel = Math.max(0, Math.min(3, cosmetic.upgradeLevel ?? 0));
+  return Object.fromEntries(
+    Object.entries(baseBonuses).map(([key, value]) => [key, (value ?? 0) + upgradeLevel])
+  ) as Partial<TennisStats>;
+}
+
+export function cosmeticPublicPayload(cosmetic: PlayerCosmetic & { upgradeLevel?: number }) {
+  const upgradeLevel = Math.max(0, Math.min(3, cosmetic.upgradeLevel ?? 0));
   return {
     id: cosmetic.id,
     cosmeticId: cosmetic.cosmeticId,
     name: cosmetic.name,
     rarity: cosmetic.rarity,
-    bonuses,
+    bonuses: effectiveCosmeticBonuses(cosmetic),
+    upgradeLevel,
+    nextUpgradeCost: upgradeLevel < 3 ? cosmeticUpgradeCost(cosmetic.rarity, upgradeLevel + 1) : null,
+    canUpgrade: upgradeLevel < 3,
     equippedSlot: cosmetic.equippedSlot,
     ownedAt: cosmetic.ownedAt
   };
 }
 
-function sumBonuses(cosmetics: Array<Pick<PlayerCosmetic, "bonuses" | "cosmeticId" | "rarity">>) {
+function sumBonuses(cosmetics: CosmeticBonusSource[]) {
   const total: Partial<TennisStats> = {};
   for (const cosmetic of cosmetics) {
-    const stored = decodeJson<Partial<TennisStats>>(cosmetic.bonuses);
-    const bonuses = Object.keys(stored).length
-      ? stored
-      : generateCosmeticBonuses(cosmetic.cosmeticId, cosmetic.rarity);
+    const bonuses = effectiveCosmeticBonuses(cosmetic);
     for (const [key, value] of Object.entries(bonuses)) {
       total[key as keyof TennisStats] = (total[key as keyof TennisStats] ?? 0) + (value ?? 0);
     }
@@ -168,6 +196,38 @@ export async function unequipCosmetic(playerId: string, cosmeticId: string) {
       data: { equippedSlot: null }
     });
     await updatePlayerStatsForEquipment(tx, playerId, before);
+
+    return cosmeticPublicPayload(updated);
+  });
+}
+
+export async function upgradeCosmetic(playerId: string, cosmeticId: string) {
+  return prisma.$transaction(async (tx) => {
+    const owned = await tx.playerCosmetic.findFirst({
+      where: { id: cosmeticId, playerId }
+    });
+    if (!owned) throw new Error("Objet cosmetique introuvable.");
+    const upgradeLevel = Math.max(0, Math.min(3, (owned as CosmeticBonusSource).upgradeLevel ?? 0));
+    if (upgradeLevel >= 3) throw new Error("Objet deja au niveau maximum.");
+
+    const cost = cosmeticUpgradeCost(owned.rarity, upgradeLevel + 1);
+    const player = await tx.player.findUniqueOrThrow({ where: { id: playerId } });
+    if (player.budget < cost) throw new Error(`Budget insuffisant. Il faut ${cost} €.`);
+
+    const before = sumBonuses(
+      await tx.playerCosmetic.findMany({ where: { playerId, equippedSlot: { not: null } } })
+    );
+
+    await tx.player.update({
+      where: { id: playerId },
+      data: { budget: { decrement: cost } }
+    });
+    const updated = await tx.playerCosmetic.update({
+      where: { id: owned.id },
+      data: { upgradeLevel: upgradeLevel + 1 } as unknown as Prisma.PlayerCosmeticUpdateInput
+    });
+
+    if (owned.equippedSlot !== null) await updatePlayerStatsForEquipment(tx, playerId, before);
 
     return cosmeticPublicPayload(updated);
   });
