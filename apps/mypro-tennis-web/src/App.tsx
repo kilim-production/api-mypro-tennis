@@ -1391,11 +1391,15 @@ function Shell({ children }: { children: React.ReactNode }) {
                 ) : null}
                 {player ? (
                   <div className="mobile-resource-strip">
-                    <span>
-                      <Zap size={13} /> {player.actionEnergy}/{player.actionEnergyMax}
+                    <span className="resource-pill resource-energy" aria-label="Énergie">
+                      <Zap size={15} />
+                      <strong>{player.actionEnergy}/{player.actionEnergyMax}</strong>
+                      <small>Énergie</small>
                     </span>
-                    <span>
-                      <Gem size={13} /> {player.gems}
+                    <span className="resource-pill resource-gems" aria-label="Gemmes">
+                      <Gem size={15} />
+                      <strong>{player.gems}</strong>
+                      <small>Gemmes</small>
                     </span>
                   </div>
                 ) : null}
@@ -6490,8 +6494,58 @@ function OrientationGuard() {
   );
 }
 
+function useFitMobileModals() {
+  useEffect(() => {
+    let frame = 0;
+
+    const fit = () => {
+      frame = 0;
+      const compactViewport = window.matchMedia("(max-width: 900px), (max-height: 560px)").matches;
+      const panels = document.querySelectorAll<HTMLElement>(".game-modal-panel");
+      panels.forEach((panel) => {
+        panel.style.setProperty("--modal-fit-scale", "1");
+        panel.classList.toggle("fit-mobile-modal", compactViewport);
+        if (!compactViewport) return;
+
+        const maxWidth = Math.max(1, window.innerWidth - 16);
+        const maxHeight = Math.max(1, window.innerHeight - 16);
+        const rect = panel.getBoundingClientRect();
+        const scale = Math.min(
+          1,
+          maxWidth / Math.max(rect.width, 1),
+          maxHeight / Math.max(rect.height, 1)
+        );
+        panel.style.setProperty("--modal-fit-scale", String(Math.max(0.35, Math.floor(scale * 100) / 100)));
+      });
+    };
+
+    const schedule = () => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(fit);
+    };
+
+    const observer = new MutationObserver(schedule);
+    observer.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("resize", schedule);
+    window.addEventListener("orientationchange", schedule);
+    document.addEventListener("click", schedule, true);
+    document.addEventListener("input", schedule, true);
+    schedule();
+
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("resize", schedule);
+      window.removeEventListener("orientationchange", schedule);
+      document.removeEventListener("click", schedule, true);
+      document.removeEventListener("input", schedule, true);
+    };
+  }, []);
+}
+
 export function App() {
   const { booted, refresh } = useGameStore();
+  useFitMobileModals();
   useEffect(() => void refresh(), [refresh]);
   if (!booted)
     return (
