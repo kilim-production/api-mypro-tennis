@@ -1164,15 +1164,34 @@ button:disabled,
     padding: 8px;
   }
 
+  .header-menu-overlay {
+    place-items: center;
+    padding: 8px;
+  }
+
   .game-modal-panel {
     max-height: none;
     overflow: visible;
     padding: 12px;
   }
 
-  .game-modal-panel.fit-mobile-modal {
-    transform: scale(var(--modal-fit-scale, 1));
-    transform-origin: center center;
+  .header-menu-panel {
+    width: min(100%, 360px);
+    max-height: none;
+    overflow: visible;
+    padding: 12px;
+  }
+
+  .header-menu-link {
+    min-height: 42px;
+    gap: 10px;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+
+  .game-modal-panel.fit-mobile-modal,
+  .header-menu-panel.fit-mobile-modal {
+    zoom: var(--modal-fit-scale, 1);
   }
 
   .game-modal-header {
@@ -1325,15 +1344,34 @@ button:disabled,
     padding: 8px;
   }
 
+  .header-menu-overlay {
+    place-items: center;
+    padding: 8px;
+  }
+
   .game-modal-panel {
     max-height: none;
     overflow: visible;
     padding: 12px;
   }
 
-  .game-modal-panel.fit-mobile-modal {
-    transform: scale(var(--modal-fit-scale, 1));
-    transform-origin: center center;
+  .header-menu-panel {
+    width: min(100%, 360px);
+    max-height: none;
+    overflow: visible;
+    padding: 12px;
+  }
+
+  .header-menu-link {
+    min-height: 42px;
+    gap: 10px;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+
+  .game-modal-panel.fit-mobile-modal,
+  .header-menu-panel.fit-mobile-modal {
+    zoom: var(--modal-fit-scale, 1);
   }
 
   .game-modal-header {

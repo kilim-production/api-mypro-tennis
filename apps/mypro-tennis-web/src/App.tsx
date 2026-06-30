@@ -6501,14 +6501,17 @@ function useFitMobileModals() {
     const fit = () => {
       frame = 0;
       const compactViewport = window.matchMedia("(max-width: 900px), (max-height: 560px)").matches;
-      const panels = document.querySelectorAll<HTMLElement>(".game-modal-panel");
+      const panels = document.querySelectorAll<HTMLElement>(".game-modal-panel, .header-menu-panel");
+      const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
       panels.forEach((panel) => {
         panel.style.setProperty("--modal-fit-scale", "1");
         panel.classList.toggle("fit-mobile-modal", compactViewport);
         if (!compactViewport) return;
 
-        const maxWidth = Math.max(1, window.innerWidth - 16);
-        const maxHeight = Math.max(1, window.innerHeight - 16);
+        const safePadding = panel.classList.contains("header-menu-panel") ? 10 : 14;
+        const maxWidth = Math.max(1, viewportWidth - safePadding * 2);
+        const maxHeight = Math.max(1, viewportHeight - safePadding * 2);
         const rect = panel.getBoundingClientRect();
         const scale = Math.min(
           1,
@@ -6528,8 +6531,11 @@ function useFitMobileModals() {
     observer.observe(document.body, { childList: true, subtree: true });
     window.addEventListener("resize", schedule);
     window.addEventListener("orientationchange", schedule);
+    window.visualViewport?.addEventListener("resize", schedule);
+    window.visualViewport?.addEventListener("scroll", schedule);
     document.addEventListener("click", schedule, true);
     document.addEventListener("input", schedule, true);
+    document.addEventListener("load", schedule, true);
     schedule();
 
     return () => {
@@ -6537,8 +6543,11 @@ function useFitMobileModals() {
       observer.disconnect();
       window.removeEventListener("resize", schedule);
       window.removeEventListener("orientationchange", schedule);
+      window.visualViewport?.removeEventListener("resize", schedule);
+      window.visualViewport?.removeEventListener("scroll", schedule);
       document.removeEventListener("click", schedule, true);
       document.removeEventListener("input", schedule, true);
+      document.removeEventListener("load", schedule, true);
     };
   }, []);
 }
