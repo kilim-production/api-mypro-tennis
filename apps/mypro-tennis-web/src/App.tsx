@@ -1268,6 +1268,10 @@ function sortCosmeticsByRarity(items: PlayerCosmeticItem[]) {
   });
 }
 
+function bonusTotal(bonuses: Record<string, number>) {
+  return Object.values(bonuses).reduce((sum, value) => sum + value, 0);
+}
+
 function CosmeticUpgradeMeta({ item }: { item: PlayerCosmeticItem }) {
   return (
     <div className="mt-3 rounded-md border border-white/10 bg-slate-950/35 p-2 text-xs text-slate-300">
@@ -1438,7 +1442,7 @@ function TennisBagSlots() {
       <p className="mt-2 text-sm text-slate-300">
         Gagnez un match pour obtenir un sac. Les 4 emplacements doivent être libérés régulièrement.
       </p>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-4 grid grid-cols-4 gap-1.5 sm:gap-3">
         {(
           data?.slots ?? Array.from({ length: 4 }, (_, slotIndex) => ({ slotIndex, chest: null }))
         ).map(({ slotIndex, chest }) => {
@@ -1446,22 +1450,29 @@ function TennisBagSlots() {
           const ready = !!chest && remaining <= 0;
           const speedCost = Math.max(1, Math.ceil(Math.max(0, remaining) / (10 * 60_000)));
           return (
-            <div key={slotIndex} className={`bag-slot ${chest ? rarityClass(chest.rarity) : ""}`}>
+            <div
+              key={slotIndex}
+              className={`bag-slot min-w-0 ${chest ? rarityClass(chest.rarity) : ""}`}
+            >
               {chest ? (
                 <>
                   <TennisBagVisual rarity={chest.rarity} />
-                  <div className="mt-3 flex items-center justify-between gap-2">
-                    <span className="font-black">{chest.rarity}</span>
-                    <span className="text-xs text-slate-400">Slot {slotIndex + 1}</span>
+                  <div className="mt-2 grid gap-0.5 sm:mt-3 sm:flex sm:items-center sm:justify-between sm:gap-2">
+                    <span className="truncate text-center text-[11px] font-black sm:text-left sm:text-base">
+                      {chest.rarity}
+                    </span>
+                    <span className="text-center text-[10px] text-slate-400 sm:text-left sm:text-xs">
+                      S{slotIndex + 1}
+                    </span>
                   </div>
-                  <div className="mt-2 text-sm text-slate-300">
+                  <div className="mt-1 min-h-8 text-center text-[10px] leading-tight text-slate-300 sm:mt-2 sm:text-left sm:text-sm">
                     {ready ? (
                       "Prêt à ouvrir"
                     ) : (
                       <Countdown endAt={chest.unlocksAt} doneLabel="Prêt" />
                     )}
                   </div>
-                  <div className="mt-3 grid grid-cols-4 gap-2 rounded-md border border-white/10 bg-slate-950/45 p-2">
+                  <div className="mt-2 hidden grid-cols-4 gap-2 rounded-md border border-white/10 bg-slate-950/45 p-2 sm:grid">
                     <StatIcon statKey="service" size="sm" />
                     <span className="grid h-8 w-8 place-items-center rounded-md border border-white/10 bg-slate-950/75 text-xs font-black text-emerald-200">
                       €
@@ -1473,26 +1484,31 @@ function TennisBagSlots() {
                       <Gem size={16} />
                     </span>
                   </div>
-                  <div className="mt-3 grid gap-2">
-                    <Button
+                  <div className="mt-2 grid gap-1 sm:mt-3 sm:gap-2">
+                    <button
+                      className="inline-flex min-h-8 items-center justify-center gap-1 rounded-md bg-emerald-400 px-1.5 py-1 text-[10px] font-black text-slate-950 transition hover:bg-emerald-300 disabled:opacity-50 sm:min-h-10 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm"
                       disabled={!ready || busy === chest.id}
                       onClick={() => openBag(chest.id)}
+                      type="button"
                     >
-                      <PackageOpen size={16} /> Ouvrir
-                    </Button>
+                      <PackageOpen size={14} />
+                      <span className="hidden sm:inline">Ouvrir</span>
+                    </button>
                     {!ready ? (
-                      <Button
-                        className="bg-white/10 text-white hover:bg-white/15"
+                      <button
+                        className="inline-flex min-h-8 items-center justify-center gap-1 rounded-md bg-white/10 px-1.5 py-1 text-[10px] font-black text-white transition hover:bg-white/15 disabled:opacity-50 sm:min-h-10 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm"
                         disabled={busy === chest.id}
                         onClick={() => speedUp(chest.id)}
+                        type="button"
                       >
-                        <Sparkles size={16} /> {speedCost} gemme(s)
-                      </Button>
+                        <Sparkles size={14} />
+                        <span>{speedCost}</span>
+                      </button>
                     ) : null}
                   </div>
                 </>
               ) : (
-                <div className="grid h-full min-h-[210px] place-items-center rounded-md border border-dashed border-white/15 text-center text-sm text-slate-400">
+                <div className="grid h-full min-h-24 place-items-center rounded-md border border-dashed border-white/15 px-1 text-center text-[10px] text-slate-400 sm:min-h-[210px] sm:text-sm">
                   Slot vide
                 </div>
               )}
@@ -3398,63 +3414,75 @@ function CollectionPage() {
             +{totalEquipmentBonus} stats actives
           </div>
         </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-4 grid grid-cols-4 gap-1.5 sm:gap-3">
           {equipped.map(({ slotIndex, item }) => (
-            <div key={slotIndex} className="metric min-h-36">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
+            <div key={slotIndex} className="metric min-w-0 p-2 sm:min-h-36 sm:p-3">
+              <div className="grid min-w-0 gap-2 sm:flex sm:items-start sm:justify-between sm:gap-3">
+                <div className="min-w-0">
+                  <div className="text-center text-[10px] uppercase tracking-[0.12em] text-slate-400 sm:text-left sm:text-xs sm:tracking-[0.18em]">
                     Slot {slotIndex + 1}
                   </div>
-                  <div className="mt-1 font-black">{item?.name ?? "Emplacement vide"}</div>
+                  <div className="mt-1 truncate text-center text-[11px] font-black leading-tight sm:text-left sm:text-base">
+                    {item?.name ?? "Vide"}
+                  </div>
                 </div>
                 {item ? (
                   <span
-                    className={`rounded-md px-2 py-1 text-xs font-black ${rarityClass(item.rarity)}`}
+                    className={`justify-self-center rounded-md px-1.5 py-1 text-[10px] font-black sm:justify-self-auto sm:px-2 sm:text-xs ${rarityClass(item.rarity)}`}
                   >
-                    {item.rarity}
+                    <span className="sm:hidden">+{bonusTotal(item.bonuses)}</span>
+                    <span className="hidden sm:inline">{item.rarity}</span>
                   </span>
                 ) : null}
               </div>
-              <div className="mt-3 text-sm text-slate-300">
+              <div className="mt-2 text-center text-[10px] leading-tight text-slate-300 sm:mt-3 sm:text-left sm:text-sm">
                 {item ? (
                   <>
-                    <StatBonusPills bonuses={item.bonuses} />
-                    <CosmeticUpgradeMeta item={item} />
+                    <div className="sm:hidden">Niv. {item.upgradeLevel}/3</div>
+                    <div className="hidden sm:block">
+                      <StatBonusPills bonuses={item.bonuses} />
+                      <CosmeticUpgradeMeta item={item} />
+                    </div>
                   </>
                 ) : (
-                  "Équipez un objet depuis l'inventaire."
+                  <span className="hidden sm:inline">Équipez un objet depuis l'inventaire.</span>
                 )}
               </div>
               {item ? (
-                <div className="mt-4 grid gap-2">
+                <div className="mt-2 grid gap-1 sm:mt-4 sm:gap-2">
                   {item.canUpgrade && item.nextUpgradeCost ? (
-                    <Button
-                      className="w-full"
+                    <button
+                      className="inline-flex min-h-8 w-full items-center justify-center rounded-md bg-emerald-400 px-1 py-1 text-[10px] font-black text-slate-950 transition hover:bg-emerald-300 disabled:opacity-50 sm:min-h-10 sm:px-3 sm:py-2 sm:text-sm"
                       onClick={() => upgradeItem(item)}
                       disabled={busyUpgrade === item.id}
+                      type="button"
                     >
-                      {busyUpgrade === item.id
-                        ? "Amélioration..."
-                        : `Améliorer · ${item.nextUpgradeCost.toLocaleString("fr-FR")} €`}
-                    </Button>
+                      <span className="sm:hidden">+</span>
+                      <span className="hidden sm:inline">
+                        {busyUpgrade === item.id
+                          ? "Amélioration..."
+                          : `Améliorer · ${item.nextUpgradeCost.toLocaleString("fr-FR")} €`}
+                      </span>
+                    </button>
                   ) : null}
                   <button
-                    className="rounded-md bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-50"
+                    className="rounded-md bg-white/10 px-1 py-1 text-[10px] font-bold text-white transition hover:bg-white/15 disabled:opacity-50 sm:px-3 sm:py-2 sm:text-sm"
                     onClick={() => unequip(item)}
                     disabled={busyCosmetic === item.id}
                     type="button"
                   >
-                    Retirer
+                    <span className="sm:hidden">X</span>
+                    <span className="hidden sm:inline">Retirer</span>
                   </button>
                 </div>
               ) : (
                 <button
-                  className="mt-4 rounded-md border border-emerald-300/40 bg-emerald-300/10 px-3 py-2 text-sm font-bold text-emerald-100 transition hover:bg-emerald-300/18"
+                  className="mt-2 min-h-8 w-full rounded-md border border-emerald-300/40 bg-emerald-300/10 px-1 py-1 text-[10px] font-bold text-emerald-100 transition hover:bg-emerald-300/18 sm:mt-4 sm:px-3 sm:py-2 sm:text-sm"
                   onClick={() => setSlotPicker(slotIndex)}
                   type="button"
                 >
-                  Choisir un objet
+                  <span className="sm:hidden">+</span>
+                  <span className="hidden sm:inline">Choisir un objet</span>
                 </button>
               )}
             </div>
@@ -4847,8 +4875,8 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                             {new Date(meeting.startsAt).toLocaleString("fr-FR")}
                           </span>
                         </div>
-                        <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-                          <span>{home}</span>
+                        <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                          <span className="min-w-0 truncate text-left">{home}</span>
                           <strong className="rounded-md bg-white/[0.08] px-3 py-2 text-base">
                             {meeting.status === "COMPLETED"
                               ? `${meeting.scoreHome} - ${meeting.scoreAway}`
@@ -4856,36 +4884,41 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                                 ? "Exempt"
                                 : "18h30"}
                           </strong>
-                          <span>{away}</span>
+                          <span className="min-w-0 truncate text-right">{away}</span>
                         </div>
                         {meeting.details?.singles?.length ? (
-                          <div className="mt-3 grid gap-1 border-t border-white/10 pt-3">
+                          <div className="mt-3 grid min-w-0 gap-2 border-t border-white/10 pt-3">
                             {meeting.details.singles.map((single) => (
                               <div
                                 key={single.label}
-                                className="grid gap-2 rounded-md bg-slate-950/35 px-2 py-2 text-xs text-slate-300 md:grid-cols-[72px_1fr_96px_1fr_auto]"
+                                className="grid min-w-0 gap-2 rounded-md bg-slate-950/35 px-2 py-2 text-xs text-slate-300 md:grid-cols-[72px_minmax(0,1fr)_96px_minmax(0,1fr)_auto]"
                               >
-                                <strong className="text-slate-100">{single.label}</strong>
+                                <div className="flex items-center justify-between gap-2 md:block">
+                                  <strong className="text-slate-100">{single.label}</strong>
+                                  <span className="rounded-md bg-white/[0.08] px-2 py-1 text-center font-black text-white md:hidden">
+                                    {single.scoreText}
+                                  </span>
+                                </div>
                                 <span
-                                  className={
+                                  className={`min-w-0 truncate ${
                                     single.winner === "home" ? "font-bold text-emerald-200" : ""
-                                  }
+                                  }`}
                                 >
                                   {single.homePlayer.name} · {single.homePlayer.fftRanking}
                                 </span>
-                                <span className="text-center font-black text-white">
+                                <span className="hidden text-center font-black text-white md:block">
                                   {single.scoreText}
                                 </span>
                                 <span
-                                  className={
+                                  className={`min-w-0 truncate ${
                                     single.winner === "away" ? "font-bold text-emerald-200" : ""
-                                  }
+                                  }`}
                                 >
                                   {single.awayPlayer.name} · {single.awayPlayer.fftRanking}
                                 </span>
                                 {meeting.status === "COMPLETED" ? (
                                   <button
-                                    className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-xs font-black text-emerald-100 transition hover:bg-emerald-300 hover:text-slate-950"
+                                    className="w-full rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-xs font-black text-emerald-100 transition hover:bg-emerald-300 hover:text-slate-950 md:w-auto"
                                     onClick={() =>
                                       setTeamReplay({
                                         single,
