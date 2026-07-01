@@ -4460,6 +4460,13 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [teamView, setTeamView] = useState<"team" | "standings" | "schedule">("team");
+  const [selectedRound, setSelectedRound] = useState<number | null>(null);
+  const [teamReplay, setTeamReplay] = useState<{
+    single: TeamChampionshipSingle;
+    homeClub: string;
+    awayClub: string;
+    round: number;
+  } | null>(null);
 
   async function loadTeamChampionship() {
     try {
@@ -4530,6 +4537,17 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
 
   const championship = data.championship;
   const nextMeeting = championship?.nextMeeting;
+  const rounds = championship
+    ? [...new Set(championship.meetings.map((meeting) => meeting.round))].sort((a, b) => a - b)
+    : [];
+  const upcomingRound =
+    nextMeeting?.round ??
+    championship?.meetings.find((meeting) => meeting.status === "SCHEDULED")?.round ??
+    rounds[rounds.length - 1] ??
+    1;
+  const displayedRound = selectedRound ?? upcomingRound;
+  const displayedRoundMeetings =
+    championship?.meetings.filter((meeting) => meeting.round === displayedRound) ?? [];
   const playerStanding = championship?.standings.find((entry) => entry.isPlayerClub);
   const lowestDivision = data.divisions[0] ?? "";
   const highestDivision = data.divisions[data.divisions.length - 1] ?? "";
@@ -4537,12 +4555,11 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
   const relegationEnabled = Boolean(championship && championship.division !== lowestDivision);
   const relegationRank = championship?.standings.length ?? 0;
   const dues = fallbackDuesState(club, data);
-  const duesWindowLabel =
-    dues.windowOpensAt && dues.windowClosesAt
-      ? `${new Date(dues.windowOpensAt).toLocaleString("fr-FR")} → ${new Date(
-          dues.windowClosesAt
-        ).toLocaleString("fr-FR")}`
-      : "À partir de 7 jours avant le prochain championnat";
+  const duesValidityLabel = dues.windowClosesAt
+    ? `Valable jusqu'à la dernière journée du championnat · ${new Date(
+        dues.windowClosesAt
+      ).toLocaleString("fr-FR")}`
+    : "Valable pour le prochain championnat identifié par le club";
 
   return (
     <section className="panel p-5">
@@ -4585,7 +4602,7 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
               Elle donne accès aux futures infrastructures du club, aux améliorations du club et à
               l'éligibilité pour la titularisation en championnat par équipe.
             </p>
-            <p className="mt-2 text-xs text-slate-400">Fenêtre : {duesWindowLabel}</p>
+            <p className="mt-2 text-xs text-slate-400">{duesValidityLabel}</p>
           </div>
           <div className="grid gap-2 text-right">
             <strong className="text-2xl">{dues.amount.toLocaleString("fr-FR")} €</strong>
@@ -4595,8 +4612,8 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                 : dues.currentPlayerPaid
                   ? "Cotisation payée"
                   : dues.isWindowOpen
-                    ? "Paiement ouvert"
-                    : "Paiement fermé"}
+                    ? "Paiement disponible"
+                    : "Championnat terminé"}
             </span>
           </div>
         </div>
@@ -4641,7 +4658,7 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
               }
             />
             <Metric label="Classement" value={playerStanding ? `${playerStanding.rank}e` : "-"} />
-            <Metric label="Points" value={playerStanding?.points ?? 0} />
+            <Metric label="Points simples" value={playerStanding?.points ?? 0} />
           </div>
 
           <div className="segmented-tabs">
@@ -4696,7 +4713,8 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                   {new Date(championship.endsAt).toLocaleString("fr-FR")}
                 </p>
                 <p className="mt-2 text-xs text-slate-400">
-                  Classement : victoires, différence de sets, différence de jeux, tirage ·{" "}
+                  Classement : points de simples gagnés, différence de sets, différence de jeux,
+                  tirage ·{" "}
                   {promotionEnabled ? "1er promu" : "Pas de montée en Elite 1"} ·{" "}
                   {relegationEnabled ? "13e relégué" : "Pas de relégation en Départementale 4"}
                 </p>
@@ -4712,7 +4730,7 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                       <tr>
                         <th className="py-2">#</th>
                         <th>Club</th>
-                        <th>Pts</th>
+                        <th>Pts simples</th>
                         <th>V</th>
                         <th>Sets</th>
                         <th>Jeux</th>
@@ -4770,9 +4788,41 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                   teamView === "schedule" ? "" : "hidden"
                 }`}
               >
-                <h3 className="font-black">Calendrier des rencontres</h3>
-                <div className="mt-4 grid max-h-[520px] gap-2 overflow-y-auto pr-1">
-                  {championship.meetings.map((meeting) => {
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-black">Calendrier des rencontres</h3>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Choisissez une journée pour voir les simples et les scores par set.
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-3 py-2 text-xs font-bold text-emerald-100">
+                    Prochaine : J{upcomingRound}
+                  </div>
+                </div>
+                <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
+                  {rounds.map((round) => {
+                    const isSelected = round === displayedRound;
+                    const isUpcoming = round === upcomingRound;
+                    return (
+                      <button
+                        className={`min-w-14 rounded-md border px-3 py-2 text-sm font-black transition ${
+                          isSelected
+                            ? "border-emerald-300 bg-emerald-300 text-slate-950"
+                            : isUpcoming
+                              ? "animate-pulse border-cyan-300/60 bg-cyan-300/15 text-cyan-100"
+                              : "border-white/10 bg-slate-950/45 text-slate-300 hover:border-emerald-300/40"
+                        }`}
+                        key={round}
+                        onClick={() => setSelectedRound(round)}
+                        type="button"
+                      >
+                        J{round}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {displayedRoundMeetings.map((meeting) => {
                     const home = meeting.home
                       ? `[${meeting.home.tag}] ${meeting.home.name}`
                       : "Exempt";
@@ -4799,7 +4849,7 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                         </div>
                         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
                           <span>{home}</span>
-                          <strong>
+                          <strong className="rounded-md bg-white/[0.08] px-3 py-2 text-base">
                             {meeting.status === "COMPLETED"
                               ? `${meeting.scoreHome} - ${meeting.scoreAway}`
                               : meeting.status === "EXEMPT"
@@ -4813,7 +4863,7 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                             {meeting.details.singles.map((single) => (
                               <div
                                 key={single.label}
-                                className="grid gap-2 rounded-md bg-slate-950/35 px-2 py-2 text-xs text-slate-300 md:grid-cols-[72px_1fr_44px_1fr]"
+                                className="grid gap-2 rounded-md bg-slate-950/35 px-2 py-2 text-xs text-slate-300 md:grid-cols-[72px_1fr_96px_1fr_auto]"
                               >
                                 <strong className="text-slate-100">{single.label}</strong>
                                 <span
@@ -4824,7 +4874,7 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                                   {single.homePlayer.name} · {single.homePlayer.fftRanking}
                                 </span>
                                 <span className="text-center font-black text-white">
-                                  {single.winner === "home" ? "1-0" : "0-1"}
+                                  {single.scoreText}
                                 </span>
                                 <span
                                   className={
@@ -4833,6 +4883,22 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                                 >
                                   {single.awayPlayer.name} · {single.awayPlayer.fftRanking}
                                 </span>
+                                {meeting.status === "COMPLETED" ? (
+                                  <button
+                                    className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-xs font-black text-emerald-100 transition hover:bg-emerald-300 hover:text-slate-950"
+                                    onClick={() =>
+                                      setTeamReplay({
+                                        single,
+                                        homeClub: home,
+                                        awayClub: away,
+                                        round: meeting.round
+                                      })
+                                    }
+                                    type="button"
+                                  >
+                                    Replay
+                                  </button>
+                                ) : null}
                               </div>
                             ))}
                           </div>
@@ -4850,6 +4916,81 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
           ) : null}
         </div>
       )}
+      {teamReplay
+        ? createPortal(
+            <div className="game-modal-overlay">
+              <div className="game-modal-panel panel max-w-3xl">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-300">
+                      Replay championnat · J{teamReplay.round}
+                    </p>
+                    <h2 className="mt-1 text-2xl font-black">{teamReplay.single.label}</h2>
+                    <p className="mt-1 text-sm text-slate-300">
+                      {teamReplay.homeClub} contre {teamReplay.awayClub}
+                    </p>
+                  </div>
+                  <button
+                    className="rounded-md border border-white/10 bg-white/[0.06] p-2 text-slate-200"
+                    onClick={() => setTeamReplay(null)}
+                    type="button"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="mt-5 grid gap-3 md:grid-cols-[1fr_auto_1fr]">
+                  <div
+                    className={`rounded-md border p-4 ${
+                      teamReplay.single.winner === "home"
+                        ? "border-emerald-300 bg-emerald-300/10"
+                        : "border-white/10 bg-white/[0.04]"
+                    }`}
+                  >
+                    <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Domicile</p>
+                    <h3 className="mt-2 text-xl font-black">{teamReplay.single.homePlayer.name}</h3>
+                    <p className="text-sm text-slate-300">
+                      {teamReplay.single.homePlayer.fftRanking} · Valeur{" "}
+                      {teamReplay.single.homeValue}
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center rounded-md border border-white/10 bg-slate-950/60 px-5 py-4 text-center">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-emerald-300">Score</p>
+                      <p className="mt-1 text-2xl font-black">{teamReplay.single.scoreText}</p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Sets {teamReplay.single.homeSets}-{teamReplay.single.awaySets}
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    className={`rounded-md border p-4 ${
+                      teamReplay.single.winner === "away"
+                        ? "border-emerald-300 bg-emerald-300/10"
+                        : "border-white/10 bg-white/[0.04]"
+                    }`}
+                  >
+                    <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Extérieur</p>
+                    <h3 className="mt-2 text-xl font-black">{teamReplay.single.awayPlayer.name}</h3>
+                    <p className="text-sm text-slate-300">
+                      {teamReplay.single.awayPlayer.fftRanking} · Valeur{" "}
+                      {teamReplay.single.awayValue}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-md border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">
+                  Ce replay reprend la logique du championnat par équipe : hiérarchie des
+                  titulaires, valeur du joueur, tirage déterministe et score en deux sets gagnants.
+                </div>
+                <Button className="mt-4 w-full" onClick={() => setTeamReplay(null)}>
+                  Fermer le replay
+                </Button>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </section>
   );
 }

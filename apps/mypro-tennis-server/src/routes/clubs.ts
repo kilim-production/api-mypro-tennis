@@ -15,7 +15,6 @@ export const clubsRouter = Router();
 const clubCreationCost = 5000;
 const clubResaleRefund = 4000;
 const teamSize = 5;
-const duesWindowMs = 7 * 24 * 60 * 60 * 1000;
 const clubComplexLevels = [
   { level: 1, name: "Club municipal", cost: 0, maxSlots: 5 },
   { level: 2, name: "Club intercommunal", cost: 10_000, maxSlots: 10 },
@@ -262,18 +261,6 @@ function roundStart(startsAt: Date, round: number) {
   return date;
 }
 
-function duesWindow(startsAt: Date) {
-  return {
-    opensAt: new Date(startsAt.getTime() - duesWindowMs),
-    closesAt: startsAt
-  };
-}
-
-function isDuesWindowOpen(startsAt: Date, now = new Date()) {
-  const window = duesWindow(startsAt);
-  return now.getTime() >= window.opensAt.getTime() && now.getTime() < window.closesAt.getTime();
-}
-
 function nextDivision(division: string) {
   const index = teamChampionshipDivisions.indexOf(division);
   if (index < 0) return firstTeamChampionshipDivision;
@@ -299,9 +286,18 @@ function relegatedDivision(division: string) {
   return previous === division ? null : previous;
 }
 
-function decodeMeetingDetails(value: string) {
+type TeamMeetingDetails = {
+  singles?: Array<{
+    homeSets?: number;
+    awaySets?: number;
+    homeGames?: number;
+    awayGames?: number;
+  }>;
+};
+
+function decodeMeetingDetails(value: string): TeamMeetingDetails {
   try {
-    return JSON.parse(value);
+    return JSON.parse(value) as TeamMeetingDetails;
   } catch {
     return {};
   }
@@ -529,6 +525,73 @@ function simulateTeamMeeting(
   };
 }
 
+async function recalculateTeamChampionshipTable(championshipId: string) {
+  const [entries, meetings] = await Promise.all([
+    prisma.teamChampionshipEntry.findMany({ where: { championshipId } }),
+    prisma.teamChampionshipMeeting.findMany({ where: { championshipId, status: "COMPLETED" } })
+  ]);
+  const totals = new Map(
+    entries.map((entry) => [
+      entry.id,
+      {
+        played: 0,
+        wins: 0,
+        losses: 0,
+        points: 0,
+        matchesFor: 0,
+        matchesAgainst: 0,
+        setsFor: 0,
+        setsAgainst: 0,
+        gamesFor: 0,
+        gamesAgainst: 0
+      }
+    ])
+  );
+  for (const meeting of meetings) {
+    if (!meeting.homeEntryId || !meeting.awayEntryId) continue;
+    const home = totals.get(meeting.homeEntryId);
+    const away = totals.get(meeting.awayEntryId);
+    if (!home || !away) continue;
+    const details = decodeMeetingDetails(meeting.details);
+    const homeScore = meeting.scoreHome ?? 0;
+    const awayScore = meeting.scoreAway ?? 0;
+    const setsHome =
+      details.singles?.reduce((sum, single) => sum + (single.homeSets ?? 0), 0) ?? 0;
+    const setsAway =
+      details.singles?.reduce((sum, single) => sum + (single.awaySets ?? 0), 0) ?? 0;
+    const gamesHome =
+      details.singles?.reduce((sum, single) => sum + (single.homeGames ?? 0), 0) ?? 0;
+    const gamesAway =
+      details.singles?.reduce((sum, single) => sum + (single.awayGames ?? 0), 0) ?? 0;
+
+    home.played += 1;
+    away.played += 1;
+    home.wins += homeScore > awayScore ? 1 : 0;
+    home.losses += homeScore > awayScore ? 0 : 1;
+    away.wins += awayScore > homeScore ? 1 : 0;
+    away.losses += awayScore > homeScore ? 0 : 1;
+    home.points += homeScore;
+    away.points += awayScore;
+    home.matchesFor += homeScore;
+    home.matchesAgainst += awayScore;
+    away.matchesFor += awayScore;
+    away.matchesAgainst += homeScore;
+    home.setsFor += setsHome;
+    home.setsAgainst += setsAway;
+    away.setsFor += setsAway;
+    away.setsAgainst += setsHome;
+    home.gamesFor += gamesHome;
+    home.gamesAgainst += gamesAway;
+    away.gamesFor += gamesAway;
+    away.gamesAgainst += gamesHome;
+  }
+  await prisma.$transaction(
+    [...totals.entries()].map(([id, data]) =>
+      prisma.teamChampionshipEntry.update({ where: { id }, data })
+    )
+  );
+}
+
 async function createTeamChampionship(teamId: string) {
   const team = await prisma.clubTeam.findUnique({
     where: { id: teamId },
@@ -630,7 +693,7 @@ async function settleTeamChampionship(championshipId: string) {
           played: { increment: 1 },
           wins: { increment: homeWon ? 1 : 0 },
           losses: { increment: homeWon ? 0 : 1 },
-          points: { increment: homeWon ? 1 : 0 },
+          points: { increment: result.scoreHome },
           matchesFor: { increment: result.scoreHome },
           matchesAgainst: { increment: result.scoreAway },
           setsFor: { increment: result.setsHome },
@@ -645,7 +708,7 @@ async function settleTeamChampionship(championshipId: string) {
           played: { increment: 1 },
           wins: { increment: homeWon ? 0 : 1 },
           losses: { increment: homeWon ? 1 : 0 },
-          points: { increment: homeWon ? 0 : 1 },
+          points: { increment: result.scoreAway },
           matchesFor: { increment: result.scoreAway },
           matchesAgainst: { increment: result.scoreHome },
           setsFor: { increment: result.setsAway },
@@ -656,6 +719,7 @@ async function settleTeamChampionship(championshipId: string) {
       })
     ]);
   }
+  await recalculateTeamChampionshipTable(championshipId);
   if (championship.status !== "COMPLETED" && championship.endsAt.getTime() <= now.getTime()) {
     const entries = (
       await prisma.teamChampionshipEntry.findMany({
@@ -701,7 +765,7 @@ async function settleTeamChampionship(championshipId: string) {
 
 async function clubDuesState(params: {
   club: { id: string; duesAmount: number; memberships: Array<{ playerId: string }> };
-  championship: { id: string; startsAt: Date; status: string } | null;
+  championship: { id: string; startsAt: Date; endsAt: Date; status: string } | null;
   currentPlayerId: string;
 }) {
   if (!params.championship) {
@@ -727,19 +791,17 @@ async function clubDuesState(params: {
       : [];
   const paidPlayerIds = payments.map((payment) => payment.playerId);
   const paidSet = new Set(paidPlayerIds);
-  const window = duesWindow(params.championship.startsAt);
-  const windowOpen =
-    params.championship.status === "SCHEDULED" && isDuesWindowOpen(params.championship.startsAt);
+  const paymentOpen = params.championship.status !== "COMPLETED";
   const currentPlayerPaid =
     params.club.duesAmount === 0 || paidSet.has(params.currentPlayerId);
   return {
     amount: params.club.duesAmount,
     championshipId: params.championship.id,
-    windowOpensAt: window.opensAt,
-    windowClosesAt: window.closesAt,
-    isWindowOpen: windowOpen,
+    windowOpensAt: null,
+    windowClosesAt: params.championship.endsAt,
+    isWindowOpen: paymentOpen,
     currentPlayerPaid,
-    currentPlayerCanPay: windowOpen && params.club.duesAmount > 0 && !currentPlayerPaid,
+    currentPlayerCanPay: paymentOpen && params.club.duesAmount > 0 && !currentPlayerPaid,
     paidCount: params.club.duesAmount === 0 ? params.club.memberships.length : paidPlayerIds.length,
     eligibleCount: params.club.duesAmount === 0 ? params.club.memberships.length : paidPlayerIds.length,
     paidPlayerIds
@@ -941,11 +1003,9 @@ clubsRouter.post("/dues/pay", requireAuth, async (request, response) => {
   const championship = await prisma.teamChampionship.findUnique({
     where: { id: latestEntry.championshipId }
   });
-  if (!championship || championship.status !== "SCHEDULED")
-    return response.status(409).json({ message: "La cotisation n'est plus ouverte." });
-  if (!isDuesWindowOpen(championship.startsAt))
-    return response.status(403).json({
-      message: "La cotisation ouvre 7 jours avant le début du championnat."
+  if (!championship || championship.status === "COMPLETED")
+    return response.status(409).json({
+      message: "La cotisation n'est plus ouverte pour ce championnat."
     });
   const existing = await prisma.clubDuePayment.findUnique({
     where: {
