@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["offline.html", "icon.svg", "icon-192.png", "icon-512.png"],
+      includeAssets: ["offline.html", "icon-192.png", "icon-512.png", "apple-touch-icon.png"],
       manifest: {
         name: "MYPRO - TENNIS",
         short_name: "MYPRO Tennis",
@@ -19,7 +19,6 @@ export default defineConfig({
         orientation: "landscape",
         start_url: "/",
         icons: [
-          { src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" },
           { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
           { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" }
         ]
