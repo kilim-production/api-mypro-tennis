@@ -15,23 +15,23 @@ const archetypes = [
   "Gros service",
   "Relanceur",
   "Frappeur de fond",
-  "AthlÃ¨te endurant",
+  "Athlète endurant",
   "Joueur complet"
 ];
 
 const firstNames = [
   "Camille",
-  "NoÃ©",
+  "Noé",
   "Lina",
   "Sacha",
   "Iris",
   "Malo",
   "Nora",
   "Eden",
-  "LÃ©on",
+  "Léon",
   "Mila",
   "Oscar",
-  "ZoÃ©",
+  "Zoé",
   "Nils",
   "Alya",
   "Hugo",
@@ -39,11 +39,11 @@ const firstNames = [
   "Tao",
   "Romane",
   "Eli",
-  "MaÃ«lys",
+  "Maëlys",
   "Yanis",
   "Clara",
   "Basile",
-  "LÃ©na",
+  "Léna",
   "Adam",
   "June",
   "Robin",
@@ -61,8 +61,8 @@ const lastNames = [
   "Serrano",
   "Delaune",
   "Okafor",
-  "MassÃ©",
-  "BergstrÃ¶m",
+  "Massé",
+  "Bergström",
   "Valcourt",
   "Mercier",
   "Noval",
@@ -192,7 +192,7 @@ function tournamentSchedule(start: Date, entrantCount: number) {
     slots.push({
       court: `Court ${1 + (index % 4)}`,
       round:
-        index < 8 ? "HuitiÃ¨mes" : index < 12 ? "Quarts" : index < 14 ? "Demi-finales" : "Finale",
+        index < 8 ? "Huitièmes" : index < 12 ? "Quarts" : index < 14 ? "Demi-finales" : "Finale",
       startsAt: matchTime.toISOString()
     });
   }
@@ -217,8 +217,8 @@ async function seedDemoAccount() {
   const passwordHash = await bcrypt.hash("demo1234", 12);
   await prisma.user.upsert({
     where: { email: demoEmail },
-    update: { passwordHash, displayName: "Compte DÃ©mo" },
-    create: { email: demoEmail, passwordHash, displayName: "Compte DÃ©mo" }
+    update: { passwordHash, displayName: "Compte Démo" },
+    create: { email: demoEmail, passwordHash, displayName: "Compte Démo" }
   });
 }
 
@@ -261,7 +261,7 @@ async function seedAiPlayers() {
           fftRanking: ranking,
           fftRankingValidated: ranking === "-15",
           amateurPoints: requiredPoints,
-          careerStage: ["-2/6", "-4/6", "-15"].includes(ranking) ? "PrÃ©-pro" : "Amateur",
+          careerStage: ["-2/6", "-4/6", "-15"].includes(ranking) ? "Pré-pro" : "Amateur",
           proUnlocked: false,
           recentForm: Math.max(35, Math.min(88, 45 + Math.round(overall * 0.35) + slot)),
           wins: Math.max(0, Math.round(requiredPoints / 120) + slot),
@@ -295,7 +295,7 @@ async function seedTournaments(aiPlayers: Awaited<ReturnType<typeof seedAiPlayer
         schedule: JSON.stringify(tournamentSchedule(startsAt, entrants.length)),
         bracket: JSON.stringify({
           entrants,
-          rounds: ["HuitiÃ¨mes", "Quarts", "Demi-finales", "Finale"]
+          rounds: ["Huitièmes", "Quarts", "Demi-finales", "Finale"]
         })
       },
       create: {
@@ -315,7 +315,7 @@ async function seedTournaments(aiPlayers: Awaited<ReturnType<typeof seedAiPlayer
         recommendedLevel: tournament.recommendedLevel,
         bracket: JSON.stringify({
           entrants,
-          rounds: ["HuitiÃ¨mes", "Quarts", "Demi-finales", "Finale"]
+          rounds: ["Huitièmes", "Quarts", "Demi-finales", "Finale"]
         })
       }
     });
@@ -328,7 +328,7 @@ async function main() {
   const aiPlayers = await seedAiPlayers();
   await seedTournaments(aiPlayers);
   console.log(
-    "DonnÃ©es rÃ©initialisÃ©es : compte dÃ©mo sans joueur, pyramide IA complÃ¨te et tournois prÃªts."
+    "Données réinitialisées : compte démo sans joueur, pyramide IA complète et tournois prêts."
   );
 }
 

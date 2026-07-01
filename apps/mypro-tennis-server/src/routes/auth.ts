@@ -8,7 +8,7 @@ import { loginSchema, signupSchema } from "@mypro/shared";
 import { config } from "../config";
 import { validateBody } from "../middleware/validate";
 import { requireAuth } from "../middleware/auth";
-import { publicPlayer } from "../services/playerMapper";
+import { publicPlayerWithClubBonuses } from "../services/playerMapper";
 
 export const authRouter = Router();
 const googleProvider = "google";
@@ -140,7 +140,7 @@ authRouter.post("/login", validateBody(loginSchema), async (request, response) =
   return response.json({
     token,
     user: publicUser(user),
-    player: user.player ? publicPlayer(user.player) : null
+    player: user.player ? await publicPlayerWithClubBonuses(user.player) : null
   });
 });
 
@@ -283,7 +283,7 @@ authRouter.get("/me", requireAuth, async (request, response) => {
   if (!user) return response.status(404).json({ message: "Compte introuvable." });
   return response.json({
     user: publicUser(user),
-    player: user.player ? publicPlayer(user.player) : null,
+    player: user.player ? await publicPlayerWithClubBonuses(user.player) : null,
     notifications: user.notifications
   });
 });

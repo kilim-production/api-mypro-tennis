@@ -522,7 +522,9 @@ type ClubBuildingLevel = {
   level: number;
   name: string;
   cost: number;
-  maxSlots: number;
+  maxSlots?: number;
+  recoveryReductionPercent?: number;
+  rareChestBonusPercent?: number;
 };
 type ClubBuilding = {
   id: string;
@@ -541,8 +543,12 @@ type ClubListItem = {
   duesAmount?: number;
   budget: number;
   complexLevel: number;
+  careCenterLevel: number;
+  trainingCenterLevel: number;
   buildings?: {
     complex: ClubBuilding;
+    careCenter: ClubBuilding;
+    trainingCenter: ClubBuilding;
   };
   competitiveLevel: string;
   maxSlots: number;
@@ -673,6 +679,22 @@ const fallbackComplexLevels: ClubBuildingLevel[] = [
   { level: 4, name: "Club régional", cost: 300_000, maxSlots: 35 },
   { level: 5, name: "Club de référence nationale", cost: 2_000_000, maxSlots: 50 }
 ];
+const fallbackCareCenterLevels: ClubBuildingLevel[] = [
+  { level: 0, name: "Aucun centre de soins", cost: 0, recoveryReductionPercent: 0 },
+  { level: 1, name: "Infirmerie de club", cost: 8_000, recoveryReductionPercent: 3 },
+  { level: 2, name: "Cabinet de kiné", cost: 25_000, recoveryReductionPercent: 6 },
+  { level: 3, name: "Pôle récupération", cost: 90_000, recoveryReductionPercent: 9 },
+  { level: 4, name: "Centre médical avancé", cost: 300_000, recoveryReductionPercent: 12 },
+  { level: 5, name: "Institut performance santé", cost: 1_000_000, recoveryReductionPercent: 15 }
+];
+const fallbackTrainingCenterLevels: ClubBuildingLevel[] = [
+  { level: 0, name: "Aucun centre d'entraînement", cost: 0, rareChestBonusPercent: 0 },
+  { level: 1, name: "Terrain d'entraînement", cost: 12_000, rareChestBonusPercent: 1 },
+  { level: 2, name: "Atelier performance", cost: 45_000, rareChestBonusPercent: 2 },
+  { level: 3, name: "Académie de progression", cost: 160_000, rareChestBonusPercent: 4 },
+  { level: 4, name: "Centre haute intensité", cost: 550_000, rareChestBonusPercent: 6 },
+  { level: 5, name: "Académie élite MyPro", cost: 1_800_000, rareChestBonusPercent: 8 }
+];
 
 function complexBuildingForClub(club: ClubDetails): ClubBuilding {
   if (club.buildings?.complex) return club.buildings.complex;
@@ -690,8 +712,262 @@ function complexBuildingForClub(club: ClubDetails): ClubBuilding {
   };
 }
 
-function complexLevelImage(level: number) {
-  return `/visuals/club/complex-level-${level}.jpg`;
+function fallbackSpecializedBuilding(
+  id: "careCenter" | "trainingCenter",
+  name: string,
+  level: number,
+  levels: ClubBuildingLevel[]
+): ClubBuilding {
+  const currentLevel =
+    levels.find((definition) => definition.level === Math.max(0, Math.min(5, level))) ??
+    levels[0]!;
+  return {
+    id,
+    name,
+    currentLevel,
+    nextLevel:
+      levels.find((definition) => definition.level === currentLevel.level + 1) ?? null,
+    maxLevel: levels.length - 1,
+    levels
+  };
+}
+
+function clubBuildingForClub(
+  club: ClubDetails,
+  id: "complex" | "careCenter" | "trainingCenter"
+) {
+  if (id === "complex") return complexBuildingForClub(club);
+  if (id === "careCenter") {
+    return (
+      club.buildings?.careCenter ??
+      fallbackSpecializedBuilding(
+        "careCenter",
+        "Centre de soins",
+        club.careCenterLevel ?? 0,
+        fallbackCareCenterLevels
+      )
+    );
+  }
+  return (
+    club.buildings?.trainingCenter ??
+    fallbackSpecializedBuilding(
+      "trainingCenter",
+      "Centre d'entraînement",
+      club.trainingCenterLevel ?? 0,
+      fallbackTrainingCenterLevels
+    )
+  );
+}
+
+function buildingLevelImage(buildingId: string, level: number) {
+  if (buildingId === "complex") return `/visuals/club/complex-level-${Math.max(1, level)}.jpg`;
+  return "";
+}
+
+function buildingEffectLabel(building: ClubBuilding, level = building.currentLevel) {
+  if (building.id === "complex") return `${level.maxSlots ?? 0} joueurs`;
+  if (building.id === "careCenter") {
+    return level.recoveryReductionPercent
+      ? `-${level.recoveryReductionPercent}% délai énergie`
+      : "Récupération standard";
+  }
+  return level.rareChestBonusPercent
+    ? `+${level.rareChestBonusPercent}% coffres non-Bronze`
+    : "Tirage standard";
+}
+
+function buildingUpgradePath(buildingId: string) {
+  if (buildingId === "careCenter") return "/clubs/me/buildings/care-center/upgrade";
+  if (buildingId === "trainingCenter") return "/clubs/me/buildings/training-center/upgrade";
+  return "/clubs/me/buildings/complex/upgrade";
+}
+
+function buildingTheme(buildingId: string) {
+  if (buildingId === "careCenter") {
+    return {
+      icon: HeartPulse,
+      label: "Récupération",
+      gradient: "from-rose-400/35 via-emerald-300/18 to-slate-950",
+      border: "border-rose-300/30"
+    };
+  }
+  if (buildingId === "trainingCenter") {
+    return {
+      icon: Dumbbell,
+      label: "Progression",
+      gradient: "from-cyan-300/35 via-emerald-300/18 to-slate-950",
+      border: "border-cyan-300/30"
+    };
+  }
+  return {
+    icon: Building2,
+    label: "Capacité",
+    gradient: "from-emerald-300/35 via-sky-300/18 to-slate-950",
+    border: "border-emerald-300/30"
+  };
+}
+
+function ClubBuildingCard({
+  club,
+  building,
+  busy,
+  onUpgrade
+}: {
+  club: ClubDetails;
+  building: ClubBuilding;
+  busy: string | null;
+  onUpgrade: (building: ClubBuilding) => void;
+}) {
+  const theme = buildingTheme(building.id);
+  const Icon = theme.icon;
+  const nextLevel = building.nextLevel;
+  const canUpgrade = Boolean(club.isPresident && nextLevel && club.budget >= nextLevel.cost);
+  const upgradeBusy = busy === `${building.id}-upgrade`;
+  const heroImage = buildingLevelImage(building.id, building.currentLevel.level);
+  const progress =
+    building.maxLevel > 0
+      ? Math.round((building.currentLevel.level / building.maxLevel) * 100)
+      : 100;
+
+  return (
+    <article
+      className={`overflow-hidden rounded-md border ${theme.border} bg-slate-950/80 shadow-xl shadow-emerald-950/20`}
+    >
+      <div className="relative min-h-32 sm:min-h-44">
+        {heroImage ? (
+          <img
+            alt={`Illustration ${building.currentLevel.name}`}
+            className="absolute inset-0 h-full w-full object-cover"
+            src={heroImage}
+          />
+        ) : (
+          <div className={`absolute inset-0 bg-gradient-to-br ${theme.gradient}`} />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/75 to-slate-950/20" />
+        <div className="relative z-10 flex min-h-32 items-end p-3 sm:min-h-44 sm:p-4">
+          <div className="w-full">
+            <div className="flex items-center justify-between gap-3">
+              <div className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/[0.08] px-2.5 py-2 text-xs font-black uppercase tracking-[0.16em] text-emerald-100">
+                <Icon size={16} />
+                {theme.label}
+              </div>
+              <div className="rounded-md bg-emerald-300 px-3 py-2 text-sm font-black text-slate-950">
+                Niv. {building.currentLevel.level}
+              </div>
+            </div>
+            <h3 className="mt-3 text-2xl font-black leading-none sm:text-3xl">{building.name}</h3>
+            <p className="mt-1 text-sm text-slate-200">{building.currentLevel.name}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 p-3 sm:p-4">
+        <div className="rounded-md border border-emerald-300/25 bg-emerald-300/10 p-3 text-sm text-slate-100">
+          <span className="text-emerald-200">Bonus actuel : </span>
+          <strong>{buildingEffectLabel(building)}</strong>
+        </div>
+
+        <div className="rounded-md border border-white/10 bg-white/[0.04] p-3">
+          <div className="flex items-center justify-between gap-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
+            <span>Progression</span>
+            <span>
+              {building.currentLevel.level}/{building.maxLevel}
+            </span>
+          </div>
+          <div className="mt-3 h-2 rounded-full bg-white/[0.08]">
+            <div className="h-full rounded-full bg-emerald-300" style={{ width: `${progress}%` }} />
+          </div>
+          <div className="mt-3 grid grid-cols-6 gap-1">
+            {building.levels.map((level) => {
+              const isCurrent = level.level === building.currentLevel.level;
+              const isUnlocked = level.level < building.currentLevel.level;
+              return (
+                <span
+                  className={`rounded-md border px-1.5 py-1 text-center text-xs font-black ${
+                    isCurrent
+                      ? "border-emerald-300 bg-emerald-300 text-slate-950"
+                      : isUnlocked
+                        ? "border-emerald-300/30 bg-emerald-300/10 text-emerald-100"
+                        : "border-white/10 bg-slate-950/50 text-slate-500"
+                  }`}
+                  key={level.level}
+                >
+                  {level.level}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+
+        <details className="rounded-md border border-white/10 bg-white/[0.04] p-3">
+          <summary className="cursor-pointer list-none text-sm font-black text-emerald-200">
+            Voir les niveaux
+          </summary>
+          <div className="mt-3 grid gap-2">
+            {building.levels.map((level) => {
+              const isCurrent = level.level === building.currentLevel.level;
+              const isUnlocked = level.level < building.currentLevel.level;
+              return (
+                <div
+                  className={`grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-md border p-2 text-sm ${
+                    isCurrent
+                      ? "border-emerald-300 bg-emerald-300/10"
+                      : isUnlocked
+                        ? "border-white/15 bg-white/[0.04]"
+                        : "border-white/10 bg-slate-950/45 text-slate-400"
+                  }`}
+                  key={level.level}
+                >
+                  <span className="rounded-md bg-white/[0.08] px-2 py-1 text-xs font-black">
+                    {level.level}
+                  </span>
+                  <span className="min-w-0">
+                    <strong className="block truncate text-slate-100">{level.name}</strong>
+                    <small className="block truncate text-slate-400">
+                      {buildingEffectLabel(building, level)}
+                    </small>
+                  </span>
+                  <span className="whitespace-nowrap text-xs font-bold text-slate-200">
+                    {level.cost === 0 ? "Base" : `${level.cost.toLocaleString("fr-FR")} €`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </details>
+
+        <div className="rounded-md border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-300">
+        {nextLevel ? (
+          <>
+            Prochaine amélioration : <span className="font-bold text-white">{nextLevel.name}</span>{" "}
+            ({buildingEffectLabel(building, nextLevel)}).
+          </>
+        ) : (
+          `${building.name} est au niveau maximum.`
+        )}
+        </div>
+
+        {club.isPresident && nextLevel ? (
+          <Button
+            className="w-full"
+            disabled={upgradeBusy || !canUpgrade}
+            onClick={() => onUpgrade(building)}
+          >
+            Améliorer pour {nextLevel.cost.toLocaleString("fr-FR")} €
+          </Button>
+        ) : (
+          <Button className="w-full bg-white/10 text-slate-100 hover:bg-white/15" disabled>
+            {nextLevel ? "Président requis" : "Niveau maximum"}
+          </Button>
+        )}
+        {club.isPresident && nextLevel && !canUpgrade ? (
+          <p className="mt-2 text-xs text-amber-200">
+            Budget du club insuffisant pour cette amélioration.
+          </p>
+        ) : null}
+      </div>
+    </article>
+  );
 }
 
 function fallbackDuesState(
@@ -937,6 +1213,9 @@ function CareerPathCard({ player }: { player: Player }) {
 
 function ActionEnergyCard({ player }: { player: Player }) {
   const now = useNow();
+  const rechargeMinutes = player.actionEnergyRechargeMinutes ?? 30;
+  const formattedRecharge =
+    Number.isInteger(rechargeMinutes) ? `${rechargeMinutes}` : rechargeMinutes.toFixed(1);
   const next = player.actionEnergyNextAt
     ? new Date(player.actionEnergyNextAt).toLocaleTimeString("fr-FR", {
         hour: "2-digit",
@@ -959,8 +1238,8 @@ function ActionEnergyCard({ player }: { player: Player }) {
         <Activity size={24} />
       </div>
       <p className="mt-3 text-sm text-slate-300">
-        Chaque action de carrière coûte 1 point. La réserve se recharge de 1 point toutes les 30
-        minutes.
+        Chaque action de carrière coûte 1 point. La réserve se recharge de 1 point toutes les{" "}
+        {formattedRecharge} minutes.
       </p>
       <div className="mt-4 h-2 rounded-full bg-white/[0.08]">
         <div className="h-full rounded-full bg-sky-300" style={{ width: `${ratio}%` }} />
@@ -4662,11 +4941,11 @@ function ClubPage() {
     }
   }
 
-  async function upgradeComplex() {
+  async function upgradeBuilding(building: ClubBuilding) {
     setMessage("");
-    setBusy("complex-upgrade");
+    setBusy(`${building.id}-upgrade`);
     try {
-      const club = await api<ClubDetails>("/clubs/me/buildings/complex/upgrade", {
+      const club = await api<ClubDetails>(buildingUpgradePath(building.id), {
         method: "POST"
       });
       setData((current) => ({ club, pendingRequest: current?.pendingRequest ?? null }));
@@ -4735,11 +5014,9 @@ function ClubPage() {
 
   if (data.club) {
     const club = data.club;
-    const complexBuilding = complexBuildingForClub(club);
-    const complexNextLevel = complexBuilding.nextLevel;
-    const canUpgradeComplex = Boolean(
-      club.isPresident && complexNextLevel && club.budget >= complexNextLevel.cost
-    );
+    const infrastructureBuildings = (
+      ["complex", "careCenter", "trainingCenter"] as const
+    ).map((buildingId) => clubBuildingForClub(club, buildingId));
     const successorOptions = club.members.filter((member) => member.player.id !== player.id);
     const selectedSuccessorId = successorPlayerId || successorOptions[0]?.player.id || "";
     return (
@@ -4798,7 +5075,7 @@ function ClubPage() {
           <div className="segmented-tabs mt-5">
             {[
               ["team", "Championnat", club.competitiveLevel],
-              ["infra", "Complexe", `Niv. ${complexBuilding.currentLevel.level}`],
+              ["infra", "Infrastructures", `${infrastructureBuildings.length} bâtiments`],
               ["members", "Effectif", `${club.memberCount}/${club.maxSlots}`],
               ["requests", "Demandes", `${club.pendingRequests.length}`]
             ].map(([value, label, meta]) => (
@@ -4822,146 +5099,36 @@ function ClubPage() {
         ) : null}
 
         {clubTab === "infra" ? (
-        <section className="panel p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-bold uppercase tracking-[0.22em] text-emerald-300">
-                Infrastructures
-              </p>
-              <h2 className="mt-1 text-2xl font-black">Développement du club</h2>
+          <section className="panel p-3 sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300 sm:text-sm sm:tracking-[0.22em]">
+                  Infrastructures
+                </p>
+                <h2 className="mt-1 text-xl font-black sm:text-2xl">Bâtiments du club</h2>
+              </div>
+              <div className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-3 py-2 text-right text-xs text-emerald-100 sm:text-sm">
+                <span className="block text-[10px] uppercase tracking-[0.14em] text-emerald-200">
+                  Budget
+                </span>
+                <span className="font-black text-white">
+                  {club.budget.toLocaleString("fr-FR")} €
+                </span>
+              </div>
             </div>
-            <div className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-300">
-              Budget disponible :{" "}
-              <span className="font-black text-white">{club.budget.toLocaleString("fr-FR")} €</span>
-            </div>
-          </div>
 
-          <div className="mt-5 grid gap-4">
-            <article className="overflow-hidden rounded-md border border-emerald-300/25 bg-slate-950/70 shadow-xl shadow-emerald-950/20">
-              <div className="relative min-h-64">
-                <img
-                  alt={`Illustration ${complexBuilding.currentLevel.name}`}
-                  className="absolute inset-0 h-full w-full object-cover"
-                  src={complexLevelImage(complexBuilding.currentLevel.level)}
+            <div className="mt-3 grid gap-3 xl:grid-cols-3">
+              {infrastructureBuildings.map((building) => (
+                <ClubBuildingCard
+                  building={building}
+                  busy={busy}
+                  club={club}
+                  key={building.id}
+                  onUpgrade={(selectedBuilding) => void upgradeBuilding(selectedBuilding)}
                 />
-                <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/65 to-slate-950/10" />
-                <div className="relative z-10 flex min-h-64 flex-col justify-end p-5">
-                  <div className="flex flex-wrap items-end justify-between gap-4">
-                    <div>
-                      <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-emerald-300/30 bg-emerald-300/15 px-3 py-2 text-sm font-black text-emerald-100">
-                        <Building2 size={18} />
-                        Niveau actuel
-                      </div>
-                      <h3 className="text-3xl font-black">{complexBuilding.name}</h3>
-                      <p className="mt-1 max-w-xl text-sm text-slate-200">
-                        Niveau {complexBuilding.currentLevel.level}/{complexBuilding.maxLevel} -{" "}
-                        {complexBuilding.currentLevel.name}
-                      </p>
-                    </div>
-                    <div className="rounded-md border border-emerald-300/35 bg-slate-950/70 px-4 py-3 text-right backdrop-blur">
-                      <div className="text-xs uppercase tracking-[0.18em] text-emerald-200">
-                        Capacité
-                      </div>
-                      <div className="text-2xl font-black">
-                        {complexBuilding.currentLevel.maxSlots} joueurs
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid gap-3 p-4 md:grid-cols-5">
-                {complexBuilding.levels.map((level) => {
-                  const isCurrent = level.level === complexBuilding.currentLevel.level;
-                  const isUnlocked = level.level < complexBuilding.currentLevel.level;
-                  const isLocked = level.level > complexBuilding.currentLevel.level;
-                  return (
-                    <div
-                      className={`overflow-hidden rounded-md border bg-white/[0.04] ${
-                        isCurrent
-                          ? "border-emerald-300 shadow-lg shadow-emerald-950/30"
-                          : isUnlocked
-                            ? "border-white/15"
-                            : "border-white/10"
-                      }`}
-                      key={level.level}
-                    >
-                      <div className="relative aspect-[16/10] overflow-hidden">
-                        <img
-                          alt={`Complexe niveau ${level.level} - ${level.name}`}
-                          className={`h-full w-full object-cover transition ${
-                            isLocked ? "grayscale opacity-35" : isCurrent ? "" : "opacity-75"
-                          }`}
-                          src={complexLevelImage(level.level)}
-                        />
-                        <div
-                          className={`absolute inset-0 ${
-                            isCurrent
-                              ? "bg-gradient-to-t from-emerald-950/55 to-transparent"
-                              : isLocked
-                                ? "bg-slate-950/55"
-                                : "bg-slate-950/20"
-                          }`}
-                        />
-                        <span
-                          className={`absolute left-2 top-2 rounded-md px-2 py-1 text-xs font-black ${
-                            isCurrent
-                              ? "bg-emerald-300 text-slate-950"
-                              : isLocked
-                                ? "bg-slate-950/75 text-slate-300"
-                                : "bg-white/15 text-slate-100"
-                          }`}
-                        >
-                          Niv. {level.level}
-                        </span>
-                      </div>
-                      <div className="p-3">
-                        <p className="text-sm font-black leading-tight">{level.name}</p>
-                        <p className="mt-1 text-xs text-slate-300">{level.maxSlots} joueurs</p>
-                        <p className="mt-2 text-xs font-bold text-slate-200">
-                          {level.cost === 0 ? "Débloqué" : `${level.cost.toLocaleString("fr-FR")} €`}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mx-4 rounded-md border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-300">
-                {complexNextLevel ? (
-                  <>
-                    Prochaine amélioration :{" "}
-                    <span className="font-bold text-white">{complexNextLevel.name}</span>,{" "}
-                    {complexNextLevel.maxSlots} slots joueur.
-                  </>
-                ) : (
-                  "Le Complexe est au niveau maximum."
-                )}
-              </div>
-
-              <div className="p-4">
-                {club.isPresident && complexNextLevel ? (
-                  <Button
-                    className="w-full"
-                    disabled={busy === "complex-upgrade" || !canUpgradeComplex}
-                    onClick={() => void upgradeComplex()}
-                  >
-                    Améliorer pour {complexNextLevel.cost.toLocaleString("fr-FR")} €
-                  </Button>
-                ) : (
-                  <Button className="w-full bg-white/10 text-slate-100 hover:bg-white/15" disabled>
-                    {complexNextLevel ? "Président requis" : "Niveau maximum"}
-                  </Button>
-                )}
-                {club.isPresident && complexNextLevel && !canUpgradeComplex ? (
-                  <p className="mt-2 text-xs text-amber-200">
-                    Budget du club insuffisant pour cette amélioration.
-                  </p>
-                ) : null}
-              </div>
-            </article>
-          </div>
-        </section>
+              ))}
+            </div>
+          </section>
         ) : null}
 
         {clubTab === "team" ? <TeamChampionshipPanel club={club} /> : null}
@@ -5898,13 +6065,16 @@ function cleanPointComment(event: ReplayEvent, a: Player, b: Player) {
 }
 
 function repairMatchText(value: string) {
-  return value
-    .replaceAll("RÃ©cupÃ©ration", "Récupération")
-    .replaceAll("ExplosivitÃ©", "Explosivité")
-    .replaceAll("VolÃ©e", "Volée")
-    .replaceAll("croisÃ©", "croisé")
-    .replaceAll("dÃ©croisÃ©", "décroisé")
-    .replaceAll("masquÃ©e", "masquée");
+  const bad = (...codes: number[]) => String.fromCharCode(...codes);
+  const replacements: Array<[string, string]> = [
+    [bad(82, 195, 169, 99, 117, 112, 195, 169, 114, 97, 116, 105, 111, 110), "Récupération"],
+    [bad(69, 120, 112, 108, 111, 115, 105, 118, 105, 116, 195, 169), "Explosivité"],
+    [bad(86, 111, 108, 195, 169, 101), "Volée"],
+    [bad(99, 114, 111, 105, 115, 195, 169), "croisé"],
+    [bad(100, 195, 169, 99, 114, 111, 105, 115, 195, 169), "décroisé"],
+    [bad(109, 97, 115, 113, 117, 195, 169, 101), "masquée"]
+  ];
+  return replacements.reduce((text, [source, target]) => text.replaceAll(source, target), value);
 }
 
 function SimpleMatchPlayerCard({

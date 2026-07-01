@@ -13,7 +13,7 @@ import {
 } from "@mypro/sports-tennis";
 import { requireAuth } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
-import { publicPlayer } from "../services/playerMapper";
+import { publicPlayer, publicPlayerWithClubBonuses } from "../services/playerMapper";
 import { encodeJson } from "../services/json";
 import { awardChestForWin } from "../services/chests";
 
@@ -213,7 +213,7 @@ playersRouter.post(
       });
       return created;
     });
-    return response.status(201).json(publicPlayer(player));
+    return response.status(201).json(await publicPlayerWithClubBonuses(player));
   }
 );
 
@@ -240,7 +240,7 @@ playersRouter.patch(
       }
     });
 
-    return response.json(publicPlayer(updated));
+    return response.json(await publicPlayerWithClubBonuses(updated));
   }
 );
 
@@ -263,7 +263,7 @@ playersRouter.patch(
       data: { avatar }
     });
 
-    return response.json(publicPlayer(updated));
+    return response.json(await publicPlayerWithClubBonuses(updated));
   }
 );
 

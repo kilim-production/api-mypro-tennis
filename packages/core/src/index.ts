@@ -14,7 +14,6 @@ export type AthleteVitals = {
 export const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
 export const ACTION_ENERGY_MAX = 10;
 export const ACTION_ENERGY_RECHARGE_MINUTES = 30;
-const actionEnergyRechargeMs = ACTION_ENERGY_RECHARGE_MINUTES * 60_000;
 
 export function calculateOverall(stats: StatBlock): number {
   const weights: Record<string, number> = {
@@ -77,33 +76,36 @@ export function rankingDelta(winnerRank: number, loserRank: number, categoryMult
 export function getActionEnergySnapshot(
   actionEnergy: number,
   updatedAtInput: Date | string,
-  nowInput: Date | string = new Date()
+  nowInput: Date | string = new Date(),
+  rechargeMinutes = ACTION_ENERGY_RECHARGE_MINUTES
 ) {
   const updatedAt = new Date(updatedAtInput);
   const now = new Date(nowInput);
+  const rechargeMs = Math.max(1, rechargeMinutes) * 60_000;
   const elapsedSlots = Math.max(
     0,
-    Math.floor((now.getTime() - updatedAt.getTime()) / actionEnergyRechargeMs)
+    Math.floor((now.getTime() - updatedAt.getTime()) / rechargeMs)
   );
   const value = Math.min(ACTION_ENERGY_MAX, actionEnergy + elapsedSlots);
   const normalizedUpdatedAt =
     elapsedSlots > 0
-      ? new Date(updatedAt.getTime() + elapsedSlots * actionEnergyRechargeMs)
+      ? new Date(updatedAt.getTime() + elapsedSlots * rechargeMs)
       : updatedAt;
   const nextRechargeAt =
     value >= ACTION_ENERGY_MAX
       ? null
-      : new Date(normalizedUpdatedAt.getTime() + actionEnergyRechargeMs);
-  return { value, updatedAt: normalizedUpdatedAt, max: ACTION_ENERGY_MAX, nextRechargeAt };
+      : new Date(normalizedUpdatedAt.getTime() + rechargeMs);
+  return { value, updatedAt: normalizedUpdatedAt, max: ACTION_ENERGY_MAX, nextRechargeAt, rechargeMinutes };
 }
 
 export function spendActionEnergy(
   actionEnergy: number,
   updatedAtInput: Date | string,
   nowInput: Date | string = new Date(),
-  amount = 1
+  amount = 1,
+  rechargeMinutes = ACTION_ENERGY_RECHARGE_MINUTES
 ) {
-  const snapshot = getActionEnergySnapshot(actionEnergy, updatedAtInput, nowInput);
+  const snapshot = getActionEnergySnapshot(actionEnergy, updatedAtInput, nowInput, rechargeMinutes);
   if (snapshot.value < amount) return { ...snapshot, spent: false, remaining: snapshot.value };
   return { ...snapshot, spent: true, remaining: snapshot.value - amount };
 }

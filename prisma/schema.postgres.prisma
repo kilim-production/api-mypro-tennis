@@ -101,6 +101,8 @@ model Club {
   duesAmount     Int               @default(0)
   budget         Int               @default(0)
   complexLevel   Int               @default(1)
+  careCenterLevel Int              @default(0)
+  trainingCenterLevel Int          @default(0)
   maxSlots       Int               @default(5)
   presidentId    String
   president      Player            @relation("ClubPresident", fields: [presidentId], references: [id], onDelete: Restrict)

@@ -18,6 +18,8 @@ export type Player = {
   actionEnergyMax: number;
   actionEnergyNextAt: string | null;
   actionEnergyUpdatedAt: string;
+  actionEnergyRechargeMinutes?: number;
+  clubCareCenterLevel?: number;
   energy: number;
   morale: number;
   fatigue: number;

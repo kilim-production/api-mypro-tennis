@@ -1,8 +1,16 @@
 import type { Player } from "@prisma/client";
 import { decodeJson } from "./json";
-import { actionEnergyPayload } from "./actionEnergy";
+import { actionEnergyPayload, actionEnergyPayloadWithClub } from "./actionEnergy";
 
 export function publicPlayer(player: Player) {
+  return publicPlayerBase(player, actionEnergyPayload(player));
+}
+
+export async function publicPlayerWithClubBonuses(player: Player) {
+  return publicPlayerBase(player, await actionEnergyPayloadWithClub(player));
+}
+
+function publicPlayerBase(player: Player, actionEnergy: ReturnType<typeof actionEnergyPayload>) {
   return {
     id: player.id,
     name: `${player.firstName} ${player.lastName}`,
@@ -16,7 +24,7 @@ export function publicPlayer(player: Player) {
     avatar: player.avatar,
     isAi: player.isAi,
     stats: decodeJson(player.stats),
-    ...actionEnergyPayload(player),
+    ...actionEnergy,
     energy: player.energy,
     morale: player.morale,
     fatigue: player.fatigue,

@@ -1,4 +1,4 @@
-import { Router } from "express";
+﻿import { Router, type Request, type Response } from "express";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@mypro/database";
 import {
@@ -22,6 +22,22 @@ const clubComplexLevels = [
   { level: 3, name: "Club départemental", cost: 50_000, maxSlots: 20 },
   { level: 4, name: "Club régional", cost: 300_000, maxSlots: 35 },
   { level: 5, name: "Club de référence nationale", cost: 2_000_000, maxSlots: 50 }
+] as const;
+const careCenterLevels = [
+  { level: 0, name: "Aucun centre de soins", cost: 0, recoveryReductionPercent: 0 },
+  { level: 1, name: "Infirmerie de club", cost: 8_000, recoveryReductionPercent: 3 },
+  { level: 2, name: "Cabinet de kine", cost: 25_000, recoveryReductionPercent: 6 },
+  { level: 3, name: "Pole recuperation", cost: 90_000, recoveryReductionPercent: 9 },
+  { level: 4, name: "Centre medical avance", cost: 300_000, recoveryReductionPercent: 12 },
+  { level: 5, name: "Institut performance sante", cost: 1_000_000, recoveryReductionPercent: 15 }
+] as const;
+const trainingCenterLevels = [
+  { level: 0, name: "Aucun centre d'entrainement", cost: 0, rareChestBonusPercent: 0 },
+  { level: 1, name: "Terrain d'entrainement", cost: 12_000, rareChestBonusPercent: 1 },
+  { level: 2, name: "Atelier performance", cost: 45_000, rareChestBonusPercent: 2 },
+  { level: 3, name: "Academie de progression", cost: 160_000, rareChestBonusPercent: 4 },
+  { level: 4, name: "Centre haute intensite", cost: 550_000, rareChestBonusPercent: 6 },
+  { level: 5, name: "Academie elite MyPro", cost: 1_800_000, rareChestBonusPercent: 8 }
 ] as const;
 const teamChampionshipDivisions = [
   "Départementale 4",
@@ -74,10 +90,35 @@ function clubComplexLevel(level: number) {
   );
 }
 
-function clubBuildings(club: { complexLevel: number }) {
+function careCenterLevel(level: number) {
+  return (
+    careCenterLevels.find((definition) => definition.level === level) ?? careCenterLevels[0]
+  );
+}
+
+function trainingCenterLevel(level: number) {
+  return (
+    trainingCenterLevels.find((definition) => definition.level === level) ??
+    trainingCenterLevels[0]
+  );
+}
+
+function clubBuildings(club: {
+  complexLevel: number;
+  careCenterLevel: number;
+  trainingCenterLevel: number;
+}) {
   const currentLevel = clubComplexLevel(club.complexLevel);
   const nextLevel = clubComplexLevels.find(
     (definition) => definition.level === currentLevel.level + 1
+  );
+  const currentCareLevel = careCenterLevel(club.careCenterLevel);
+  const nextCareLevel = careCenterLevels.find(
+    (definition) => definition.level === currentCareLevel.level + 1
+  );
+  const currentTrainingLevel = trainingCenterLevel(club.trainingCenterLevel);
+  const nextTrainingLevel = trainingCenterLevels.find(
+    (definition) => definition.level === currentTrainingLevel.level + 1
   );
   return {
     complex: {
@@ -87,6 +128,22 @@ function clubBuildings(club: { complexLevel: number }) {
       nextLevel: nextLevel ?? null,
       maxLevel: clubComplexLevels.length,
       levels: clubComplexLevels
+    },
+    careCenter: {
+      id: "careCenter",
+      name: "Centre de soins",
+      currentLevel: currentCareLevel,
+      nextLevel: nextCareLevel ?? null,
+      maxLevel: careCenterLevels.length - 1,
+      levels: careCenterLevels
+    },
+    trainingCenter: {
+      id: "trainingCenter",
+      name: "Centre d'entrainement",
+      currentLevel: currentTrainingLevel,
+      nextLevel: nextTrainingLevel ?? null,
+      maxLevel: trainingCenterLevels.length - 1,
+      levels: trainingCenterLevels
     }
   };
 }
@@ -100,6 +157,8 @@ function clubSummary(club: {
   duesAmount: number;
   budget: number;
   complexLevel: number;
+  careCenterLevel: number;
+  trainingCenterLevel: number;
   maxSlots: number;
   createdAt: Date;
   president: ClubWithDetails["president"];
@@ -116,6 +175,8 @@ function clubSummary(club: {
     duesAmount: club.duesAmount,
     budget: club.budget,
     complexLevel: club.complexLevel,
+    careCenterLevel: club.careCenterLevel,
+    trainingCenterLevel: club.trainingCenterLevel,
     buildings: clubBuildings(club),
     competitiveLevel,
     maxSlots: club.maxSlots,
@@ -1102,6 +1163,60 @@ clubsRouter.post("/me/buildings/complex/upgrade", requireAuth, async (request, r
   });
   return response.json(clubDetails(club, player.id));
 });
+
+async function upgradeSpecializedBuilding(
+  request: Request,
+  response: Response,
+  building: "careCenter" | "trainingCenter"
+) {
+  const player = await currentPlayer(request.session!.userId);
+  if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+  const membership = await prisma.clubMembership.findUnique({
+    where: { playerId: player.id },
+    include: { club: true }
+  });
+  if (!membership?.club)
+    return response.status(404).json({ message: "Vous n'êtes membre d'aucun club." });
+  if (membership.club.presidentId !== player.id)
+    return response
+      .status(403)
+      .json({ message: "Seul le président peut améliorer les infrastructures du club." });
+
+  const levels = building === "careCenter" ? careCenterLevels : trainingCenterLevels;
+  const currentLevel =
+    building === "careCenter"
+      ? careCenterLevel(membership.club.careCenterLevel)
+      : trainingCenterLevel(membership.club.trainingCenterLevel);
+  const nextLevel = levels.find((definition) => definition.level === currentLevel.level + 1);
+  const label = building === "careCenter" ? "Centre de soins" : "Centre d'entrainement";
+  if (!nextLevel) {
+    return response.status(409).json({ message: `${label} deja au niveau maximum.` });
+  }
+  if (membership.club.budget < nextLevel.cost) {
+    return response.status(400).json({
+      message: `Budget du club insuffisant. Amelioration requise : ${nextLevel.cost.toLocaleString("fr-FR")} euros.`
+    });
+  }
+
+  const data =
+    building === "careCenter"
+      ? { budget: { decrement: nextLevel.cost }, careCenterLevel: nextLevel.level }
+      : { budget: { decrement: nextLevel.cost }, trainingCenterLevel: nextLevel.level };
+  const club = await prisma.club.update({
+    where: { id: membership.clubId },
+    data,
+    include: clubInclude
+  });
+  return response.json(clubDetails(club, player.id));
+}
+
+clubsRouter.post("/me/buildings/care-center/upgrade", requireAuth, async (request, response) =>
+  upgradeSpecializedBuilding(request, response, "careCenter")
+);
+
+clubsRouter.post("/me/buildings/training-center/upgrade", requireAuth, async (request, response) =>
+  upgradeSpecializedBuilding(request, response, "trainingCenter")
+);
 
 clubsRouter.post(
   "/me/leave",

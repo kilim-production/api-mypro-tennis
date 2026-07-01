@@ -133,6 +133,14 @@ const victoryChestOdds: Array<{ rarity: ChestRarity; weight: number }> = [
   { rarity: "Légendaire", weight: 4 },
   { rarity: "Mythique", weight: 1 }
 ];
+const trainingCenterRareChestBonuses: Record<number, number> = {
+  0: 0,
+  1: 1,
+  2: 2,
+  3: 4,
+  4: 6,
+  5: 8
+};
 
 function hashSeed(seed: string) {
   let hash = 2166136261;
@@ -155,10 +163,32 @@ function pickInt(random: () => number, min: number, max: number) {
   return min + Math.floor(random() * (max - min + 1));
 }
 
-function rollRarity(random: () => number): ChestRarity {
-  const totalWeight = victoryChestOdds.reduce((sum, item) => sum + item.weight, 0);
+function adjustedVictoryChestOdds(rareChestBonusPercent: number) {
+  const bonus = Math.max(0, Math.min(8, rareChestBonusPercent));
+  if (bonus <= 0) return victoryChestOdds;
+  const nonBronzeWeight = victoryChestOdds
+    .filter((item) => item.rarity !== "Bronze")
+    .reduce((sum, item) => sum + item.weight, 0);
+  return victoryChestOdds.map((item) => {
+    if (item.rarity === "Bronze") return { ...item, weight: Math.max(1, item.weight - bonus) };
+    return { ...item, weight: item.weight + bonus * (item.weight / nonBronzeWeight) };
+  });
+}
+
+async function rareChestBonusForPlayer(playerId: string, tx: Prisma.TransactionClient) {
+  const membership = await tx.clubMembership.findUnique({
+    where: { playerId },
+    include: { club: { select: { trainingCenterLevel: true } } }
+  });
+  const level = membership?.club.trainingCenterLevel ?? 0;
+  return trainingCenterRareChestBonuses[Math.max(0, Math.min(5, level))] ?? 0;
+}
+
+function rollRarity(random: () => number, rareChestBonusPercent = 0): ChestRarity {
+  const odds = adjustedVictoryChestOdds(rareChestBonusPercent);
+  const totalWeight = odds.reduce((sum, item) => sum + item.weight, 0);
   let roll = random() * totalWeight;
-  for (const item of victoryChestOdds) {
+  for (const item of odds) {
     roll -= item.weight;
     if (roll < 0) return item.rarity;
   }
@@ -241,7 +271,8 @@ export async function awardChestForWin(
   const slotIndex = [0, 1, 2, 3].find((slot) => !used.has(slot));
   if (slotIndex === undefined) return null;
   const random = randomFromSeed(`${player.id}-${source}-${Date.now()}-${slotIndex}`);
-  const rarity = forcedRarity ?? rollRarity(random);
+  const rareChestBonus = forcedRarity ? 0 : await rareChestBonusForPlayer(player.id, tx);
+  const rarity = forcedRarity ?? rollRarity(random, rareChestBonus);
   const definition = chestDefinitions[rarity];
   const now = new Date();
   const unlocksAt = new Date(now.getTime() + definition.durationMinutes * 60_000);
