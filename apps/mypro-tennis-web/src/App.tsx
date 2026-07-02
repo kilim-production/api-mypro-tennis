@@ -1314,6 +1314,44 @@ function bonusTotal(bonuses: Record<string, number>) {
   return Object.values(bonuses).reduce((sum, value) => sum + value, 0);
 }
 
+function cosmeticIconPath(name: string) {
+  const normalized = name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  if (normalized.includes("poignets")) return "/visuals/cosmetics/wristbands-emerald.jpg";
+  if (normalized.includes("casquette")) return "/visuals/cosmetics/academy-cap.jpg";
+  if (normalized.includes("surgrip")) return "/visuals/cosmetics/premium-overgrip.jpg";
+  if (normalized.includes("sac")) return "/visuals/cosmetics/signature-bag.jpg";
+  if (normalized.includes("t-shirt")) return "/visuals/cosmetics/junior-shirt.jpg";
+  if (normalized.includes("bandeau")) return "/visuals/cosmetics/night-headband.jpg";
+  return "/visuals/cosmetics/signature-bag.jpg";
+}
+
+function CosmeticIcon({
+  item,
+  compact = false
+}: {
+  item: Pick<PlayerCosmeticItem, "name" | "rarity">;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={`relative overflow-hidden rounded-md border border-white/10 bg-slate-950/50 ${rarityClass(item.rarity)} ${
+        compact ? "h-14 w-14" : "aspect-square w-full"
+      }`}
+    >
+      <img
+        alt={item.name}
+        className="h-full w-full object-cover"
+        draggable={false}
+        src={cosmeticIconPath(item.name)}
+      />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/55 via-transparent to-white/5" />
+    </div>
+  );
+}
+
 function CosmeticUpgradeMeta({ item }: { item: PlayerCosmeticItem }) {
   return (
     <div className="mt-3 rounded-md border border-white/10 bg-slate-950/35 p-2 text-xs text-slate-300">
@@ -1424,12 +1462,17 @@ function RewardModal({
                 key={item.id}
                 className={`rounded-md border border-white/10 bg-white/[0.04] p-3 text-left ${rarityClass(item.rarity)}`}
               >
-                <div className="text-xs uppercase tracking-[0.18em] text-sky-200">
-                  Cosmétique {item.rarity}
-                </div>
-                <div className="mt-1 font-black">{item.name}</div>
-                <div className="mt-3">
-                  <StatBonusPills bonuses={item.bonuses} />
+                <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-3">
+                  <CosmeticIcon item={item} compact />
+                  <div className="min-w-0">
+                    <div className="text-xs uppercase tracking-[0.18em] text-sky-200">
+                      Cosmétique {item.rarity}
+                    </div>
+                    <div className="mt-1 truncate font-black">{item.name}</div>
+                    <div className="mt-3">
+                      <StatBonusPills bonuses={item.bonuses} />
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
@@ -3498,6 +3541,15 @@ function CollectionPage() {
           <div className="mt-4 grid grid-cols-4 gap-1.5 sm:gap-3">
             {equipped.map(({ slotIndex, item }) => (
               <div key={slotIndex} className="metric min-w-0 p-2 sm:min-h-36 sm:p-3">
+                {item ? (
+                  <div className="mb-2">
+                    <CosmeticIcon item={item} />
+                  </div>
+                ) : (
+                  <div className="mb-2 grid aspect-square w-full place-items-center rounded-md border border-dashed border-white/15 bg-slate-950/35 text-[10px] text-slate-500">
+                    Vide
+                  </div>
+                )}
                 <div className="grid min-w-0 gap-2 sm:flex sm:items-start sm:justify-between sm:gap-3">
                   <div className="min-w-0">
                     <div className="text-center text-[10px] uppercase tracking-[0.12em] text-slate-400 sm:text-left sm:text-xs sm:tracking-[0.18em]">
@@ -3649,18 +3701,19 @@ function CollectionPage() {
             {sortedCosmetics.length ? (
               sortedCosmetics.map((item) => (
                 <div key={item.id} className={`metric ${rarityClass(item.rarity)}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
+                  <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-3">
+                    <CosmeticIcon item={item} compact />
+                    <div className="min-w-0">
                       <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
                         {item.rarity}
                       </div>
-                      <div className="mt-1 font-black">{item.name}</div>
+                      <div className="mt-1 truncate font-black">{item.name}</div>
+                      {item.equippedSlot !== null ? (
+                        <span className="mt-2 inline-flex rounded-md bg-emerald-300 px-2 py-1 text-xs font-black text-slate-950">
+                          Slot {item.equippedSlot + 1}
+                        </span>
+                      ) : null}
                     </div>
-                    {item.equippedSlot !== null ? (
-                      <span className="rounded-md bg-emerald-300 px-2 py-1 text-xs font-black text-slate-950">
-                        Slot {item.equippedSlot + 1}
-                      </span>
-                    ) : null}
                   </div>
                   <div className="mt-3">
                     <StatBonusPills bonuses={item.bonuses} />
@@ -3769,18 +3822,19 @@ function CosmeticSlotPicker({
                 disabled={busyCosmetic === item.id || item.equippedSlot === slotIndex}
                 type="button"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
+                <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-3">
+                  <CosmeticIcon item={item} compact />
+                  <div className="min-w-0">
                     <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
                       {item.rarity}
                     </div>
-                    <div className="mt-1 font-black">{item.name}</div>
+                    <div className="mt-1 truncate font-black">{item.name}</div>
+                    {item.equippedSlot !== null ? (
+                      <span className="mt-2 inline-flex rounded-md bg-emerald-300 px-2 py-1 text-xs font-black text-slate-950">
+                        Slot {item.equippedSlot + 1}
+                      </span>
+                    ) : null}
                   </div>
-                  {item.equippedSlot !== null ? (
-                    <span className="rounded-md bg-emerald-300 px-2 py-1 text-xs font-black text-slate-950">
-                      Slot {item.equippedSlot + 1}
-                    </span>
-                  ) : null}
                 </div>
                 <div className="mt-3">
                   <StatBonusPills bonuses={item.bonuses} />
