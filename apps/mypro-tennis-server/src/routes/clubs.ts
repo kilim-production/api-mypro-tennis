@@ -25,18 +25,18 @@ const clubComplexLevels = [
 const careCenterLevels = [
   { level: 0, name: "Aucun centre de soins", cost: 0, recoveryReductionPercent: 0 },
   { level: 1, name: "Infirmerie de club", cost: 8_000, recoveryReductionPercent: 3 },
-  { level: 2, name: "Cabinet de kine", cost: 25_000, recoveryReductionPercent: 6 },
-  { level: 3, name: "Pole recuperation", cost: 90_000, recoveryReductionPercent: 9 },
-  { level: 4, name: "Centre medical avance", cost: 300_000, recoveryReductionPercent: 12 },
-  { level: 5, name: "Institut performance sante", cost: 1_000_000, recoveryReductionPercent: 15 }
+  { level: 2, name: "Cabinet de kinésithérapie", cost: 25_000, recoveryReductionPercent: 6 },
+  { level: 3, name: "Pôle récupération sportive", cost: 90_000, recoveryReductionPercent: 9 },
+  { level: 4, name: "Centre médico-performance", cost: 300_000, recoveryReductionPercent: 12 },
+  { level: 5, name: "Institut santé haute performance", cost: 1_000_000, recoveryReductionPercent: 15 }
 ] as const;
 const trainingCenterLevels = [
-  { level: 0, name: "Aucun centre d'entrainement", cost: 0, rareChestBonusPercent: 0 },
-  { level: 1, name: "Terrain d'entrainement", cost: 12_000, rareChestBonusPercent: 1 },
-  { level: 2, name: "Atelier performance", cost: 45_000, rareChestBonusPercent: 2 },
-  { level: 3, name: "Academie de progression", cost: 160_000, rareChestBonusPercent: 4 },
-  { level: 4, name: "Centre haute intensite", cost: 550_000, rareChestBonusPercent: 6 },
-  { level: 5, name: "Academie elite MyPro", cost: 1_800_000, rareChestBonusPercent: 8 }
+  { level: 0, name: "Aucun centre d'entraînement", cost: 0, rareChestBonusPercent: 0 },
+  { level: 1, name: "Court d'entraînement encadré", cost: 12_000, rareChestBonusPercent: 1 },
+  { level: 2, name: "Atelier technique vidéo", cost: 45_000, rareChestBonusPercent: 2 },
+  { level: 3, name: "Académie de progression", cost: 160_000, rareChestBonusPercent: 4 },
+  { level: 4, name: "Centre haute intensité", cost: 550_000, rareChestBonusPercent: 6 },
+  { level: 5, name: "Académie élite MyPro", cost: 1_800_000, rareChestBonusPercent: 8 }
 ] as const;
 const teamChampionshipDivisions = [
   "Départementale 4",
@@ -138,7 +138,7 @@ function clubBuildings(club: {
     },
     trainingCenter: {
       id: "trainingCenter",
-      name: "Centre d'entrainement",
+      name: "Centre d'entraînement",
       currentLevel: currentTrainingLevel,
       nextLevel: nextTrainingLevel ?? null,
       maxLevel: trainingCenterLevels.length - 1,
@@ -1248,7 +1248,7 @@ async function upgradeSpecializedBuilding(
       ? careCenterLevel(membership.club.careCenterLevel)
       : trainingCenterLevel(membership.club.trainingCenterLevel);
   const nextLevel = levels.find((definition) => definition.level === currentLevel.level + 1);
-  const label = building === "careCenter" ? "Centre de soins" : "Centre d'entrainement";
+  const label = building === "careCenter" ? "Centre de soins" : "Centre d'entraînement";
   if (!nextLevel) {
     return response.status(409).json({ message: `${label} deja au niveau maximum.` });
   }

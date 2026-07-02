@@ -701,15 +701,15 @@ const fallbackComplexLevels: ClubBuildingLevel[] = [
 const fallbackCareCenterLevels: ClubBuildingLevel[] = [
   { level: 0, name: "Aucun centre de soins", cost: 0, recoveryReductionPercent: 0 },
   { level: 1, name: "Infirmerie de club", cost: 8_000, recoveryReductionPercent: 3 },
-  { level: 2, name: "Cabinet de kiné", cost: 25_000, recoveryReductionPercent: 6 },
-  { level: 3, name: "Pôle récupération", cost: 90_000, recoveryReductionPercent: 9 },
-  { level: 4, name: "Centre médical avancé", cost: 300_000, recoveryReductionPercent: 12 },
-  { level: 5, name: "Institut performance santé", cost: 1_000_000, recoveryReductionPercent: 15 }
+  { level: 2, name: "Cabinet de kinésithérapie", cost: 25_000, recoveryReductionPercent: 6 },
+  { level: 3, name: "Pôle récupération sportive", cost: 90_000, recoveryReductionPercent: 9 },
+  { level: 4, name: "Centre médico-performance", cost: 300_000, recoveryReductionPercent: 12 },
+  { level: 5, name: "Institut santé haute performance", cost: 1_000_000, recoveryReductionPercent: 15 }
 ];
 const fallbackTrainingCenterLevels: ClubBuildingLevel[] = [
   { level: 0, name: "Aucun centre d'entraînement", cost: 0, rareChestBonusPercent: 0 },
-  { level: 1, name: "Terrain d'entraînement", cost: 12_000, rareChestBonusPercent: 1 },
-  { level: 2, name: "Atelier performance", cost: 45_000, rareChestBonusPercent: 2 },
+  { level: 1, name: "Court d'entraînement encadré", cost: 12_000, rareChestBonusPercent: 1 },
+  { level: 2, name: "Atelier technique vidéo", cost: 45_000, rareChestBonusPercent: 2 },
   { level: 3, name: "Académie de progression", cost: 160_000, rareChestBonusPercent: 4 },
   { level: 4, name: "Centre haute intensité", cost: 550_000, rareChestBonusPercent: 6 },
   { level: 5, name: "Académie élite MyPro", cost: 1_800_000, rareChestBonusPercent: 8 }
@@ -780,6 +780,10 @@ function clubBuildingForClub(
 
 function buildingLevelImage(buildingId: string, level: number) {
   if (buildingId === "complex") return `/visuals/club/complex-level-${Math.max(1, level)}.jpg`;
+  if (buildingId === "careCenter" && level > 0)
+    return `/visuals/club/care-center-level-${level}.jpg`;
+  if (buildingId === "trainingCenter" && level > 0)
+    return `/visuals/club/training-center-level-${level}.jpg`;
   return "";
 }
 
@@ -928,7 +932,7 @@ function ClubBuildingCard({
               const isUnlocked = level.level < building.currentLevel.level;
               return (
                 <div
-                  className={`grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-md border p-2 text-sm ${
+                  className={`grid grid-cols-[84px_minmax(0,1fr)_auto] items-center gap-3 rounded-md border p-2 text-sm ${
                     isCurrent
                       ? "border-emerald-300 bg-emerald-300/10"
                       : isUnlocked
@@ -937,11 +941,23 @@ function ClubBuildingCard({
                   }`}
                   key={level.level}
                 >
-                  <span className="rounded-md bg-white/[0.08] px-2 py-1 text-xs font-black">
-                    {level.level}
-                  </span>
+                  {buildingLevelImage(building.id, level.level) ? (
+                    <img
+                      alt={`Niveau ${level.level} - ${level.name}`}
+                      className={`h-12 w-20 rounded-md object-cover ${
+                        isCurrent || isUnlocked ? "" : "grayscale"
+                      }`}
+                      src={buildingLevelImage(building.id, level.level)}
+                    />
+                  ) : (
+                    <span className="grid h-12 w-20 place-items-center rounded-md bg-white/[0.08] text-xs font-black">
+                      Niv. {level.level}
+                    </span>
+                  )}
                   <span className="min-w-0">
-                    <strong className="block truncate text-slate-100">{level.name}</strong>
+                    <strong className="block truncate text-slate-100">
+                      Niv. {level.level} · {level.name}
+                    </strong>
                     <small className="block truncate text-slate-400">
                       {buildingEffectLabel(building, level)}
                     </small>
