@@ -92,8 +92,7 @@ button:disabled,
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   background:
-    linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(2, 6, 23, 0.96)),
-    rgba(2, 6, 23, 0.94);
+    linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(2, 6, 23, 0.96)), rgba(2, 6, 23, 0.94);
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.42);
   padding: 7px;
   backdrop-filter: blur(18px);
@@ -416,8 +415,7 @@ button:disabled,
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   background:
-    linear-gradient(180deg, rgba(15, 23, 42, 0.58), rgba(2, 6, 23, 0.62)),
-    rgba(2, 6, 23, 0.56);
+    linear-gradient(180deg, rgba(15, 23, 42, 0.58), rgba(2, 6, 23, 0.62)), rgba(2, 6, 23, 0.56);
   padding: 6px;
 }
 
@@ -474,9 +472,7 @@ button:disabled,
 
 .segmented-tabs button.is-active {
   border-color: rgba(52, 211, 153, 0.9);
-  background:
-    linear-gradient(180deg, #5eead4, #34d399),
-    #34d399;
+  background: linear-gradient(180deg, #5eead4, #34d399), #34d399;
   box-shadow:
     0 0 0 1px rgba(236, 253, 245, 0.16),
     0 14px 30px rgba(52, 211, 153, 0.18);
@@ -771,8 +767,7 @@ button:disabled,
   gap: 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   background:
-    linear-gradient(180deg, rgba(2, 6, 23, 0.96), rgba(2, 6, 23, 0.88)),
-    rgba(2, 6, 23, 0.92);
+    linear-gradient(180deg, rgba(2, 6, 23, 0.96), rgba(2, 6, 23, 0.88)), rgba(2, 6, 23, 0.92);
   margin: -18px -18px 0;
   padding: 18px;
   backdrop-filter: blur(12px);
@@ -952,8 +947,7 @@ button:disabled,
 
 .auth-highlight {
   background:
-    linear-gradient(180deg, rgba(16, 185, 129, 0.14), rgba(2, 6, 23, 0.76)),
-    rgba(2, 6, 23, 0.82);
+    linear-gradient(180deg, rgba(16, 185, 129, 0.14), rgba(2, 6, 23, 0.76)), rgba(2, 6, 23, 0.82);
 }
 
 .stat-card {
@@ -998,6 +992,119 @@ button:disabled,
 .metric.rarity-mythique,
 .rarity-mythique:not(.tennis-bag) {
   border-color: rgba(45, 212, 191, 0.62);
+}
+
+.cosmetic-icon {
+  isolation: isolate;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+.cosmetic-icon::before,
+.cosmetic-icon::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.cosmetic-icon::before {
+  z-index: 2;
+  border: 2px solid var(--rarity-main, rgba(255, 255, 255, 0.22));
+  box-shadow:
+    inset 0 0 16px var(--rarity-soft, rgba(255, 255, 255, 0.1)),
+    0 0 var(--rarity-glow, 12px) var(--rarity-soft, rgba(255, 255, 255, 0.1));
+  animation: rarity-frame-pulse var(--rarity-speed, 3.8s) ease-in-out infinite;
+}
+
+.cosmetic-icon::after {
+  z-index: 3;
+  opacity: var(--rarity-shine-opacity, 0);
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    transparent 36%,
+    rgba(255, 255, 255, 0.5) 47%,
+    transparent 58%,
+    transparent 100%
+  );
+  transform: translateX(-125%);
+  animation: rarity-shine var(--rarity-shine-speed, 5.5s) ease-in-out infinite;
+}
+
+.cosmetic-icon.rarity-bronze {
+  --rarity-main: rgba(205, 127, 50, 0.82);
+  --rarity-soft: rgba(205, 127, 50, 0.18);
+  --rarity-glow: 10px;
+  --rarity-speed: 4.8s;
+}
+
+.cosmetic-icon.rarity-argent {
+  --rarity-main: rgba(226, 232, 240, 0.82);
+  --rarity-soft: rgba(203, 213, 225, 0.22);
+  --rarity-glow: 12px;
+  --rarity-speed: 4.2s;
+  --rarity-shine-opacity: 0.18;
+  --rarity-shine-speed: 6.2s;
+}
+
+.cosmetic-icon.rarity-or {
+  --rarity-main: rgba(250, 204, 21, 0.92);
+  --rarity-soft: rgba(250, 204, 21, 0.28);
+  --rarity-glow: 16px;
+  --rarity-speed: 3.5s;
+  --rarity-shine-opacity: 0.28;
+  --rarity-shine-speed: 5.2s;
+}
+
+.cosmetic-icon.rarity-legendaire {
+  --rarity-main: rgba(192, 132, 252, 0.96);
+  --rarity-soft: rgba(168, 85, 247, 0.34);
+  --rarity-glow: 22px;
+  --rarity-speed: 2.8s;
+  --rarity-shine-opacity: 0.35;
+  --rarity-shine-speed: 4.4s;
+}
+
+.cosmetic-icon.rarity-mythique {
+  --rarity-main: rgba(45, 212, 191, 1);
+  --rarity-soft: rgba(45, 212, 191, 0.42);
+  --rarity-glow: 28px;
+  --rarity-speed: 2.2s;
+  --rarity-shine-opacity: 0.48;
+  --rarity-shine-speed: 3.7s;
+}
+
+@keyframes rarity-frame-pulse {
+  0%,
+  100% {
+    opacity: 0.78;
+    filter: saturate(0.95);
+  }
+  50% {
+    opacity: 1;
+    filter: saturate(1.35);
+  }
+}
+
+@keyframes rarity-shine {
+  0%,
+  42% {
+    transform: translateX(-125%);
+  }
+  68%,
+  100% {
+    transform: translateX(125%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cosmetic-icon::before,
+  .cosmetic-icon::after {
+    animation: none;
+  }
 }
 
 .court {

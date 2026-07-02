@@ -1337,7 +1337,7 @@ function CosmeticIcon({
 }) {
   return (
     <div
-      className={`relative overflow-hidden rounded-md border border-white/10 bg-slate-950/50 ${rarityClass(item.rarity)} ${
+      className={`cosmetic-icon relative overflow-hidden rounded-md border border-white/10 bg-slate-950/50 ${rarityClass(item.rarity)} ${
         compact ? "h-14 w-14" : "aspect-square w-full"
       }`}
     >
