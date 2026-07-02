@@ -22,11 +22,10 @@ import { equipCosmetic, unequipCosmetic, upgradeCosmetic } from "../services/equ
 import { createServerMatch } from "../services/matches";
 import { publicPlayer } from "../services/playerMapper";
 import { decodeJson, encodeJson } from "../services/json";
+import { DAY_MS, seasonWindow } from "../services/seasons";
 
 export const gameRouter = Router();
 
-const seasonDurationMs = 30 * 24 * 60 * 60 * 1000;
-const dayMs = 24 * 60 * 60 * 1000;
 const archetypes = [
   "Gros service",
   "Relanceur",
@@ -165,22 +164,6 @@ function seasonEconomyForRanking(definition: SeasonDefinition, playerRanking: st
   return { entryFee, cashPrize };
 }
 
-function seasonWindow(createdAt: Date, now = new Date()) {
-  const index = Math.max(0, Math.floor((now.getTime() - createdAt.getTime()) / seasonDurationMs));
-  const startsAt = new Date(createdAt.getTime() + index * seasonDurationMs);
-  const endsAt = new Date(startsAt.getTime() + seasonDurationMs);
-  const elapsed = Math.max(0, now.getTime() - startsAt.getTime());
-  return {
-    index,
-    startsAt,
-    endsAt,
-    day: Math.floor(elapsed / dayMs) + 1,
-    week: Math.floor(elapsed / (7 * dayMs)) + 1,
-    remainingDays: Math.max(0, Math.ceil((endsAt.getTime() - now.getTime()) / dayMs)),
-    progress: Math.max(0, Math.min(100, Math.round((elapsed / seasonDurationMs) * 100)))
-  };
-}
-
 function periodKey(
   type: SeasonCompetitionType,
   seasonKey: string,
@@ -194,11 +177,11 @@ function periodKey(
 function nextPlayableAt(type: SeasonCompetitionType, window: ReturnType<typeof seasonWindow>) {
   if (type === "daily")
     return new Date(
-      Math.min(window.startsAt.getTime() + window.day * dayMs, window.endsAt.getTime())
+      Math.min(window.startsAt.getTime() + window.day * DAY_MS, window.endsAt.getTime())
     );
   if (type === "weekly")
     return new Date(
-      Math.min(window.startsAt.getTime() + window.week * 7 * dayMs, window.endsAt.getTime())
+      Math.min(window.startsAt.getTime() + window.week * 7 * DAY_MS, window.endsAt.getTime())
     );
   return window.endsAt;
 }
@@ -943,8 +926,8 @@ gameRouter.post("/cosmetics/:id/upgrade", requireAuth, async (request, response)
 gameRouter.get("/season", requireAuth, async (request, response) => {
   const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
   if (!player) return response.status(404).json({ message: "Joueur introuvable." });
-  const window = seasonWindow(player.createdAt);
-  const seasonKey = `saison-${window.index + 1}`;
+  const window = seasonWindow();
+  const seasonKey = window.key;
   const entries = await prisma.seasonCompetitionEntry.findMany({
     where: { playerId: player.id, seasonKey },
     orderBy: { createdAt: "desc" }
@@ -1041,8 +1024,8 @@ gameRouter.post("/season/:type/register", requireAuth, async (request, response)
   if (!definition) return response.status(400).json({ message: "Compétition inconnue." });
   const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
   if (!player) return response.status(404).json({ message: "Joueur introuvable." });
-  const window = seasonWindow(player.createdAt);
-  const seasonKey = `saison-${window.index + 1}`;
+  const window = seasonWindow();
+  const seasonKey = window.key;
   const key = periodKey(type, seasonKey, window);
   const bracket = buildSeasonBracket(type, player);
   const economy = seasonEconomyForRanking(definition, player.fftRanking);

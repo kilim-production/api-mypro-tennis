@@ -108,11 +108,13 @@ La progression amateur suit les échelons FFT depuis `15/1` jusqu'à `-15`, avec
 
 En amateur, le seul moyen de monter est de gagner des matchs officiels homologués. Le serveur enregistre un palmarès `FftResult`, recalcule les points de victoire selon l'écart entre l'échelon visé et le classement de l'adversaire, applique la logique V-E-2I-5G, puis valide ou non le nouvel échelon avec les normes de points et de victoires retenues.
 
-Une saison sportive dure 30 jours réels dans MyPro - Tennis. Le recalcul du classement du joueur ne tient compte que des résultats de cette saison active. Le circuit professionnel reste verrouillé tant que le classement `-15` n'est pas validé.
+Une saison sportive dure 30 jours réels dans MyPro - Tennis. Elle est globale : elle commence et se termine au même moment pour tous les joueurs, indépendamment de la date de création du compte. Le recalcul du classement du joueur ne tient compte que des résultats de cette saison active. Le circuit professionnel reste verrouillé tant que le classement `-15` n'est pas validé.
+
+La date de départ de la première saison globale est configurable côté serveur avec `MYPRO_SEASON_START_AT`. Par défaut, elle correspond au 1er juillet 2026 à 00h00 heure de Paris.
 
 ## Saison En Cours
 
-L'ancien onglet Tournois est remplacé par `Saison en cours`. Une saison dure 30 jours réels et propose trois compétitions simultanément accessibles :
+L'ancien onglet Tournois est remplacé par `Saison en cours`. Une saison dure 30 jours réels, synchronisés pour toute la communauté, et propose trois compétitions simultanément accessibles :
 
 - Tournoi journalier : 1 fois par jour, tableau de 16 joueurs, coût de 1 point d'énergie.
 - Tournoi hebdomadaire : 1 fois par semaine, tableau de 16 joueurs, coût de 2 points d'énergie.
