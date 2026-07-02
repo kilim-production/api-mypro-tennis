@@ -621,10 +621,15 @@ type TeamChampionshipEntry = {
   setsAgainst: number;
   gamesFor: number;
   gamesAgainst: number;
+  finalPosition?: number | null;
+  cashPrize?: number;
+  cashPrizeAwardedAt?: string | null;
+  projectedCashPrize?: number;
 };
 type TeamChampionshipSingle = {
   label: string;
   court: number;
+  replayMatchId?: string;
   homePlayer: { name: string; fftRanking: string; winPct: number; strength: number };
   awayPlayer: { name: string; fftRanking: string; winPct: number; strength: number };
   homeValue: number;
@@ -704,7 +709,12 @@ const fallbackCareCenterLevels: ClubBuildingLevel[] = [
   { level: 2, name: "Cabinet de kinésithérapie", cost: 25_000, recoveryReductionPercent: 6 },
   { level: 3, name: "Pôle récupération sportive", cost: 90_000, recoveryReductionPercent: 9 },
   { level: 4, name: "Centre médico-performance", cost: 300_000, recoveryReductionPercent: 12 },
-  { level: 5, name: "Institut santé haute performance", cost: 1_000_000, recoveryReductionPercent: 15 }
+  {
+    level: 5,
+    name: "Institut santé haute performance",
+    cost: 1_000_000,
+    recoveryReductionPercent: 15
+  }
 ];
 const fallbackTrainingCenterLevels: ClubBuildingLevel[] = [
   { level: 0, name: "Aucun centre d'entraînement", cost: 0, rareChestBonusPercent: 0 },
@@ -738,23 +748,18 @@ function fallbackSpecializedBuilding(
   levels: ClubBuildingLevel[]
 ): ClubBuilding {
   const currentLevel =
-    levels.find((definition) => definition.level === Math.max(0, Math.min(5, level))) ??
-    levels[0]!;
+    levels.find((definition) => definition.level === Math.max(0, Math.min(5, level))) ?? levels[0]!;
   return {
     id,
     name,
     currentLevel,
-    nextLevel:
-      levels.find((definition) => definition.level === currentLevel.level + 1) ?? null,
+    nextLevel: levels.find((definition) => definition.level === currentLevel.level + 1) ?? null,
     maxLevel: levels.length - 1,
     levels
   };
 }
 
-function clubBuildingForClub(
-  club: ClubDetails,
-  id: "complex" | "careCenter" | "trainingCenter"
-) {
+function clubBuildingForClub(club: ClubDetails, id: "complex" | "careCenter" | "trainingCenter") {
   if (id === "complex") return complexBuildingForClub(club);
   if (id === "careCenter") {
     return (
@@ -972,14 +977,15 @@ function ClubBuildingCard({
         </details>
 
         <div className="rounded-md border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-300">
-        {nextLevel ? (
-          <>
-            Prochaine amélioration : <span className="font-bold text-white">{nextLevel.name}</span>{" "}
-            ({buildingEffectLabel(building, nextLevel)}).
-          </>
-        ) : (
-          `${building.name} est au niveau maximum.`
-        )}
+          {nextLevel ? (
+            <>
+              Prochaine amélioration :{" "}
+              <span className="font-bold text-white">{nextLevel.name}</span> (
+              {buildingEffectLabel(building, nextLevel)}).
+            </>
+          ) : (
+            `${building.name} est au niveau maximum.`
+          )}
         </div>
 
         {club.isPresident && nextLevel ? (
@@ -1249,8 +1255,9 @@ function CareerPathCard({ player }: { player: Player }) {
 function ActionEnergyCard({ player }: { player: Player }) {
   const now = useNow();
   const rechargeMinutes = player.actionEnergyRechargeMinutes ?? 30;
-  const formattedRecharge =
-    Number.isInteger(rechargeMinutes) ? `${rechargeMinutes}` : rechargeMinutes.toFixed(1);
+  const formattedRecharge = Number.isInteger(rechargeMinutes)
+    ? `${rechargeMinutes}`
+    : rechargeMinutes.toFixed(1);
   const next = player.actionEnergyNextAt
     ? new Date(player.actionEnergyNextAt).toLocaleTimeString("fr-FR", {
         hour: "2-digit",
@@ -1704,7 +1711,8 @@ function Shell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
-  const showGameNav = user && !["/", "/login", "/signup", "/oauth/google"].includes(location.pathname);
+  const showGameNav =
+    user && !["/", "/login", "/signup", "/oauth/google"].includes(location.pathname);
   const navBadges = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const notification of notifications) {
@@ -1760,7 +1768,9 @@ function Shell({ children }: { children: React.ReactNode }) {
                   <div className="mobile-resource-strip">
                     <span className="resource-pill resource-energy" aria-label="Énergie">
                       <Zap size={15} />
-                      <strong>{player.actionEnergy}/{player.actionEnergyMax}</strong>
+                      <strong>
+                        {player.actionEnergy}/{player.actionEnergyMax}
+                      </strong>
                       <small>Énergie</small>
                     </span>
                     <span className="resource-pill resource-gems" aria-label="Gemmes">
@@ -1824,7 +1834,10 @@ function Shell({ children }: { children: React.ReactNode }) {
       </footer>
       {showGameNav && menuOpen
         ? createPortal(
-            <div className="game-modal-overlay header-menu-overlay" onClick={() => setMenuOpen(false)}>
+            <div
+              className="game-modal-overlay header-menu-overlay"
+              onClick={() => setMenuOpen(false)}
+            >
               <nav className="panel header-menu-panel" onClick={(event) => event.stopPropagation()}>
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div>
@@ -2326,58 +2339,62 @@ function CreatePlayer() {
           </>
         ) : null}
         {creationStep === "photo" ? (
-        <section className="rounded-md border border-white/10 bg-white/[0.04] p-4 md:col-span-2">
-          <div className="grid gap-5 lg:grid-cols-[180px_1fr]">
-            <div>
-              <p className="text-sm font-semibold text-emerald-300">Photo de profil</p>
-              <div className="mt-4 grid place-items-center rounded-md bg-slate-950/70 p-4">
-                <ProfilePicture
-                  picture={form.avatarPicture}
-                  initials={initialsFromName(form.firstName, form.lastName)}
-                  size="lg"
-                />
-              </div>
-            </div>
-            <div className="grid gap-4">
+          <section className="rounded-md border border-white/10 bg-white/[0.04] p-4 md:col-span-2">
+            <div className="grid gap-5 lg:grid-cols-[180px_1fr]">
               <div>
-                <p className="text-sm font-semibold text-slate-200">Choisir une Personal Picture</p>
-                <div className="mt-3 grid grid-cols-5 gap-2 sm:grid-cols-10">
-                  {personalPictures.map((picture) => (
-                    <button
-                      key={picture.id}
-                      type="button"
-                      className={`rounded-md border p-1 transition ${form.avatarPicture.kind === "preset" && form.avatarPicture.id === picture.id ? "border-emerald-300 bg-emerald-300/10" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.08]"}`}
-                      onClick={() => usePresetPicture(picture.id)}
-                      title={picture.label}
-                    >
-                      <ProfilePicture
-                        picture={{ kind: "preset", id: picture.id }}
-                        initials={initialsFromName(form.firstName, form.lastName)}
-                        size="sm"
-                      />
-                    </button>
-                  ))}
+                <p className="text-sm font-semibold text-emerald-300">Photo de profil</p>
+                <div className="mt-4 grid place-items-center rounded-md bg-slate-950/70 p-4">
+                  <ProfilePicture
+                    picture={form.avatarPicture}
+                    initials={initialsFromName(form.firstName, form.lastName)}
+                    size="lg"
+                  />
                 </div>
               </div>
-              <label className="grid gap-2 text-sm font-semibold text-slate-200">
-                <span>Importer une photo</span>
-                <input
-                  className="rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-sm"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={(event) => importPicture(event.target.files?.[0])}
-                />
-              </label>
-              <p className="text-xs text-slate-400">
-                Formats acceptés : JPG, PNG, WebP. Poids maximum : 120 Ko. L'image est stockée en
-                version légère pour ne pas ralentir le jeu.
-              </p>
-              {pictureError ? (
-                <p className="rounded-md bg-red-500/15 p-3 text-sm text-red-100">{pictureError}</p>
-              ) : null}
+              <div className="grid gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-slate-200">
+                    Choisir une Personal Picture
+                  </p>
+                  <div className="mt-3 grid grid-cols-5 gap-2 sm:grid-cols-10">
+                    {personalPictures.map((picture) => (
+                      <button
+                        key={picture.id}
+                        type="button"
+                        className={`rounded-md border p-1 transition ${form.avatarPicture.kind === "preset" && form.avatarPicture.id === picture.id ? "border-emerald-300 bg-emerald-300/10" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.08]"}`}
+                        onClick={() => usePresetPicture(picture.id)}
+                        title={picture.label}
+                      >
+                        <ProfilePicture
+                          picture={{ kind: "preset", id: picture.id }}
+                          initials={initialsFromName(form.firstName, form.lastName)}
+                          size="sm"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <label className="grid gap-2 text-sm font-semibold text-slate-200">
+                  <span>Importer une photo</span>
+                  <input
+                    className="rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-sm"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(event) => importPicture(event.target.files?.[0])}
+                  />
+                </label>
+                <p className="text-xs text-slate-400">
+                  Formats acceptés : JPG, PNG, WebP. Poids maximum : 120 Ko. L'image est stockée en
+                  version légère pour ne pas ralentir le jeu.
+                </p>
+                {pictureError ? (
+                  <p className="rounded-md bg-red-500/15 p-3 text-sm text-red-100">
+                    {pictureError}
+                  </p>
+                ) : null}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
         ) : null}
         {creationStep === "photo" ? (
           <div className="grid gap-3 md:col-span-2 md:grid-cols-2">
@@ -2612,10 +2629,16 @@ function Dashboard() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <GameMiniMetric label="Énergie" value={`${player.actionEnergy}/${player.actionEnergyMax}`} />
+              <GameMiniMetric
+                label="Énergie"
+                value={`${player.actionEnergy}/${player.actionEnergyMax}`}
+              />
               <GameMiniMetric label="Budget" value={`${player.budget.toLocaleString("fr-FR")} €`} />
               <GameMiniMetric label="FFT" value={player.fftRanking} />
-              <GameMiniMetric label="Cash prize" value={`${player.careerCashPrizeWon.toLocaleString("fr-FR")} €`} />
+              <GameMiniMetric
+                label="Cash prize"
+                value={`${player.careerCashPrizeWon.toLocaleString("fr-FR")} €`}
+              />
             </div>
             <div className="grid gap-2 sm:grid-cols-4">
               <QuickActionButton
@@ -2791,7 +2814,10 @@ function PlayerPage() {
           <GameMiniMetric label="Victoires" value={player.wins} />
           <GameMiniMetric label="Défaites" value={player.losses} />
           <GameMiniMetric label="Titres" value={career?.palmares.titles ?? "..."} />
-          <GameMiniMetric label="Simulation" value={career?.rankingSimulation.simulatedRanking ?? "..."} />
+          <GameMiniMetric
+            label="Simulation"
+            value={career?.rankingSimulation.simulatedRanking ?? "..."}
+          />
         </div>
         <div className="segmented-tabs mt-4">
           {[
@@ -2812,26 +2838,26 @@ function PlayerPage() {
         </div>
       </section>
       {tab === "stats" ? (
-      <section className="panel p-4 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-sm text-emerald-300">Profil joueur</p>
-            <h2 className="font-bold">Statistiques</h2>
+        <section className="panel p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm text-emerald-300">Profil joueur</p>
+              <h2 className="font-bold">Statistiques</h2>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {topStats.map((item) => (
+                <span key={item.key} className="stat-bonus-pill">
+                  <StatIcon statKey={item.key} size="sm" />
+                  <span>{statLabels[item.key]}</span>
+                  <strong>{Math.round(item.value)}</strong>
+                </span>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {topStats.map((item) => (
-              <span key={item.key} className="stat-bonus-pill">
-                <StatIcon statKey={item.key} size="sm" />
-                <span>{statLabels[item.key]}</span>
-                <strong>{Math.round(item.value)}</strong>
-              </span>
-            ))}
+          <div className="mt-4">
+            <StatBars player={player} />
           </div>
-        </div>
-        <div className="mt-4">
-          <StatBars player={player} />
-        </div>
-      </section>
+        </section>
       ) : null}
       {tab === "overview" ? (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -2987,7 +3013,11 @@ function ProfileEditorModal({
         ) : null}
 
         <div className="mt-6 flex flex-wrap justify-end gap-3">
-          <Button className="bg-white/10 text-white hover:bg-white/15" onClick={onClose} type="button">
+          <Button
+            className="bg-white/10 text-white hover:bg-white/15"
+            onClick={onClose}
+            type="button"
+          >
             Annuler
           </Button>
           <Button type="submit" disabled={saving}>
@@ -3431,7 +3461,11 @@ function CollectionPage() {
         </div>
         <div className="segmented-tabs mt-4">
           {[
-            ["equipment", "Équipement", totalEquipmentBonus ? `+${totalEquipmentBonus}` : "4 slots"],
+            [
+              "equipment",
+              "Équipement",
+              totalEquipmentBonus ? `+${totalEquipmentBonus}` : "4 slots"
+            ],
             ["cards", "Cartes", unlockableCards ? `${unlockableCards} prêt(s)` : "12 stats"],
             ["cosmetics", "Objets", `${sortedCosmetics.length}`]
           ].map(([value, label, meta]) => (
@@ -3451,230 +3485,230 @@ function CollectionPage() {
         <div className="panel p-4 text-sm text-emerald-100">{collectionMessage}</div>
       ) : null}
       {tab === "equipment" ? (
-      <section className="panel p-4 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-sm text-emerald-300">Équipement</p>
-            <h2 className="font-bold">4 objets cosmétiques actifs maximum</h2>
-          </div>
-          <div className="rounded-md bg-emerald-300 px-3 py-1 text-sm font-black text-slate-950">
-            +{totalEquipmentBonus} stats actives
-          </div>
-        </div>
-        <div className="mt-4 grid grid-cols-4 gap-1.5 sm:gap-3">
-          {equipped.map(({ slotIndex, item }) => (
-            <div key={slotIndex} className="metric min-w-0 p-2 sm:min-h-36 sm:p-3">
-              <div className="grid min-w-0 gap-2 sm:flex sm:items-start sm:justify-between sm:gap-3">
-                <div className="min-w-0">
-                  <div className="text-center text-[10px] uppercase tracking-[0.12em] text-slate-400 sm:text-left sm:text-xs sm:tracking-[0.18em]">
-                    Slot {slotIndex + 1}
-                  </div>
-                  <div className="mt-1 truncate text-center text-[11px] font-black leading-tight sm:text-left sm:text-base">
-                    {item?.name ?? "Vide"}
-                  </div>
-                </div>
-                {item ? (
-                  <span
-                    className={`justify-self-center rounded-md px-1.5 py-1 text-[10px] font-black sm:justify-self-auto sm:px-2 sm:text-xs ${rarityClass(item.rarity)}`}
-                  >
-                    <span className="sm:hidden">+{bonusTotal(item.bonuses)}</span>
-                    <span className="hidden sm:inline">{item.rarity}</span>
-                  </span>
-                ) : null}
-              </div>
-              <div className="mt-2 text-center text-[10px] leading-tight text-slate-300 sm:mt-3 sm:text-left sm:text-sm">
-                {item ? (
-                  <>
-                    <div className="sm:hidden">Niv. {item.upgradeLevel}/3</div>
-                    <div className="hidden sm:block">
-                      <StatBonusPills bonuses={item.bonuses} />
-                      <CosmeticUpgradeMeta item={item} />
-                    </div>
-                  </>
-                ) : (
-                  <span className="hidden sm:inline">Équipez un objet depuis l'inventaire.</span>
-                )}
-              </div>
-              {item ? (
-                <div className="mt-2 grid gap-1 sm:mt-4 sm:gap-2">
-                  {item.canUpgrade && item.nextUpgradeCost ? (
-                    <button
-                      className="inline-flex min-h-8 w-full items-center justify-center rounded-md bg-emerald-400 px-1 py-1 text-[10px] font-black text-slate-950 transition hover:bg-emerald-300 disabled:opacity-50 sm:min-h-10 sm:px-3 sm:py-2 sm:text-sm"
-                      onClick={() => upgradeItem(item)}
-                      disabled={busyUpgrade === item.id}
-                      type="button"
-                    >
-                      <span className="sm:hidden">+</span>
-                      <span className="hidden sm:inline">
-                        {busyUpgrade === item.id
-                          ? "Amélioration..."
-                          : `Améliorer · ${item.nextUpgradeCost.toLocaleString("fr-FR")} €`}
-                      </span>
-                    </button>
-                  ) : null}
-                  <button
-                    className="rounded-md bg-white/10 px-1 py-1 text-[10px] font-bold text-white transition hover:bg-white/15 disabled:opacity-50 sm:px-3 sm:py-2 sm:text-sm"
-                    onClick={() => unequip(item)}
-                    disabled={busyCosmetic === item.id}
-                    type="button"
-                  >
-                    <span className="sm:hidden">X</span>
-                    <span className="hidden sm:inline">Retirer</span>
-                  </button>
-                </div>
-              ) : (
-                <button
-                  className="mt-2 min-h-8 w-full rounded-md border border-emerald-300/40 bg-emerald-300/10 px-1 py-1 text-[10px] font-bold text-emerald-100 transition hover:bg-emerald-300/18 sm:mt-4 sm:px-3 sm:py-2 sm:text-sm"
-                  onClick={() => setSlotPicker(slotIndex)}
-                  type="button"
-                >
-                  <span className="sm:hidden">+</span>
-                  <span className="hidden sm:inline">Choisir un objet</span>
-                </button>
-              )}
+        <section className="panel p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm text-emerald-300">Équipement</p>
+              <h2 className="font-bold">4 objets cosmétiques actifs maximum</h2>
             </div>
-          ))}
-        </div>
-      </section>
-      ) : null}
-      {tab === "cards" ? (
-      <section className="panel p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-sm text-emerald-300">Cartes de statistiques</p>
-            <h2 className="font-bold">Progression permanente</h2>
+            <div className="rounded-md bg-emerald-300 px-3 py-1 text-sm font-black text-slate-950">
+              +{totalEquipmentBonus} stats actives
+            </div>
           </div>
-          <Sparkles size={20} />
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {(data?.cards ?? []).map((card) => {
-            const progress = Math.max(
-              0,
-              Math.min(100, (card.copiesIntoLevel / Math.max(1, card.copiesNeeded)) * 100)
-            );
-            const readyLabel = card.unlockable
-              ? `Palier ${card.level + 1} prêt`
-              : `${card.remaining} doublon(s) avant le prochain palier`;
-            return (
-              <div key={card.statKey} className="metric">
-                <div className="flex justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <StatIcon statKey={card.statKey} />
-                    <div className="min-w-0">
-                      <div className="truncate font-bold">{card.label}</div>
-                      <div className="text-xs text-slate-400">
-                        {card.copies} doublon(s) collecté(s)
-                      </div>
+          <div className="mt-4 grid grid-cols-4 gap-1.5 sm:gap-3">
+            {equipped.map(({ slotIndex, item }) => (
+              <div key={slotIndex} className="metric min-w-0 p-2 sm:min-h-36 sm:p-3">
+                <div className="grid min-w-0 gap-2 sm:flex sm:items-start sm:justify-between sm:gap-3">
+                  <div className="min-w-0">
+                    <div className="text-center text-[10px] uppercase tracking-[0.12em] text-slate-400 sm:text-left sm:text-xs sm:tracking-[0.18em]">
+                      Slot {slotIndex + 1}
+                    </div>
+                    <div className="mt-1 truncate text-center text-[11px] font-black leading-tight sm:text-left sm:text-base">
+                      {item?.name ?? "Vide"}
                     </div>
                   </div>
-                  <div className="rounded-md bg-white/[0.08] px-2 py-1 text-sm font-black text-emerald-300">
-                    +{card.level}
-                  </div>
-                </div>
-                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300">
-                  <span>Bonus débloqué +{card.level}</span>
-                  <span>Palier atteint +{card.earnedLevel}</span>
-                </div>
-                <div className="mt-3 h-2 rounded-full bg-white/[0.08]">
-                  <div
-                    className="h-full rounded-full bg-emerald-300"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-                <div className="mt-2 text-xs text-slate-400">{readyLabel}</div>
-                {card.unlockable ? (
-                  <Button
-                    className="mt-3 w-full justify-center"
-                    onClick={() => unlockCard(card.statKey)}
-                    disabled={busyCard === card.statKey}
-                  >
-                    {busyCard === card.statKey
-                      ? "Déblocage..."
-                      : `Débloquer +1 · ${card.unlockCost} €`}
-                  </Button>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      </section>
-      ) : null}
-      {tab === "cosmetics" ? (
-      <section className="panel p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-sm text-emerald-300">Avatar</p>
-            <h2 className="font-bold">Inventaire cosmétique</h2>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-slate-300">
-            <span className="rounded-md bg-white/[0.08] px-3 py-1">Tri : rareté</span>
-            <PackageOpen size={20} />
-          </div>
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {sortedCosmetics.length ? (
-            sortedCosmetics.map((item) => (
-              <div key={item.id} className={`metric ${rarityClass(item.rarity)}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                      {item.rarity}
-                    </div>
-                    <div className="mt-1 font-black">{item.name}</div>
-                  </div>
-                  {item.equippedSlot !== null ? (
-                    <span className="rounded-md bg-emerald-300 px-2 py-1 text-xs font-black text-slate-950">
-                      Slot {item.equippedSlot + 1}
+                  {item ? (
+                    <span
+                      className={`justify-self-center rounded-md px-1.5 py-1 text-[10px] font-black sm:justify-self-auto sm:px-2 sm:text-xs ${rarityClass(item.rarity)}`}
+                    >
+                      <span className="sm:hidden">+{bonusTotal(item.bonuses)}</span>
+                      <span className="hidden sm:inline">{item.rarity}</span>
                     </span>
                   ) : null}
                 </div>
-                <div className="mt-3">
-                  <StatBonusPills bonuses={item.bonuses} />
+                <div className="mt-2 text-center text-[10px] leading-tight text-slate-300 sm:mt-3 sm:text-left sm:text-sm">
+                  {item ? (
+                    <>
+                      <div className="sm:hidden">Niv. {item.upgradeLevel}/3</div>
+                      <div className="hidden sm:block">
+                        <StatBonusPills bonuses={item.bonuses} />
+                        <CosmeticUpgradeMeta item={item} />
+                      </div>
+                    </>
+                  ) : (
+                    <span className="hidden sm:inline">Équipez un objet depuis l'inventaire.</span>
+                  )}
                 </div>
-                <CosmeticUpgradeMeta item={item} />
-                {item.canUpgrade && item.nextUpgradeCost ? (
-                  <Button
-                    className="mt-3 w-full"
-                    onClick={() => upgradeItem(item)}
-                    disabled={busyUpgrade === item.id}
-                  >
-                    {busyUpgrade === item.id
-                      ? "Amélioration..."
-                      : `Améliorer · ${item.nextUpgradeCost.toLocaleString("fr-FR")} €`}
-                  </Button>
-                ) : null}
-                <div className="mt-4 grid grid-cols-4 gap-2">
-                  {[0, 1, 2, 3].map((slotIndex) => (
+                {item ? (
+                  <div className="mt-2 grid gap-1 sm:mt-4 sm:gap-2">
+                    {item.canUpgrade && item.nextUpgradeCost ? (
+                      <button
+                        className="inline-flex min-h-8 w-full items-center justify-center rounded-md bg-emerald-400 px-1 py-1 text-[10px] font-black text-slate-950 transition hover:bg-emerald-300 disabled:opacity-50 sm:min-h-10 sm:px-3 sm:py-2 sm:text-sm"
+                        onClick={() => upgradeItem(item)}
+                        disabled={busyUpgrade === item.id}
+                        type="button"
+                      >
+                        <span className="sm:hidden">+</span>
+                        <span className="hidden sm:inline">
+                          {busyUpgrade === item.id
+                            ? "Amélioration..."
+                            : `Améliorer · ${item.nextUpgradeCost.toLocaleString("fr-FR")} €`}
+                        </span>
+                      </button>
+                    ) : null}
                     <button
-                      key={slotIndex}
-                      className="rounded-md border border-white/10 bg-white/[0.05] px-2 py-2 text-xs font-black text-white transition hover:bg-white/[0.1] disabled:opacity-40"
-                      onClick={() => equip(item, slotIndex)}
-                      disabled={busyCosmetic === item.id || item.equippedSlot === slotIndex}
+                      className="rounded-md bg-white/10 px-1 py-1 text-[10px] font-bold text-white transition hover:bg-white/15 disabled:opacity-50 sm:px-3 sm:py-2 sm:text-sm"
+                      onClick={() => unequip(item)}
+                      disabled={busyCosmetic === item.id}
                       type="button"
                     >
-                      {slotIndex + 1}
+                      <span className="sm:hidden">X</span>
+                      <span className="hidden sm:inline">Retirer</span>
                     </button>
-                  ))}
-                </div>
-                {item.equippedSlot !== null ? (
+                  </div>
+                ) : (
                   <button
-                    className="mt-3 rounded-md bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-50"
-                    onClick={() => unequip(item)}
-                    disabled={busyCosmetic === item.id}
+                    className="mt-2 min-h-8 w-full rounded-md border border-emerald-300/40 bg-emerald-300/10 px-1 py-1 text-[10px] font-bold text-emerald-100 transition hover:bg-emerald-300/18 sm:mt-4 sm:px-3 sm:py-2 sm:text-sm"
+                    onClick={() => setSlotPicker(slotIndex)}
                     type="button"
                   >
-                    Retirer l'objet
+                    <span className="sm:hidden">+</span>
+                    <span className="hidden sm:inline">Choisir un objet</span>
                   </button>
-                ) : null}
+                )}
               </div>
-            ))
-          ) : (
-            <div className="rounded-md border border-dashed border-white/15 p-4 text-sm text-slate-400">
-              Aucun cosmétique débloqué pour le moment.
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {tab === "cards" ? (
+        <section className="panel p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm text-emerald-300">Cartes de statistiques</p>
+              <h2 className="font-bold">Progression permanente</h2>
             </div>
-          )}
-        </div>
-      </section>
+            <Sparkles size={20} />
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {(data?.cards ?? []).map((card) => {
+              const progress = Math.max(
+                0,
+                Math.min(100, (card.copiesIntoLevel / Math.max(1, card.copiesNeeded)) * 100)
+              );
+              const readyLabel = card.unlockable
+                ? `Palier ${card.level + 1} prêt`
+                : `${card.remaining} doublon(s) avant le prochain palier`;
+              return (
+                <div key={card.statKey} className="metric">
+                  <div className="flex justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <StatIcon statKey={card.statKey} />
+                      <div className="min-w-0">
+                        <div className="truncate font-bold">{card.label}</div>
+                        <div className="text-xs text-slate-400">
+                          {card.copies} doublon(s) collecté(s)
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-md bg-white/[0.08] px-2 py-1 text-sm font-black text-emerald-300">
+                      +{card.level}
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300">
+                    <span>Bonus débloqué +{card.level}</span>
+                    <span>Palier atteint +{card.earnedLevel}</span>
+                  </div>
+                  <div className="mt-3 h-2 rounded-full bg-white/[0.08]">
+                    <div
+                      className="h-full rounded-full bg-emerald-300"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                  <div className="mt-2 text-xs text-slate-400">{readyLabel}</div>
+                  {card.unlockable ? (
+                    <Button
+                      className="mt-3 w-full justify-center"
+                      onClick={() => unlockCard(card.statKey)}
+                      disabled={busyCard === card.statKey}
+                    >
+                      {busyCard === card.statKey
+                        ? "Déblocage..."
+                        : `Débloquer +1 · ${card.unlockCost} €`}
+                    </Button>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+      {tab === "cosmetics" ? (
+        <section className="panel p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm text-emerald-300">Avatar</p>
+              <h2 className="font-bold">Inventaire cosmétique</h2>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-slate-300">
+              <span className="rounded-md bg-white/[0.08] px-3 py-1">Tri : rareté</span>
+              <PackageOpen size={20} />
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {sortedCosmetics.length ? (
+              sortedCosmetics.map((item) => (
+                <div key={item.id} className={`metric ${rarityClass(item.rarity)}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                        {item.rarity}
+                      </div>
+                      <div className="mt-1 font-black">{item.name}</div>
+                    </div>
+                    {item.equippedSlot !== null ? (
+                      <span className="rounded-md bg-emerald-300 px-2 py-1 text-xs font-black text-slate-950">
+                        Slot {item.equippedSlot + 1}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="mt-3">
+                    <StatBonusPills bonuses={item.bonuses} />
+                  </div>
+                  <CosmeticUpgradeMeta item={item} />
+                  {item.canUpgrade && item.nextUpgradeCost ? (
+                    <Button
+                      className="mt-3 w-full"
+                      onClick={() => upgradeItem(item)}
+                      disabled={busyUpgrade === item.id}
+                    >
+                      {busyUpgrade === item.id
+                        ? "Amélioration..."
+                        : `Améliorer · ${item.nextUpgradeCost.toLocaleString("fr-FR")} €`}
+                    </Button>
+                  ) : null}
+                  <div className="mt-4 grid grid-cols-4 gap-2">
+                    {[0, 1, 2, 3].map((slotIndex) => (
+                      <button
+                        key={slotIndex}
+                        className="rounded-md border border-white/10 bg-white/[0.05] px-2 py-2 text-xs font-black text-white transition hover:bg-white/[0.1] disabled:opacity-40"
+                        onClick={() => equip(item, slotIndex)}
+                        disabled={busyCosmetic === item.id || item.equippedSlot === slotIndex}
+                        type="button"
+                      >
+                        {slotIndex + 1}
+                      </button>
+                    ))}
+                  </div>
+                  {item.equippedSlot !== null ? (
+                    <button
+                      className="mt-3 rounded-md bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-50"
+                      onClick={() => unequip(item)}
+                      disabled={busyCosmetic === item.id}
+                      type="button"
+                    >
+                      Retirer l'objet
+                    </button>
+                  ) : null}
+                </div>
+              ))
+            ) : (
+              <div className="rounded-md border border-dashed border-white/15 p-4 text-sm text-slate-400">
+                Aucun cosmétique débloqué pour le moment.
+              </div>
+            )}
+          </div>
+        </section>
       ) : null}
       {slotPicker !== null ? (
         <CosmeticSlotPicker
@@ -3844,10 +3878,7 @@ function SeasonEntryDetails({
                 />
                 <GameMiniMetric label="Matchs joués" value={`${playedMatches}`} />
                 <GameMiniMetric label="Victoires" value={`${wonMatches}`} />
-                <GameMiniMetric
-                  label="Prochain rang"
-                  value={nextRanking ?? "Terminé"}
-                />
+                <GameMiniMetric label="Prochain rang" value={nextRanking ?? "Terminé"} />
               </div>
             </div>
             <div className="rounded-md border border-cyan-300/20 bg-cyan-300/10 p-4">
@@ -4342,7 +4373,8 @@ function SeasonPage() {
       );
       setDailyRewardOpening({
         rewards: result.rewards,
-        rarity: result.dailyReward.type === "chest" ? (result.dailyReward.rarity ?? "Bronze") : "Bronze"
+        rarity:
+          result.dailyReward.type === "chest" ? (result.dailyReward.rarity ?? "Bronze") : "Bronze"
       });
       await Promise.all([load(), refresh()]);
     } catch (error) {
@@ -4353,8 +4385,7 @@ function SeasonPage() {
   }
   if (!data) return <section className="panel p-5">Chargement de la saison...</section>;
   const activeCompetition =
-    data.competitions.find((competition) => competition.type === seasonTab) ??
-    data.competitions[0];
+    data.competitions.find((competition) => competition.type === seasonTab) ?? data.competitions[0];
   return (
     <div className="grid gap-4">
       <section className="panel p-4 sm:p-5">
@@ -4414,110 +4445,119 @@ function SeasonPage() {
       <section className="grid gap-4">
         {activeCompetition
           ? [activeCompetition].map((competition) => {
-          const entry = competition.entry;
-          const nextRanking =
-            entry?.bracket.mode === "pyramide"
-              ? entry.bracket.path?.[entry.currentRound]?.ranking
-              : entry?.bracket.opponents?.[entry.currentRound]?.ranking;
-          const statusLabel = entry
-            ? (entry.championTitle ?? entry.status.replaceAll("_", " "))
-            : "Non inscrit";
-          const nextAt = competition.nextPlayableAt ? new Date(competition.nextPlayableAt) : null;
-          const periodEnd = new Date(competition.currentPeriodEndsAt);
-          const entryFee = entry?.entryFee ?? competition.entryFee;
-          const cashPrize = entry?.cashPrize ?? competition.cashPrize;
-          const availabilityLabel = entry
-            ? competition.type === "individual"
-              ? "Prochain championnat"
-              : "Prochaine inscription"
-            : "Disponibilité";
-          return (
-            <article key={competition.type} className="season-card panel p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-black">{competition.title}</h2>
-                  <p className="text-sm text-emerald-300">
-                    {competition.frequency} · {competition.energyCost} énergie
-                  </p>
-                </div>
-                <div className="rounded-md bg-white/[0.08] px-3 py-2 text-center">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Prix</div>
-                  <div className="text-lg font-black">{entryFee.toLocaleString("fr-FR")} €</div>
-                </div>
-              </div>
-              <p className="mt-3 line-clamp-2 text-sm text-slate-300">{competition.subtitle}</p>
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <GameMiniMetric
-                  label="Format"
-                  value={competition.type === "individual" ? "Pyramide" : "Tableau 16"}
-                />
-                <GameMiniMetric label="Statut" value={statusLabel} />
-                <GameMiniMetric label="Zone haute" value={competition.rankingRange.best} />
-                <GameMiniMetric label="Cash prize" value={`${cashPrize.toLocaleString("fr-FR")} €`} />
-              </div>
-              <div className="mt-4 rounded-md border border-cyan-300/15 bg-cyan-300/10 p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-200">
-                      {availabilityLabel}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-200">
-                      {entry && nextAt ? (
-                        <>
-                          <Countdown
-                            endAt={competition.nextPlayableAt}
-                            doneLabel="Jouable maintenant"
-                          />{" "}
-                          · {nextAt.toLocaleDateString("fr-FR")} à{" "}
-                          {nextAt.toLocaleTimeString("fr-FR", {
-                            hour: "2-digit",
-                            minute: "2-digit"
-                          })}
-                        </>
-                      ) : (
-                        <>
-                          Jouable maintenant · période active jusqu'à{" "}
-                          {periodEnd.toLocaleTimeString("fr-FR", {
-                            hour: "2-digit",
-                            minute: "2-digit"
-                          })}
-                        </>
-                      )}
-                    </p>
+              const entry = competition.entry;
+              const nextRanking =
+                entry?.bracket.mode === "pyramide"
+                  ? entry.bracket.path?.[entry.currentRound]?.ranking
+                  : entry?.bracket.opponents?.[entry.currentRound]?.ranking;
+              const statusLabel = entry
+                ? (entry.championTitle ?? entry.status.replaceAll("_", " "))
+                : "Non inscrit";
+              const nextAt = competition.nextPlayableAt
+                ? new Date(competition.nextPlayableAt)
+                : null;
+              const periodEnd = new Date(competition.currentPeriodEndsAt);
+              const entryFee = entry?.entryFee ?? competition.entryFee;
+              const cashPrize = entry?.cashPrize ?? competition.cashPrize;
+              const availabilityLabel = entry
+                ? competition.type === "individual"
+                  ? "Prochain championnat"
+                  : "Prochaine inscription"
+                : "Disponibilité";
+              return (
+                <article key={competition.type} className="season-card panel p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-xl font-black">{competition.title}</h2>
+                      <p className="text-sm text-emerald-300">
+                        {competition.frequency} · {competition.energyCost} énergie
+                      </p>
+                    </div>
+                    <div className="rounded-md bg-white/[0.08] px-3 py-2 text-center">
+                      <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                        Prix
+                      </div>
+                      <div className="text-lg font-black">{entryFee.toLocaleString("fr-FR")} €</div>
+                    </div>
                   </div>
-                  <CalendarDays size={18} className="mt-1 text-cyan-200" />
-                </div>
-              </div>
-              <div className="mt-4 rounded-md bg-white/5 p-3 text-sm text-slate-300">
-                {nextRanking
-                  ? `Prochain adversaire estimé : ${nextRanking}. La difficulté suit son classement FFT et ses statistiques.`
-                  : "Inscription disponible selon la période."}
-              </div>
-              {!entry ? (
-                <Button className="mt-4 w-full" onClick={() => register(competition.type)}>
-                  S'inscrire
-                </Button>
-              ) : (
-                <Button
-                  className="mt-4 w-full"
-                  disabled={["ELIMINE", "VAINQUEUR", "CHAMPION_NATIONAL"].includes(entry.status)}
-                  onClick={() => play(entry.id)}
-                >
-                  Jouer le prochain match
-                </Button>
-              )}
-              {entry ? (
-                <Button
-                  className="mt-3 w-full border border-cyan-300 bg-cyan-300 text-slate-950 shadow-[0_0_18px_rgba(103,232,249,0.28)] hover:bg-cyan-200"
-                  onClick={() => setSelectedCompetition(competition)}
-                >
-                  <Eye size={16} />{" "}
-                  {competition.type === "individual" ? "Voir le parcours" : "Voir le tableau"}
-                </Button>
-              ) : null}
-            </article>
-          );
-        })
+                  <p className="mt-3 line-clamp-2 text-sm text-slate-300">{competition.subtitle}</p>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <GameMiniMetric
+                      label="Format"
+                      value={competition.type === "individual" ? "Pyramide" : "Tableau 16"}
+                    />
+                    <GameMiniMetric label="Statut" value={statusLabel} />
+                    <GameMiniMetric label="Zone haute" value={competition.rankingRange.best} />
+                    <GameMiniMetric
+                      label="Cash prize"
+                      value={`${cashPrize.toLocaleString("fr-FR")} €`}
+                    />
+                  </div>
+                  <div className="mt-4 rounded-md border border-cyan-300/15 bg-cyan-300/10 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-200">
+                          {availabilityLabel}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-200">
+                          {entry && nextAt ? (
+                            <>
+                              <Countdown
+                                endAt={competition.nextPlayableAt}
+                                doneLabel="Jouable maintenant"
+                              />{" "}
+                              · {nextAt.toLocaleDateString("fr-FR")} à{" "}
+                              {nextAt.toLocaleTimeString("fr-FR", {
+                                hour: "2-digit",
+                                minute: "2-digit"
+                              })}
+                            </>
+                          ) : (
+                            <>
+                              Jouable maintenant · période active jusqu'à{" "}
+                              {periodEnd.toLocaleTimeString("fr-FR", {
+                                hour: "2-digit",
+                                minute: "2-digit"
+                              })}
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <CalendarDays size={18} className="mt-1 text-cyan-200" />
+                    </div>
+                  </div>
+                  <div className="mt-4 rounded-md bg-white/5 p-3 text-sm text-slate-300">
+                    {nextRanking
+                      ? `Prochain adversaire estimé : ${nextRanking}. La difficulté suit son classement FFT et ses statistiques.`
+                      : "Inscription disponible selon la période."}
+                  </div>
+                  {!entry ? (
+                    <Button className="mt-4 w-full" onClick={() => register(competition.type)}>
+                      S'inscrire
+                    </Button>
+                  ) : (
+                    <Button
+                      className="mt-4 w-full"
+                      disabled={["ELIMINE", "VAINQUEUR", "CHAMPION_NATIONAL"].includes(
+                        entry.status
+                      )}
+                      onClick={() => play(entry.id)}
+                    >
+                      Jouer le prochain match
+                    </Button>
+                  )}
+                  {entry ? (
+                    <Button
+                      className="mt-3 w-full border border-cyan-300 bg-cyan-300 text-slate-950 shadow-[0_0_18px_rgba(103,232,249,0.28)] hover:bg-cyan-200"
+                      onClick={() => setSelectedCompetition(competition)}
+                    >
+                      <Eye size={16} />{" "}
+                      {competition.type === "individual" ? "Voir le parcours" : "Voir le tableau"}
+                    </Button>
+                  ) : null}
+                </article>
+              );
+            })
           : null}
       </section>
       {selectedCompetition ? (
@@ -4591,9 +4631,7 @@ function RankingsPage() {
   return (
     <div className="grid gap-4">
       <section className="panel p-4 sm:p-5">
-        <p className="text-sm font-bold uppercase tracking-[0.22em] text-emerald-300">
-          Classement
-        </p>
+        <p className="text-sm font-bold uppercase tracking-[0.22em] text-emerald-300">Classement</p>
         <h1 className="mt-1 text-2xl font-black">Top mondial MyPro</h1>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           {podium.map((player) => (
@@ -4642,8 +4680,7 @@ function ClubPlayerRow({ player, badge }: { player: ClubPlayerSummary; badge?: R
             {player.name}
           </Link>
           <p className="text-sm text-slate-300">
-            {nationalityLabel(player.nationality)} · {player.fftRanking} · Niveau{" "}
-            {player.overall}
+            {nationalityLabel(player.nationality)} · {player.fftRanking} · Niveau {player.overall}
           </p>
         </div>
       </div>
@@ -4878,24 +4915,24 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
           </div>
 
           {teamView === "team" ? (
-          <div className="grid gap-3 md:grid-cols-5">
-            {data.team.members.map((member) => (
-              <ClubPlayerRow
-                key={member.id}
-                player={member.player}
-                badge={
-                  <span className="rounded-md bg-emerald-300/10 px-2 py-1 text-xs font-bold text-emerald-100">
-                    N°{member.slotIndex}
-                    {dues.amount > 0 && championship
-                      ? (member.duesPaid ?? dues.amount === 0)
-                        ? " · À jour"
-                        : " · Non payé"
-                      : ""}
-                  </span>
-                }
-              />
-            ))}
-          </div>
+            <div className="grid gap-3 md:grid-cols-5">
+              {data.team.members.map((member) => (
+                <ClubPlayerRow
+                  key={member.id}
+                  player={member.player}
+                  badge={
+                    <span className="rounded-md bg-emerald-300/10 px-2 py-1 text-xs font-bold text-emerald-100">
+                      N°{member.slotIndex}
+                      {dues.amount > 0 && championship
+                        ? (member.duesPaid ?? dues.amount === 0)
+                          ? " · À jour"
+                          : " · Non payé"
+                        : ""}
+                    </span>
+                  }
+                />
+              ))}
+            </div>
           ) : null}
 
           {teamView !== "team" && championship ? (
@@ -4912,8 +4949,7 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                 </p>
                 <p className="mt-2 text-xs text-slate-400">
                   Classement : points de simples gagnés, différence de sets, différence de jeux,
-                  tirage ·{" "}
-                  {promotionEnabled ? "1er promu" : "Pas de montée en Elite 1"} ·{" "}
+                  tirage · {promotionEnabled ? "1er promu" : "Pas de montée en Elite 1"} ·{" "}
                   {relegationEnabled ? "13e relégué" : "Pas de relégation en Départementale 4"}
                 </p>
                 {nextMeeting ? (
@@ -4932,6 +4968,7 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                         <th>V</th>
                         <th>Sets</th>
                         <th>Jeux</th>
+                        <th>Prime</th>
                         <th>Sort</th>
                       </tr>
                     </thead>
@@ -4943,6 +4980,10 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                             : entry.rank === relegationRank && relegationEnabled
                               ? "Descente"
                               : "";
+                        const displayedCashPrize =
+                          (entry.cashPrize ?? 0) > 0
+                            ? (entry.cashPrize ?? 0)
+                            : (entry.projectedCashPrize ?? 0);
                         return (
                           <tr
                             key={entry.id}
@@ -4958,6 +4999,9 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                             <td>{entry.wins}</td>
                             <td>{entry.setsFor - entry.setsAgainst}</td>
                             <td>{entry.gamesFor - entry.gamesAgainst}</td>
+                            <td className="font-black text-amber-100">
+                              {displayedCashPrize.toLocaleString("fr-FR")} €
+                            </td>
                             <td>
                               {movement ? (
                                 <span
@@ -4982,7 +5026,7 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
               </article>
 
               <article
-                className={`rounded-md border border-white/10 bg-white/[0.04] p-4 ${
+                className={`w-full max-w-full overflow-hidden rounded-md border border-white/10 bg-white/[0.04] p-4 ${
                   teamView === "schedule" ? "" : "hidden"
                 }`}
               >
@@ -4997,13 +5041,16 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                     Prochaine : J{upcomingRound}
                   </div>
                 </div>
-                <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
+                <div
+                  className="mt-4 grid max-w-full gap-1.5"
+                  style={{ gridTemplateColumns: `repeat(${rounds.length}, minmax(0, 1fr))` }}
+                >
                   {rounds.map((round) => {
                     const isSelected = round === displayedRound;
                     const isUpcoming = round === upcomingRound;
                     return (
                       <button
-                        className={`min-w-14 rounded-md border px-3 py-2 text-sm font-black transition ${
+                        className={`min-w-0 rounded-md border px-1 py-2 text-xs font-black transition sm:text-sm ${
                           isSelected
                             ? "border-emerald-300 bg-emerald-300 text-slate-950"
                             : isUpcoming
@@ -5033,7 +5080,7 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                     return (
                       <div
                         key={meeting.id}
-                        className={`rounded-md border p-3 text-sm ${
+                        className={`max-w-full overflow-hidden rounded-md border p-3 text-sm ${
                           involvesPlayerClub
                             ? "border-emerald-300/40 bg-emerald-300/10"
                             : "border-white/10 bg-slate-950/30"
@@ -5045,7 +5092,7 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                             {new Date(meeting.startsAt).toLocaleString("fr-FR")}
                           </span>
                         </div>
-                        <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                        <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center">
                           <span className="min-w-0 truncate text-left">{home}</span>
                           <strong className="rounded-md bg-white/[0.08] px-3 py-2 text-base">
                             {meeting.status === "COMPLETED"
@@ -5054,7 +5101,7 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                                 ? "Exempt"
                                 : "18h30"}
                           </strong>
-                          <span className="min-w-0 truncate text-right">{away}</span>
+                          <span className="min-w-0 truncate text-left sm:text-right">{away}</span>
                         </div>
                         {meeting.details?.singles?.length ? (
                           <div className="mt-3 grid min-w-0 gap-2 border-t border-white/10 pt-3">
@@ -5087,20 +5134,29 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                                   {single.awayPlayer.name} · {single.awayPlayer.fftRanking}
                                 </span>
                                 {meeting.status === "COMPLETED" ? (
-                                  <button
-                                    className="w-full rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-xs font-black text-emerald-100 transition hover:bg-emerald-300 hover:text-slate-950 md:w-auto"
-                                    onClick={() =>
-                                      setTeamReplay({
-                                        single,
-                                        homeClub: home,
-                                        awayClub: away,
-                                        round: meeting.round
-                                      })
-                                    }
-                                    type="button"
-                                  >
-                                    Replay
-                                  </button>
+                                  single.replayMatchId ? (
+                                    <Link
+                                      className="w-full rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-center text-xs font-black text-emerald-100 transition hover:bg-emerald-300 hover:text-slate-950 md:w-auto"
+                                      to={`/match/${single.replayMatchId}`}
+                                    >
+                                      Replay
+                                    </Link>
+                                  ) : (
+                                    <button
+                                      className="w-full rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-xs font-black text-emerald-100 transition hover:bg-emerald-300 hover:text-slate-950 md:w-auto"
+                                      onClick={() =>
+                                        setTeamReplay({
+                                          single,
+                                          homeClub: home,
+                                          awayClub: away,
+                                          round: meeting.round
+                                        })
+                                      }
+                                      type="button"
+                                    >
+                                      Résumé
+                                    </button>
+                                  )
                                 ) : null}
                               </div>
                             ))}
@@ -5358,9 +5414,9 @@ function ClubPage() {
 
   if (data.club) {
     const club = data.club;
-    const infrastructureBuildings = (
-      ["complex", "careCenter", "trainingCenter"] as const
-    ).map((buildingId) => clubBuildingForClub(club, buildingId));
+    const infrastructureBuildings = (["complex", "careCenter", "trainingCenter"] as const).map(
+      (buildingId) => clubBuildingForClub(club, buildingId)
+    );
     const successorOptions = club.members.filter((member) => member.player.id !== player.id);
     const selectedSuccessorId = successorPlayerId || successorOptions[0]?.player.id || "";
     return (
@@ -5412,7 +5468,10 @@ function ClubPage() {
             <Metric label="Membres" value={club.memberCount} />
             <Metric label="Places libres" value={club.openSlots} />
             <Metric label="Classement requis" value={club.minimumRanking} />
-            <Metric label="Cotisation" value={`${clubDuesAmount(club).toLocaleString("fr-FR")} €`} />
+            <Metric
+              label="Cotisation"
+              value={`${clubDuesAmount(club).toLocaleString("fr-FR")} €`}
+            />
             <Metric label="Niveau compétitif" value={club.competitiveLevel} />
             <Metric label="Budget du club" value={`${club.budget.toLocaleString("fr-FR")} €`} />
           </div>
@@ -5480,10 +5539,7 @@ function ClubPage() {
         {club.isPresident && settingsOpen
           ? createPortal(
               <div className="game-modal-overlay">
-                <form
-                  className="game-modal-panel panel max-w-2xl"
-                  onSubmit={updateClubSettings}
-                >
+                <form className="game-modal-panel panel max-w-2xl" onSubmit={updateClubSettings}>
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-sm font-bold uppercase tracking-[0.22em] text-emerald-300">
@@ -5657,25 +5713,24 @@ function ClubPage() {
           : null}
 
         {clubTab === "members" ? (
-        <section className="grid gap-5 lg:grid-cols-[1fr_360px]">
-          <article className="panel p-5">
-            <h2 className="text-xl font-black">Effectif du club</h2>
-            <div className="mt-4 grid gap-3">
-              {club.members.map((member) => (
-                <ClubPlayerRow
-                  key={member.id}
-                  player={member.player}
-                  badge={
-                    <span className="rounded-md bg-white/10 px-2 py-1 text-xs font-bold text-slate-200">
-                      {member.role === "PRESIDENT" ? "Président" : "Membre"}
-                    </span>
-                  }
-                />
-              ))}
-            </div>
-          </article>
-
-        </section>
+          <section className="grid gap-5 lg:grid-cols-[1fr_360px]">
+            <article className="panel p-5">
+              <h2 className="text-xl font-black">Effectif du club</h2>
+              <div className="mt-4 grid gap-3">
+                {club.members.map((member) => (
+                  <ClubPlayerRow
+                    key={member.id}
+                    player={member.player}
+                    badge={
+                      <span className="rounded-md bg-white/10 px-2 py-1 text-xs font-bold text-slate-200">
+                        {member.role === "PRESIDENT" ? "Président" : "Membre"}
+                      </span>
+                    }
+                  />
+                ))}
+              </div>
+            </article>
+          </section>
         ) : null}
 
         {clubTab === "requests" ? (
@@ -5765,149 +5820,154 @@ function ClubPage() {
 
       <section className="grid gap-5">
         {clubDiscoveryTab === "create" ? (
-        <form className="panel grid gap-4 p-5" onSubmit={createClub}>
-          <div>
-            <h2 className="text-xl font-black">Créer un club</h2>
-            <p className="mt-1 text-sm text-slate-300">
-              Coût : {clubCreationCost.toLocaleString("fr-FR")} € · Budget :{" "}
-              {player.budget.toLocaleString("fr-FR")} €
-            </p>
-          </div>
-          <label className="grid gap-1 text-sm">
-            <span className="text-slate-300">Nom du club</span>
-            <Field
-              maxLength={32}
-              minLength={3}
-              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-              placeholder="Ex : Central Horizon"
-              required
-              value={form.name}
-            />
-          </label>
-          <label className="grid gap-1 text-sm">
-            <span className="text-slate-300">Sigle</span>
-            <Field
-              maxLength={5}
-              minLength={2}
-              onChange={(event) => setForm((current) => ({ ...current, tag: event.target.value }))}
-              placeholder="CHT"
-              required
-              value={form.tag}
-            />
-          </label>
-          <label className="grid gap-1 text-sm">
-            <span className="text-slate-300">Description</span>
-            <Field
-              maxLength={280}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, description: event.target.value }))
-              }
-              placeholder="Objectif, niveau recherché, ambiance..."
-              value={form.description}
-            />
-          </label>
-          <label className="grid gap-1 text-sm">
-            <span className="text-slate-300">Classement minimum pour rejoindre</span>
-            <select
-              className="rounded-md border border-white/10 bg-slate-950 px-3 py-2"
-              onChange={(event) =>
-                setForm((current) => ({ ...current, minimumRanking: event.target.value }))
-              }
-              value={form.minimumRanking}
-            >
-              {fftPath.map((ranking) => (
-                <option key={ranking} value={ranking}>
-                  {ranking}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm">
-            <span className="text-slate-300">Cotisation par joueur</span>
-            <Field
-              min={0}
-              max={50000}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  duesAmount: Math.max(0, Number(event.target.value) || 0)
-                }))
-              }
-              type="number"
-              value={form.duesAmount}
-            />
-          </label>
-          {!canCreateClub ? (
-            <p className="rounded-md border border-amber-300/30 bg-amber-300/10 p-3 text-sm text-amber-100">
-              Budget insuffisant pour fonder un club.
-            </p>
-          ) : null}
-          <Button disabled={busy === "create" || Boolean(data.pendingRequest) || !canCreateClub}>
-            Créer le club · {clubCreationCost.toLocaleString("fr-FR")} €
-          </Button>
-        </form>
+          <form className="panel grid gap-4 p-5" onSubmit={createClub}>
+            <div>
+              <h2 className="text-xl font-black">Créer un club</h2>
+              <p className="mt-1 text-sm text-slate-300">
+                Coût : {clubCreationCost.toLocaleString("fr-FR")} € · Budget :{" "}
+                {player.budget.toLocaleString("fr-FR")} €
+              </p>
+            </div>
+            <label className="grid gap-1 text-sm">
+              <span className="text-slate-300">Nom du club</span>
+              <Field
+                maxLength={32}
+                minLength={3}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, name: event.target.value }))
+                }
+                placeholder="Ex : Central Horizon"
+                required
+                value={form.name}
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-slate-300">Sigle</span>
+              <Field
+                maxLength={5}
+                minLength={2}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, tag: event.target.value }))
+                }
+                placeholder="CHT"
+                required
+                value={form.tag}
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-slate-300">Description</span>
+              <Field
+                maxLength={280}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, description: event.target.value }))
+                }
+                placeholder="Objectif, niveau recherché, ambiance..."
+                value={form.description}
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-slate-300">Classement minimum pour rejoindre</span>
+              <select
+                className="rounded-md border border-white/10 bg-slate-950 px-3 py-2"
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, minimumRanking: event.target.value }))
+                }
+                value={form.minimumRanking}
+              >
+                {fftPath.map((ranking) => (
+                  <option key={ranking} value={ranking}>
+                    {ranking}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-slate-300">Cotisation par joueur</span>
+              <Field
+                min={0}
+                max={50000}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    duesAmount: Math.max(0, Number(event.target.value) || 0)
+                  }))
+                }
+                type="number"
+                value={form.duesAmount}
+              />
+            </label>
+            {!canCreateClub ? (
+              <p className="rounded-md border border-amber-300/30 bg-amber-300/10 p-3 text-sm text-amber-100">
+                Budget insuffisant pour fonder un club.
+              </p>
+            ) : null}
+            <Button disabled={busy === "create" || Boolean(data.pendingRequest) || !canCreateClub}>
+              Créer le club · {clubCreationCost.toLocaleString("fr-FR")} €
+            </Button>
+          </form>
         ) : null}
 
         {clubDiscoveryTab === "join" ? (
-        <article className="panel p-5">
-          <h2 className="text-xl font-black">Clubs disponibles</h2>
-          <div className="mt-4 grid gap-3">
-            {clubs.length ? (
-              clubs.map((club) => {
-                const rankingAllowed = fftIndex(player.fftRanking) >= fftIndex(club.minimumRanking);
-                const disabled =
-                  club.openSlots <= 0 ||
-                  club.myRequestStatus === "PENDING" ||
-                  Boolean(data.pendingRequest) ||
-                  !rankingAllowed ||
-                  busy === `join-${club.id}`;
-                return (
-                  <div
-                    key={club.id}
-                    className="rounded-md border border-white/10 bg-white/[0.04] p-4"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-lg font-black">
-                          [{club.tag}] {club.name}
-                        </h3>
-                        <p className="mt-1 text-sm text-slate-300">
-                          Président : {club.president.name} · {club.memberCount}/{club.maxSlots}{" "}
-                          membres
-                        </p>
-                        <p className="mt-1 text-sm text-emerald-200">
-                          Niveau compétitif : {club.competitiveLevel}
-                        </p>
-                        <p className="mt-1 text-sm text-cyan-100">
-                          Classement requis : {club.minimumRanking} minimum
-                        </p>
-                        <p className="mt-1 text-sm text-slate-300">
-                          Cotisation : {clubDuesAmount(club).toLocaleString("fr-FR")} €
-                        </p>
-                        {club.description ? (
-                          <p className="mt-2 text-sm text-slate-400">{club.description}</p>
-                        ) : null}
+          <article className="panel p-5">
+            <h2 className="text-xl font-black">Clubs disponibles</h2>
+            <div className="mt-4 grid gap-3">
+              {clubs.length ? (
+                clubs.map((club) => {
+                  const rankingAllowed =
+                    fftIndex(player.fftRanking) >= fftIndex(club.minimumRanking);
+                  const disabled =
+                    club.openSlots <= 0 ||
+                    club.myRequestStatus === "PENDING" ||
+                    Boolean(data.pendingRequest) ||
+                    !rankingAllowed ||
+                    busy === `join-${club.id}`;
+                  return (
+                    <div
+                      key={club.id}
+                      className="rounded-md border border-white/10 bg-white/[0.04] p-4"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-black">
+                            [{club.tag}] {club.name}
+                          </h3>
+                          <p className="mt-1 text-sm text-slate-300">
+                            Président : {club.president.name} · {club.memberCount}/{club.maxSlots}{" "}
+                            membres
+                          </p>
+                          <p className="mt-1 text-sm text-emerald-200">
+                            Niveau compétitif : {club.competitiveLevel}
+                          </p>
+                          <p className="mt-1 text-sm text-cyan-100">
+                            Classement requis : {club.minimumRanking} minimum
+                          </p>
+                          <p className="mt-1 text-sm text-slate-300">
+                            Cotisation : {clubDuesAmount(club).toLocaleString("fr-FR")} €
+                          </p>
+                          {club.description ? (
+                            <p className="mt-2 text-sm text-slate-400">{club.description}</p>
+                          ) : null}
+                        </div>
+                        <Button disabled={disabled} onClick={() => void joinClub(club.id)}>
+                          {club.openSlots <= 0
+                            ? "Complet"
+                            : club.myRequestStatus === "PENDING"
+                              ? "Demande envoyée"
+                              : !rankingAllowed
+                                ? `Requis ${club.minimumRanking}`
+                                : "Demander à rejoindre"}
+                        </Button>
                       </div>
-                      <Button disabled={disabled} onClick={() => void joinClub(club.id)}>
-                        {club.openSlots <= 0
-                          ? "Complet"
-                          : club.myRequestStatus === "PENDING"
-                            ? "Demande envoyée"
-                            : !rankingAllowed
-                              ? `Requis ${club.minimumRanking}`
-                              : "Demander à rejoindre"}
-                      </Button>
                     </div>
-                  </div>
-                );
-              })
-            ) : (
-              <p className="text-sm text-slate-300">
-                Aucun club créé pour le moment. Vous pouvez fonder le premier.
-              </p>
-            )}
-          </div>
-        </article>
+                  );
+                })
+              ) : (
+                <p className="text-sm text-slate-300">
+                  Aucun club créé pour le moment. Vous pouvez fonder le premier.
+                </p>
+              )}
+            </div>
+          </article>
         ) : null}
       </section>
     </div>
@@ -6067,8 +6127,8 @@ function MatchStartPage() {
               </p>
               <h2 className="text-2xl font-black">Chercher un joueur réel</h2>
               <p className="mt-2 text-sm text-slate-300">
-                Recherchez un ami par prénom ou nom. Seuls les joueurs dans votre zone de
-                classement peuvent être défiés.
+                Recherchez un ami par prénom ou nom. Seuls les joueurs dans votre zone de classement
+                peuvent être défiés.
               </p>
             </div>
             <form className="mt-4 flex flex-col gap-3 sm:flex-row" onSubmit={searchOpponents}>
@@ -6228,108 +6288,110 @@ function MatchReplayPage() {
       </section>
 
       {replayTab === "live" ? (
-      <section className="grid gap-5 xl:grid-cols-[1fr_340px_1fr]">
-        <SimpleMatchPlayerCard player={a} side="left" active={event.winnerId === a.id} compact />
-        <div className="match-center-panel panel grid content-between gap-4 p-4 text-center">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-              Point {index + 1}/{events.length}
-            </p>
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              <Metric label="Sets" value={`${event.score.sets[0]} - ${event.score.sets[1]}`} />
-              <Metric label="Jeux" value={`${event.score.games[0]} - ${event.score.games[1]}`} />
-              <Metric
-                label="Points"
-                value={`${event.score.points[0]} - ${event.score.points[1]}`}
-              />
+        <section className="grid gap-5 xl:grid-cols-[1fr_340px_1fr]">
+          <SimpleMatchPlayerCard player={a} side="left" active={event.winnerId === a.id} compact />
+          <div className="match-center-panel panel grid content-between gap-4 p-4 text-center">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                Point {index + 1}/{events.length}
+              </p>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <Metric label="Sets" value={`${event.score.sets[0]} - ${event.score.sets[1]}`} />
+                <Metric label="Jeux" value={`${event.score.games[0]} - ${event.score.games[1]}`} />
+                <Metric
+                  label="Points"
+                  value={`${event.score.points[0]} - ${event.score.points[1]}`}
+                />
+              </div>
+            </div>
+            <div className="rounded-md border border-cyan-300/20 bg-cyan-300/10 p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">
+                Statistique du point
+              </p>
+              <div className="mt-3 flex flex-col items-center gap-2">
+                <StatIcon statKey={statKey} size="lg" />
+                <h2 className="text-3xl font-black">{statLabel}</h2>
+              </div>
+              <p className="mt-3 text-sm text-slate-300">{pointComment}</p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-300">Point remporté par</p>
+              <div className="mt-2 rounded-md bg-emerald-300 px-4 py-3 text-xl font-black text-slate-950">
+                {pointWinner.firstName} {pointWinner.lastName}
+              </div>
             </div>
           </div>
-          <div className="rounded-md border border-cyan-300/20 bg-cyan-300/10 p-4">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">
-              Statistique du point
-            </p>
-            <div className="mt-3 flex flex-col items-center gap-2">
-              <StatIcon statKey={statKey} size="lg" />
-              <h2 className="text-3xl font-black">{statLabel}</h2>
-            </div>
-            <p className="mt-3 text-sm text-slate-300">{pointComment}</p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-300">Point remporté par</p>
-            <div className="mt-2 rounded-md bg-emerald-300 px-4 py-3 text-xl font-black text-slate-950">
-              {pointWinner.firstName} {pointWinner.lastName}
-            </div>
-          </div>
-        </div>
-        <SimpleMatchPlayerCard player={b} side="right" active={event.winnerId === b.id} compact />
-      </section>
+          <SimpleMatchPlayerCard player={b} side="right" active={event.winnerId === b.id} compact />
+        </section>
       ) : null}
 
       {replayTab === "calc" ? (
-      <section className="panel p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm text-emerald-300">Calcul du point</p>
-            <h2 className="text-xl font-black">Duel statistique en miroir</h2>
-          </div>
-          <span className="rounded-md bg-white/10 px-3 py-1 text-sm text-slate-300">
-            Énergie incluse dans le total
-          </span>
-        </div>
-        <div className="mt-4 grid gap-4 md:grid-cols-[1fr_120px_1fr]">
-          <PointValueCard
-            player={a}
-            raw={rawValues[0]}
-            bonus={energyBonus[0]}
-            total={statValues[0]}
-            won={event.winnerId === a.id}
-          />
-          <div className="grid place-items-center rounded-md border border-white/10 bg-white/[0.04] text-center">
+        <section className="panel p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">VS</div>
-              <div className="mx-auto mt-2 w-fit">
-                <StatIcon statKey={statKey} />
-              </div>
-              <div className="mt-2 text-2xl font-black">{statLabel}</div>
+              <p className="text-sm text-emerald-300">Calcul du point</p>
+              <h2 className="text-xl font-black">Duel statistique en miroir</h2>
             </div>
+            <span className="rounded-md bg-white/10 px-3 py-1 text-sm text-slate-300">
+              Énergie incluse dans le total
+            </span>
           </div>
-          <PointValueCard
-            player={b}
-            raw={rawValues[1]}
-            bonus={energyBonus[1]}
-            total={statValues[1]}
-            won={event.winnerId === b.id}
-          />
-        </div>
-      </section>
+          <div className="mt-4 grid gap-4 md:grid-cols-[1fr_120px_1fr]">
+            <PointValueCard
+              player={a}
+              raw={rawValues[0]}
+              bonus={energyBonus[0]}
+              total={statValues[0]}
+              won={event.winnerId === a.id}
+            />
+            <div className="grid place-items-center rounded-md border border-white/10 bg-white/[0.04] text-center">
+              <div>
+                <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                  VS
+                </div>
+                <div className="mx-auto mt-2 w-fit">
+                  <StatIcon statKey={statKey} />
+                </div>
+                <div className="mt-2 text-2xl font-black">{statLabel}</div>
+              </div>
+            </div>
+            <PointValueCard
+              player={b}
+              raw={rawValues[1]}
+              bonus={energyBonus[1]}
+              total={statValues[1]}
+              won={event.winnerId === b.id}
+            />
+          </div>
+        </section>
       ) : null}
 
       {replayTab === "feed" ? (
-      <section className="panel p-5">
-        <h2 className="font-black">Fil des points</h2>
-        <div className="mt-4 grid max-h-[360px] gap-2 overflow-auto">
-          {events
-            .slice(Math.max(0, index - 12), index + 1)
-            .reverse()
-            .map((item) => {
-              const winner = item.winnerId === a.id ? a : b;
-              return (
-                <div
-                  key={item.index}
-                  className={`grid gap-2 rounded-md border p-3 text-sm md:grid-cols-[90px_150px_1fr] ${item.index === event.index ? "border-cyan-300 bg-cyan-300/10" : "border-white/10 bg-white/[0.04]"}`}
-                >
-                  <strong>Point {item.index + 1}</strong>
-                  <span className="text-emerald-300">
-                    {winner.firstName} {winner.lastName}
-                  </span>
-                  <span className="text-slate-300">
-                    {pointStatLabel(item)} · {cleanPointComment(item, a, b)}
-                  </span>
-                </div>
-              );
-            })}
-        </div>
-      </section>
+        <section className="panel p-5">
+          <h2 className="font-black">Fil des points</h2>
+          <div className="mt-4 grid max-h-[360px] gap-2 overflow-auto">
+            {events
+              .slice(Math.max(0, index - 12), index + 1)
+              .reverse()
+              .map((item) => {
+                const winner = item.winnerId === a.id ? a : b;
+                return (
+                  <div
+                    key={item.index}
+                    className={`grid gap-2 rounded-md border p-3 text-sm md:grid-cols-[90px_150px_1fr] ${item.index === event.index ? "border-cyan-300 bg-cyan-300/10" : "border-white/10 bg-white/[0.04]"}`}
+                  >
+                    <strong>Point {item.index + 1}</strong>
+                    <span className="text-emerald-300">
+                      {winner.firstName} {winner.lastName}
+                    </span>
+                    <span className="text-slate-300">
+                      {pointStatLabel(item)} · {cleanPointComment(item, a, b)}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
+        </section>
       ) : null}
       {finalReached && !resultDismissed ? (
         <MatchResultModal
@@ -6453,8 +6515,7 @@ function SimpleMatchPlayerCard({
             {player.firstName} {player.lastName}
           </h2>
           <p className="text-sm text-slate-300">
-            {nationalityLabel(player.nationality)} · {player.fftRanking} · Niveau{" "}
-            {player.overall}
+            {nationalityLabel(player.nationality)} · {player.fftRanking} · Niveau {player.overall}
           </p>
         </div>
       </div>
@@ -6651,11 +6712,7 @@ function MatchesPage() {
       <h1 className="mt-1 text-2xl font-black">Historique</h1>
       <div className="mt-4 grid gap-3">
         {matches.map((match) => (
-          <Link
-            key={match.id}
-            to={`/match/${match.id}`}
-            className="match-history-card"
-          >
+          <Link key={match.id} to={`/match/${match.id}`} className="match-history-card">
             <div className="flex min-w-0 items-center gap-3">
               <ProfilePicture avatar={match.playerA.avatar} size="sm" />
               <div className="min-w-0">
@@ -6826,8 +6883,8 @@ function CommunityPage() {
               Le club-house des joueurs.
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-200">
-              Rejoignez le Discord communautaire pour discuter, retrouver les mises à jour,
-              signaler un bug, proposer une idée et suivre l'évolution de MYPRO - TENNIS.
+              Rejoignez le Discord communautaire pour discuter, retrouver les mises à jour, signaler
+              un bug, proposer une idée et suivre l'évolution de MYPRO - TENNIS.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               {discordInviteUrl ? (
@@ -6867,9 +6924,7 @@ function CommunityPage() {
           <button
             className={communityTab === value ? "is-active" : ""}
             key={value}
-            onClick={() =>
-              setCommunityTab(value as "discord" | "onboarding" | "structure")
-            }
+            onClick={() => setCommunityTab(value as "discord" | "onboarding" | "structure")}
             type="button"
           >
             <span>{label}</span>
@@ -6911,7 +6966,10 @@ function CommunityPage() {
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-4">
             {newcomerSteps.map(({ title, body, icon: Icon }, index) => (
-              <article className="rounded-md border border-white/10 bg-white/[0.04] p-4" key={title}>
+              <article
+                className="rounded-md border border-white/10 bg-white/[0.04] p-4"
+                key={title}
+              >
                 <div className="flex items-center gap-3">
                   <span className="grid h-10 w-10 place-items-center rounded-md bg-emerald-300 text-slate-950">
                     <Icon size={19} />
@@ -6977,9 +7035,7 @@ function SettingsPage() {
   return (
     <section className="grid gap-4">
       <div className="game-hub panel p-5">
-        <p className="text-sm font-bold uppercase tracking-[0.22em] text-emerald-300">
-          Réglages
-        </p>
+        <p className="text-sm font-bold uppercase tracking-[0.22em] text-emerald-300">Réglages</p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-black">Compte et session</h1>
@@ -7085,7 +7141,9 @@ function useFitMobileModals() {
     const fit = () => {
       frame = 0;
       const compactViewport = window.matchMedia("(max-width: 900px), (max-height: 560px)").matches;
-      const panels = document.querySelectorAll<HTMLElement>(".game-modal-panel, .header-menu-panel");
+      const panels = document.querySelectorAll<HTMLElement>(
+        ".game-modal-panel, .header-menu-panel"
+      );
       const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
       const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
       panels.forEach((panel) => {
@@ -7102,7 +7160,10 @@ function useFitMobileModals() {
           maxWidth / Math.max(rect.width, 1),
           maxHeight / Math.max(rect.height, 1)
         );
-        panel.style.setProperty("--modal-fit-scale", String(Math.max(0.35, Math.floor(scale * 100) / 100)));
+        panel.style.setProperty(
+          "--modal-fit-scale",
+          String(Math.max(0.35, Math.floor(scale * 100) / 100))
+        );
       });
     };
 
@@ -7154,128 +7215,128 @@ export function App() {
       <OrientationGuard />
       <Shell>
         <Routes>
-        <Route path="/" element={<HomeRoute />} />
-        <Route path="/login" element={<AuthPage mode="login" />} />
-        <Route path="/signup" element={<AuthPage mode="signup" />} />
-        <Route path="/oauth/google" element={<GoogleOAuthCallback />} />
-        <Route
-          path="/create-player"
-          element={
-            <NeedAuth>
-              <CreatePlayer />
-            </NeedAuth>
-          }
-        />
-        <Route
-          path="/dashboard"
-          element={
-            <NeedAuth>
-              <NeedPlayer>
-                <Dashboard />
-              </NeedPlayer>
-            </NeedAuth>
-          }
-        />
-        <Route
-          path="/player"
-          element={
-            <NeedAuth>
-              <NeedPlayer>
-                <PlayerPage />
-              </NeedPlayer>
-            </NeedAuth>
-          }
-        />
-        <Route
-          path="/collection"
-          element={
-            <NeedAuth>
-              <NeedPlayer>
-                <CollectionPage />
-              </NeedPlayer>
-            </NeedAuth>
-          }
-        />
-        <Route
-          path="/club"
-          element={
-            <NeedAuth>
-              <NeedPlayer>
-                <ClubPage />
-              </NeedPlayer>
-            </NeedAuth>
-          }
-        />
-        <Route
-          path="/season"
-          element={
-            <NeedAuth>
-              <NeedPlayer>
-                <SeasonPage />
-              </NeedPlayer>
-            </NeedAuth>
-          }
-        />
-        <Route
-          path="/tournaments"
-          element={
-            <NeedAuth>
-              <NeedPlayer>
-                <SeasonPage />
-              </NeedPlayer>
-            </NeedAuth>
-          }
-        />
-        <Route
-          path="/duel"
-          element={
-            <NeedAuth>
-              <NeedPlayer>
-                <MatchStartPage />
-              </NeedPlayer>
-            </NeedAuth>
-          }
-        />
-        <Route path="/match" element={<Navigate to="/duel" replace />} />
-        <Route
-          path="/match/:id"
-          element={
-            <NeedAuth>
-              <NeedPlayer>
-                <MatchReplayPage />
-              </NeedPlayer>
-            </NeedAuth>
-          }
-        />
-        <Route
-          path="/matches"
-          element={
-            <NeedAuth>
-              <NeedPlayer>
-                <MatchesPage />
-              </NeedPlayer>
-            </NeedAuth>
-          }
-        />
-        <Route path="/rankings" element={<RankingsPage />} />
-        <Route
-          path="/online"
-          element={
-            <NeedAuth>
-              <OnlinePage />
-            </NeedAuth>
-          }
-        />
-        <Route path="/community" element={<CommunityPage />} />
-        <Route path="/profile/:id" element={<ProfilePage />} />
-        <Route
-          path="/settings"
-          element={
-            <NeedAuth>
-              <SettingsPage />
-            </NeedAuth>
-          }
-        />
+          <Route path="/" element={<HomeRoute />} />
+          <Route path="/login" element={<AuthPage mode="login" />} />
+          <Route path="/signup" element={<AuthPage mode="signup" />} />
+          <Route path="/oauth/google" element={<GoogleOAuthCallback />} />
+          <Route
+            path="/create-player"
+            element={
+              <NeedAuth>
+                <CreatePlayer />
+              </NeedAuth>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <NeedAuth>
+                <NeedPlayer>
+                  <Dashboard />
+                </NeedPlayer>
+              </NeedAuth>
+            }
+          />
+          <Route
+            path="/player"
+            element={
+              <NeedAuth>
+                <NeedPlayer>
+                  <PlayerPage />
+                </NeedPlayer>
+              </NeedAuth>
+            }
+          />
+          <Route
+            path="/collection"
+            element={
+              <NeedAuth>
+                <NeedPlayer>
+                  <CollectionPage />
+                </NeedPlayer>
+              </NeedAuth>
+            }
+          />
+          <Route
+            path="/club"
+            element={
+              <NeedAuth>
+                <NeedPlayer>
+                  <ClubPage />
+                </NeedPlayer>
+              </NeedAuth>
+            }
+          />
+          <Route
+            path="/season"
+            element={
+              <NeedAuth>
+                <NeedPlayer>
+                  <SeasonPage />
+                </NeedPlayer>
+              </NeedAuth>
+            }
+          />
+          <Route
+            path="/tournaments"
+            element={
+              <NeedAuth>
+                <NeedPlayer>
+                  <SeasonPage />
+                </NeedPlayer>
+              </NeedAuth>
+            }
+          />
+          <Route
+            path="/duel"
+            element={
+              <NeedAuth>
+                <NeedPlayer>
+                  <MatchStartPage />
+                </NeedPlayer>
+              </NeedAuth>
+            }
+          />
+          <Route path="/match" element={<Navigate to="/duel" replace />} />
+          <Route
+            path="/match/:id"
+            element={
+              <NeedAuth>
+                <NeedPlayer>
+                  <MatchReplayPage />
+                </NeedPlayer>
+              </NeedAuth>
+            }
+          />
+          <Route
+            path="/matches"
+            element={
+              <NeedAuth>
+                <NeedPlayer>
+                  <MatchesPage />
+                </NeedPlayer>
+              </NeedAuth>
+            }
+          />
+          <Route path="/rankings" element={<RankingsPage />} />
+          <Route
+            path="/online"
+            element={
+              <NeedAuth>
+                <OnlinePage />
+              </NeedAuth>
+            }
+          />
+          <Route path="/community" element={<CommunityPage />} />
+          <Route path="/profile/:id" element={<ProfilePage />} />
+          <Route
+            path="/settings"
+            element={
+              <NeedAuth>
+                <SettingsPage />
+              </NeedAuth>
+            }
+          />
         </Routes>
       </Shell>
     </>

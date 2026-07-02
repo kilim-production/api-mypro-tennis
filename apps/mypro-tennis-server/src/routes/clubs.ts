@@ -1,15 +1,25 @@
 ﻿import { Router, type Request, type Response } from "express";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@mypro/database";
+import { calculateOverall } from "@mypro/core";
 import {
   clubCreateSchema,
   clubJoinRequestSchema,
   clubLeaveSchema,
   clubUpdateSchema
 } from "@mypro/shared";
-import { fftRankIndex } from "@mypro/sports-tennis";
+import {
+  createStatsForArchetype,
+  fftRankingPath,
+  fftRankIndex,
+  type FftRanking,
+  type TennisStats
+} from "@mypro/sports-tennis";
 import { requireAuth } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
+import { encodeJson } from "../services/json";
+import { createServerMatch } from "../services/matches";
+import { teamChampionshipCashPrize } from "../services/teamChampionshipPrizes";
 
 export const clubsRouter = Router();
 const clubCreationCost = 5000;
@@ -28,7 +38,12 @@ const careCenterLevels = [
   { level: 2, name: "Cabinet de kinésithérapie", cost: 25_000, recoveryReductionPercent: 6 },
   { level: 3, name: "Pôle récupération sportive", cost: 90_000, recoveryReductionPercent: 9 },
   { level: 4, name: "Centre médico-performance", cost: 300_000, recoveryReductionPercent: 12 },
-  { level: 5, name: "Institut santé haute performance", cost: 1_000_000, recoveryReductionPercent: 15 }
+  {
+    level: 5,
+    name: "Institut santé haute performance",
+    cost: 1_000_000,
+    recoveryReductionPercent: 15
+  }
 ] as const;
 const trainingCenterLevels = [
   { level: 0, name: "Aucun centre d'entraînement", cost: 0, rareChestBonusPercent: 0 },
@@ -84,21 +99,16 @@ function playerSummary(player: ClubWithDetails["memberships"][number]["player"])
 }
 
 function clubComplexLevel(level: number) {
-  return (
-    clubComplexLevels.find((definition) => definition.level === level) ?? clubComplexLevels[0]
-  );
+  return clubComplexLevels.find((definition) => definition.level === level) ?? clubComplexLevels[0];
 }
 
 function careCenterLevel(level: number) {
-  return (
-    careCenterLevels.find((definition) => definition.level === level) ?? careCenterLevels[0]
-  );
+  return careCenterLevels.find((definition) => definition.level === level) ?? careCenterLevels[0];
 }
 
 function trainingCenterLevel(level: number) {
   return (
-    trainingCenterLevels.find((definition) => definition.level === level) ??
-    trainingCenterLevels[0]
+    trainingCenterLevels.find((definition) => definition.level === level) ?? trainingCenterLevels[0]
   );
 }
 
@@ -288,6 +298,7 @@ function relegatedDivision(division: string) {
 
 type TeamMeetingDetails = {
   singles?: Array<{
+    replayMatchId?: string;
     homeSets?: number;
     awaySets?: number;
     homeGames?: number;
@@ -376,6 +387,7 @@ function roundRobin(entryIds: string[]) {
 }
 
 type TeamSinglePlayer = {
+  playerId?: string;
   name: string;
   fftRanking: string;
   winPct: number;
@@ -383,48 +395,111 @@ type TeamSinglePlayer = {
   isEligible?: boolean;
 };
 
-function simulateSingleScore(winner: "home" | "away", seed: string) {
-  const loserSets = seededRange(`${seed}-sets`, 0, 3) === 0 ? 1 : 0;
-  const totalSets = 2 + loserSets;
-  let homeSets = 0;
-  let awaySets = 0;
-  let homeGames = 0;
-  let awayGames = 0;
-  const setScores: string[] = [];
-  for (let setIndex = 0; setIndex < totalSets; setIndex += 1) {
-    const winnerTakesSet =
-      loserSets === 0 || setIndex !== seededRange(`${seed}-lost-set`, 0, totalSets - 1);
-    const setWinner = winnerTakesSet ? winner : winner === "home" ? "away" : "home";
-    const loserGamesRoll = seededRange(`${seed}-games-${setIndex}`, 0, 5);
-    const winnerGames = loserGamesRoll === 5 ? 7 : 6;
-    const loserGames = loserGamesRoll === 5 ? 5 : loserGamesRoll;
-    const homeSetGames = setWinner === "home" ? winnerGames : loserGames;
-    const awaySetGames = setWinner === "away" ? winnerGames : loserGames;
-    homeGames += homeSetGames;
-    awayGames += awaySetGames;
-    if (setWinner === "home") homeSets += 1;
-    else awaySets += 1;
-    setScores.push(`${homeSetGames}-${awaySetGames}`);
-  }
-  return {
-    homeSets,
-    awaySets,
-    homeGames,
-    awayGames,
-    scoreText: setScores.join(" ")
-  };
-}
-
 function aiLineup(entry: { name: string; strength: number }, seed: string) {
   return Array.from({ length: teamSize }, (_, index) => ({
     name: `${entry.name} ${index + 1}`,
-    fftRanking: "IA",
+    fftRanking: rankingForTeamStrength(entry.strength + (teamSize - index - 3) * 2),
     winPct: 0,
     strength: Math.max(
       1,
       entry.strength + (teamSize - index - 3) * 2 + seededRange(`${seed}-${index}`, -2, 2)
     )
   }));
+}
+
+const clubAiFirstNames = [
+  "Alex",
+  "Noa",
+  "Milan",
+  "Lina",
+  "Hugo",
+  "Iris",
+  "Eden",
+  "Nora",
+  "Leo",
+  "Malo"
+];
+const clubAiLastNames = [
+  "Morel",
+  "Roux",
+  "Vidal",
+  "Garnier",
+  "Mercier",
+  "Brun",
+  "Robin",
+  "Aubert",
+  "Faure",
+  "Blanc"
+];
+
+function rankingForTeamStrength(strength: number): FftRanking {
+  const index = Math.max(
+    0,
+    Math.min(
+      fftRankingPath.length - 1,
+      Math.round(((Math.max(18, Math.min(86, strength)) - 18) / 68) * (fftRankingPath.length - 1))
+    )
+  );
+  return fftRankingPath[index] ?? "NC";
+}
+
+function tunedStatsForTeamStrength(strength: number, seed: string): TennisStats {
+  const archetypes = [
+    "Gros service",
+    "Relanceur",
+    "Frappeur de fond",
+    "Athlète endurant",
+    "Joueur complet"
+  ];
+  const archetype = archetypes[Math.abs(seededHash(seed)) % archetypes.length] ?? "Joueur complet";
+  const base = createStatsForArchetype(archetype);
+  const diff = strength - calculateOverall(base);
+  return Object.fromEntries(
+    Object.entries(base).map(([key, value]) => [
+      key,
+      Math.max(0, Math.min(94, Math.round(value + diff)))
+    ])
+  ) as TennisStats;
+}
+
+async function getOrCreateTeamAiPlayer(input: { seed: string; strength: number; ranking: string }) {
+  const hash = Math.abs(seededHash(input.seed));
+  const firstName = clubAiFirstNames[hash % clubAiFirstNames.length] ?? "Alex";
+  const lastName = clubAiLastNames[Math.floor(hash / 7) % clubAiLastNames.length] ?? "Morel";
+  const overall = Math.max(1, Math.min(94, Math.round(input.strength)));
+  const fftRanking = input.ranking as FftRanking;
+  const existing = await prisma.player.findFirst({
+    where: { isAi: true, firstName, lastName, fftRanking, overall }
+  });
+  if (existing) return existing;
+  const stats = tunedStatsForTeamStrength(overall, input.seed);
+  const initials = `${firstName[0] ?? "A"}${lastName[0] ?? "M"}`.toUpperCase();
+  return prisma.player.create({
+    data: {
+      firstName,
+      lastName,
+      nationality: "FR",
+      gender: "Homme",
+      dominantHand: hash % 3 === 0 ? "Gaucher" : "Droitier",
+      backhand: hash % 2 === 0 ? "Deux mains" : "Une main",
+      archetype: "Joueur complet",
+      avatar: encodeJson({
+        type: "picture-v1",
+        initials,
+        picture: { kind: "preset", id: `pp-${String((hash % 10) + 1).padStart(2, "0")}` }
+      }),
+      isAi: true,
+      stats: encodeJson(stats),
+      overall,
+      fftRanking,
+      worldRank: 900 + (hash % 90),
+      energy: 82,
+      morale: 70,
+      fatigue: 12,
+      health: 95,
+      recentForm: 55
+    }
+  });
 }
 
 async function entryLineup(entry: {
@@ -453,12 +528,13 @@ async function entryLineup(entry: {
       paidPlayerIds.has(membership.playerId)
     );
   }
-  const starters = orderPlayersForSingles(
+  const starters: TeamSinglePlayer[] = orderPlayersForSingles(
     eligibleMemberships.map((membership) => membership.player),
     `${entry.id}-${entry.championshipId}`
   )
     .slice(0, teamSize)
     .map((player) => ({
+      playerId: player.id,
       name: `${player.firstName} ${player.lastName}`,
       fftRanking: player.fftRanking,
       winPct: winPercentage(player),
@@ -477,9 +553,50 @@ async function entryLineup(entry: {
   return starters;
 }
 
-function simulateTeamMeeting(
-  home: { id: string; strength: number },
-  away: { id: string; strength: number },
+function scoreTotals(scoreText: string) {
+  return scoreText.split(/\s+/).reduce(
+    (totals, setScore) => {
+      const [homeRaw = 0, awayRaw = 0] = setScore
+        .split("-")
+        .map((value) => Number.parseInt(value, 10));
+      const homeGames = Number.isFinite(homeRaw) ? homeRaw : 0;
+      const awayGames = Number.isFinite(awayRaw) ? awayRaw : 0;
+      totals.homeGames += homeGames;
+      totals.awayGames += awayGames;
+      if (homeGames > awayGames) totals.homeSets += 1;
+      if (awayGames > homeGames) totals.awaySets += 1;
+      return totals;
+    },
+    { homeSets: 0, awaySets: 0, homeGames: 0, awayGames: 0 }
+  );
+}
+
+async function resolveTeamSinglePlayer(
+  entry: { id: string; name: string; strength: number },
+  player: TeamSinglePlayer,
+  seed: string
+) {
+  if (player.playerId) return { ...player, playerId: player.playerId };
+  const aiPlayer = await getOrCreateTeamAiPlayer({
+    seed,
+    strength: player.strength || entry.strength,
+    ranking:
+      player.fftRanking === "IA" || player.fftRanking === "Cotisation"
+        ? rankingForTeamStrength(player.strength || entry.strength)
+        : player.fftRanking
+  });
+  return {
+    ...player,
+    playerId: aiPlayer.id,
+    name: `${aiPlayer.firstName} ${aiPlayer.lastName}`,
+    fftRanking: aiPlayer.fftRanking,
+    strength: aiPlayer.overall
+  };
+}
+
+async function simulateTeamMeeting(
+  home: { id: string; name: string; strength: number },
+  away: { id: string; name: string; strength: number },
   seed: string,
   homeLineup: TeamSinglePlayer[],
   awayLineup: TeamSinglePlayer[]
@@ -489,31 +606,53 @@ function simulateTeamMeeting(
   let awaySets = 0;
   let homeGames = 0;
   let awayGames = 0;
-  const singles = Array.from({ length: teamSize }, (_, index) => {
+  const singles = [];
+  for (let index = 0; index < teamSize; index += 1) {
     const homePlayer =
       homeLineup[index] ?? aiLineup({ name: "Domicile", strength: home.strength }, seed)[index]!;
     const awayPlayer =
       awayLineup[index] ?? aiLineup({ name: "Extérieur", strength: away.strength }, seed)[index]!;
-    const homeValue = homePlayer.strength + seededRange(`${seed}-h-${index}`, -9, 9);
-    const awayValue = awayPlayer.strength + seededRange(`${seed}-a-${index}`, -9, 9);
-    const winner = homeValue >= awayValue ? "home" : "away";
-    const score = simulateSingleScore(winner, `${seed}-single-${index}`);
+    const resolvedHome = await resolveTeamSinglePlayer(
+      home,
+      homePlayer,
+      `${seed}-home-${index}-${home.id}`
+    );
+    const resolvedAway = await resolveTeamSinglePlayer(
+      away,
+      awayPlayer,
+      `${seed}-away-${index}-${away.id}`
+    );
+    const match = await createServerMatch({
+      playerAId: resolvedHome.playerId,
+      playerBId: resolvedAway.playerId,
+      surface: "Dur",
+      tactic: "Équilibré",
+      risk: "Normale",
+      format: "Deux sets gagnants",
+      type: "Championnat par équipe officiel amateur",
+      seed: `${seed}-team-single-${index}`,
+      awardChests: false
+    });
+    const winner = match.winnerId === resolvedHome.playerId ? "home" : "away";
+    const score = scoreTotals(match.scoreText);
     if (winner === "home") homeWins += 1;
     homeSets += score.homeSets;
     awaySets += score.awaySets;
     homeGames += score.homeGames;
     awayGames += score.awayGames;
-    return {
+    singles.push({
       label: `Simple ${index + 1}`,
       court: index + 1,
-      homePlayer,
-      awayPlayer,
-      homeValue,
-      awayValue,
+      homePlayer: resolvedHome,
+      awayPlayer: resolvedAway,
+      homeValue: resolvedHome.strength,
+      awayValue: resolvedAway.strength,
+      replayMatchId: match.id,
+      scoreText: match.scoreText,
       ...score,
       winner
-    };
-  });
+    });
+  }
   return {
     scoreHome: homeWins,
     scoreAway: teamSize - homeWins,
@@ -555,10 +694,8 @@ async function recalculateTeamChampionshipTable(championshipId: string) {
     const details = decodeMeetingDetails(meeting.details);
     const homeScore = meeting.scoreHome ?? 0;
     const awayScore = meeting.scoreAway ?? 0;
-    const setsHome =
-      details.singles?.reduce((sum, single) => sum + (single.homeSets ?? 0), 0) ?? 0;
-    const setsAway =
-      details.singles?.reduce((sum, single) => sum + (single.awaySets ?? 0), 0) ?? 0;
+    const setsHome = details.singles?.reduce((sum, single) => sum + (single.homeSets ?? 0), 0) ?? 0;
+    const setsAway = details.singles?.reduce((sum, single) => sum + (single.awaySets ?? 0), 0) ?? 0;
     const gamesHome =
       details.singles?.reduce((sum, single) => sum + (single.homeGames ?? 0), 0) ?? 0;
     const gamesAway =
@@ -590,6 +727,42 @@ async function recalculateTeamChampionshipTable(championshipId: string) {
       prisma.teamChampionshipEntry.update({ where: { id }, data })
     )
   );
+}
+
+async function awardTeamChampionshipCashPrizes(championshipId: string, division: string) {
+  const awardedAt = new Date();
+  const entries = (
+    await prisma.teamChampionshipEntry.findMany({
+      where: { championshipId },
+      include: { team: true }
+    })
+  ).sort((left, right) => teamEntrySort(left, right, championshipId));
+
+  await prisma.$transaction(async (tx) => {
+    for (const [index, entry] of entries.entries()) {
+      const finalPosition = index + 1;
+      const cashPrize = teamChampionshipCashPrize(division, finalPosition);
+      const shouldCreditClub = Boolean(
+        entry.team?.clubId && !entry.cashPrizeAwardedAt && cashPrize > 0
+      );
+
+      await tx.teamChampionshipEntry.update({
+        where: { id: entry.id },
+        data: {
+          finalPosition,
+          cashPrize,
+          cashPrizeAwardedAt: entry.cashPrizeAwardedAt ?? awardedAt
+        }
+      });
+
+      if (shouldCreditClub && entry.team?.clubId) {
+        await tx.club.update({
+          where: { id: entry.team.clubId },
+          data: { budget: { increment: cashPrize } }
+        });
+      }
+    }
+  });
 }
 
 async function createTeamChampionship(teamId: string) {
@@ -669,7 +842,7 @@ async function settleTeamChampionship(championshipId: string) {
     const home = entriesById.get(meeting.homeEntryId);
     const away = entriesById.get(meeting.awayEntryId);
     if (!home || !away) continue;
-    const result = simulateTeamMeeting(
+    const result = await simulateTeamMeeting(
       home,
       away,
       meeting.id,
@@ -732,6 +905,7 @@ async function settleTeamChampionship(championshipId: string) {
       where: { id: championshipId },
       data: { status: "COMPLETED" }
     });
+    await awardTeamChampionshipCashPrizes(championshipId, championship.division);
     if (winner?.teamId) {
       const team = await prisma.clubTeam.findUnique({ where: { id: winner.teamId } });
       const division = team ? promotedDivision(team.division) : null;
@@ -752,6 +926,8 @@ async function settleTeamChampionship(championshipId: string) {
         });
       }
     }
+  } else if (championship.status === "COMPLETED") {
+    await awardTeamChampionshipCashPrizes(championshipId, championship.division);
   } else if (
     championship.status === "SCHEDULED" &&
     championship.startsAt.getTime() <= now.getTime()
@@ -792,8 +968,7 @@ async function clubDuesState(params: {
   const paidPlayerIds = payments.map((payment) => payment.playerId);
   const paidSet = new Set(paidPlayerIds);
   const paymentOpen = params.championship.status !== "COMPLETED";
-  const currentPlayerPaid =
-    params.club.duesAmount === 0 || paidSet.has(params.currentPlayerId);
+  const currentPlayerPaid = params.club.duesAmount === 0 || paidSet.has(params.currentPlayerId);
   return {
     amount: params.club.duesAmount,
     championshipId: params.championship.id,
@@ -803,7 +978,8 @@ async function clubDuesState(params: {
     currentPlayerPaid,
     currentPlayerCanPay: paymentOpen && params.club.duesAmount > 0 && !currentPlayerPaid,
     paidCount: params.club.duesAmount === 0 ? params.club.memberships.length : paidPlayerIds.length,
-    eligibleCount: params.club.duesAmount === 0 ? params.club.memberships.length : paidPlayerIds.length,
+    eligibleCount:
+      params.club.duesAmount === 0 ? params.club.memberships.length : paidPlayerIds.length,
     paidPlayerIds
   };
 }
@@ -926,7 +1102,11 @@ clubsRouter.get("/team-championship", requireAuth, async (request, response) => 
   const standings = championship
     ? [...championship.entries]
         .sort((left, right) => teamEntrySort(left, right, championship.id))
-        .map((entry, index) => ({ ...entry, rank: index + 1 }))
+        .map((entry, index) => ({
+          ...entry,
+          rank: index + 1,
+          projectedCashPrize: teamChampionshipCashPrize(championship.division, index + 1)
+        }))
     : [];
   const nextMeeting =
     championship?.meetings.find((meeting) => meeting.status === "SCHEDULED") ?? null;

@@ -58,12 +58,14 @@ export async function createServerMatch(input: {
   risk: RiskMode;
   format: MatchFormat;
   type: string;
+  seed?: string;
+  awardChests?: boolean;
 }) {
   const [playerA, playerB] = await Promise.all([
     prisma.player.findFirstOrThrow({ where: { id: input.playerAId } }),
     prisma.player.findFirstOrThrow({ where: { id: input.playerBId } })
   ]);
-  const seed = `${input.playerAId}-${input.playerBId}-${Date.now()}-${input.surface}`;
+  const seed = input.seed ?? `${input.playerAId}-${input.playerBId}-${Date.now()}-${input.surface}`;
   const aiEnergyRange: [number, number] = input.type.includes("Championnat individuel")
     ? [1, 7]
     : [0, 10];
@@ -174,8 +176,10 @@ export async function createServerMatch(input: {
         ...(await refreshFft(loser))
       }
     });
-    await awardChestForWin(winner, tx, input.type);
-    await awardChestForWin(loser, tx, `Défaite - ${input.type}`, "Bronze");
+    if (input.awardChests ?? true) {
+      await awardChestForWin(winner, tx, input.type);
+      await awardChestForWin(loser, tx, `Défaite - ${input.type}`, "Bronze");
+    }
     return created;
   });
 

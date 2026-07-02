@@ -94,25 +94,25 @@ model Player {
 }
 
 model Club {
-  id             String            @id @default(cuid())
-  name           String            @unique
-  tag            String            @unique
-  description    String            @default("")
-  minimumRanking String            @default("NC")
-  duesAmount     Int               @default(0)
-  budget         Int               @default(0)
-  complexLevel   Int               @default(1)
-  careCenterLevel Int              @default(0)
-  trainingCenterLevel Int          @default(0)
-  maxSlots       Int               @default(5)
-  presidentId    String
-  president      Player            @relation("ClubPresident", fields: [presidentId], references: [id], onDelete: Restrict)
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  memberships    ClubMembership[]
-  joinRequests   ClubJoinRequest[]
-  team           ClubTeam?
-  duePayments    ClubDuePayment[]
+  id                  String            @id @default(cuid())
+  name                String            @unique
+  tag                 String            @unique
+  description         String            @default("")
+  minimumRanking      String            @default("NC")
+  duesAmount          Int               @default(0)
+  budget              Int               @default(0)
+  complexLevel        Int               @default(1)
+  careCenterLevel     Int               @default(0)
+  trainingCenterLevel Int               @default(0)
+  maxSlots            Int               @default(5)
+  presidentId         String
+  president           Player            @relation("ClubPresident", fields: [presidentId], references: [id], onDelete: Restrict)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  memberships         ClubMembership[]
+  joinRequests        ClubJoinRequest[]
+  team                ClubTeam?
+  duePayments         ClubDuePayment[]
 
   @@index([presidentId])
 }
@@ -158,28 +158,31 @@ model TeamChampionship {
 }
 
 model TeamChampionshipEntry {
-  id             String                    @id @default(cuid())
-  championshipId String
-  championship   TeamChampionship          @relation(fields: [championshipId], references: [id], onDelete: Cascade)
-  teamId         String?
-  team           ClubTeam?                 @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  name           String
-  tag            String
-  isPlayerClub   Boolean                   @default(false)
-  strength       Int                       @default(50)
-  points         Int                       @default(0)
-  played         Int                       @default(0)
-  wins           Int                       @default(0)
-  draws          Int                       @default(0)
-  losses         Int                       @default(0)
-  matchesFor     Int                       @default(0)
-  matchesAgainst Int                       @default(0)
-  setsFor        Int                       @default(0)
-  setsAgainst    Int                       @default(0)
-  gamesFor       Int                       @default(0)
-  gamesAgainst   Int                       @default(0)
-  meetingsHome   TeamChampionshipMeeting[] @relation("TeamMeetingHome")
-  meetingsAway   TeamChampionshipMeeting[] @relation("TeamMeetingAway")
+  id                 String                    @id @default(cuid())
+  championshipId     String
+  championship       TeamChampionship          @relation(fields: [championshipId], references: [id], onDelete: Cascade)
+  teamId             String?
+  team               ClubTeam?                 @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  name               String
+  tag                String
+  isPlayerClub       Boolean                   @default(false)
+  strength           Int                       @default(50)
+  points             Int                       @default(0)
+  played             Int                       @default(0)
+  wins               Int                       @default(0)
+  draws              Int                       @default(0)
+  losses             Int                       @default(0)
+  matchesFor         Int                       @default(0)
+  matchesAgainst     Int                       @default(0)
+  setsFor            Int                       @default(0)
+  setsAgainst        Int                       @default(0)
+  gamesFor           Int                       @default(0)
+  gamesAgainst       Int                       @default(0)
+  finalPosition      Int?
+  cashPrize          Int                       @default(0)
+  cashPrizeAwardedAt DateTime?
+  meetingsHome       TeamChampionshipMeeting[] @relation("TeamMeetingHome")
+  meetingsAway       TeamChampionshipMeeting[] @relation("TeamMeetingAway")
 
   @@index([championshipId])
   @@index([teamId])
