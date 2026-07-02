@@ -9,10 +9,13 @@ import {
   clubUpdateSchema
 } from "@mypro/shared";
 import {
+  baseStats,
   createStatsForArchetype,
   fftRankingPath,
   fftRankIndex,
+  playableStatKeys,
   type FftRanking,
+  type TennisStatKey,
   type TennisStats
 } from "@mypro/sports-tennis";
 import { requireAuth } from "../middleware/auth";
@@ -454,7 +457,12 @@ function rankingForTeamStrength(strength: number): FftRanking {
   return fftRankingPath[index] ?? "NC";
 }
 
-function tunedStatsForTeamStrength(strength: number, seed: string): TennisStats {
+function teamAiStatTargetForRanking(ranking: string) {
+  const index = Math.max(0, fftRankingPath.indexOf(ranking as FftRanking));
+  return Math.max(1, Math.min(58, Math.round(2 + index * 2.25)));
+}
+
+function tunedStatsForTeamRanking(ranking: string, seed: string): TennisStats {
   const archetypes = [
     "Gros service",
     "Relanceur",
@@ -463,27 +471,46 @@ function tunedStatsForTeamStrength(strength: number, seed: string): TennisStats 
     "Joueur complet"
   ];
   const archetype = archetypes[Math.abs(seededHash(seed)) % archetypes.length] ?? "Joueur complet";
-  const base = createStatsForArchetype(archetype);
-  const diff = strength - calculateOverall(base);
-  return Object.fromEntries(
-    Object.entries(base).map(([key, value]) => [
-      key,
-      Math.max(0, Math.min(94, Math.round(value + diff)))
-    ])
-  ) as TennisStats;
+  const archetypeStats = createStatsForArchetype(archetype);
+  const target = teamAiStatTargetForRanking(ranking);
+  const playableSet = new Set<TennisStatKey>(playableStatKeys);
+  const stats = { ...baseStats };
+
+  for (const key of Object.keys(stats) as TennisStatKey[]) {
+    const archetypeValue = archetypeStats[key] ?? 0;
+    const identityBonus = playableSet.has(key) ? Math.round((archetypeValue - 2) * 0.72) : -1;
+    const variance = seededRange(`${seed}-${key}`, -1, 1);
+    stats[key] = Math.max(0, Math.min(74, target + identityBonus + variance));
+  }
+
+  return stats;
 }
 
 async function getOrCreateTeamAiPlayer(input: { seed: string; strength: number; ranking: string }) {
   const hash = Math.abs(seededHash(input.seed));
   const firstName = clubAiFirstNames[hash % clubAiFirstNames.length] ?? "Alex";
   const lastName = clubAiLastNames[Math.floor(hash / 7) % clubAiLastNames.length] ?? "Morel";
-  const overall = Math.max(1, Math.min(94, Math.round(input.strength)));
   const fftRanking = input.ranking as FftRanking;
+  const stats = tunedStatsForTeamRanking(fftRanking, input.seed);
+  const overall = calculateOverall(stats);
   const existing = await prisma.player.findFirst({
-    where: { isAi: true, firstName, lastName, fftRanking, overall }
+    where: { isAi: true, firstName, lastName, fftRanking }
   });
-  if (existing) return existing;
-  const stats = tunedStatsForTeamStrength(overall, input.seed);
+  if (existing) {
+    return prisma.player.update({
+      where: { id: existing.id },
+      data: {
+        stats: encodeJson(stats),
+        overall,
+        archetype: "Equipe club IA",
+        energy: 82,
+        morale: 70,
+        fatigue: 12,
+        health: 95,
+        recentForm: 55
+      }
+    });
+  }
   const initials = `${firstName[0] ?? "A"}${lastName[0] ?? "M"}`.toUpperCase();
   return prisma.player.create({
     data: {
@@ -493,7 +520,7 @@ async function getOrCreateTeamAiPlayer(input: { seed: string; strength: number; 
       gender: "Homme",
       dominantHand: hash % 3 === 0 ? "Gaucher" : "Droitier",
       backhand: hash % 2 === 0 ? "Deux mains" : "Une main",
-      archetype: "Joueur complet",
+      archetype: "Equipe club IA",
       avatar: encodeJson({
         type: "picture-v1",
         initials,
