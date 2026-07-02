@@ -23,6 +23,7 @@ import { createServerMatch } from "../services/matches";
 import { publicPlayer } from "../services/playerMapper";
 import { decodeJson, encodeJson } from "../services/json";
 import { DAY_MS, seasonWindow } from "../services/seasons";
+import { claimTodaySeasonReward, getSeasonDailyRewardState } from "../services/seasonRewards";
 
 export const gameRouter = Router();
 
@@ -1014,8 +1015,23 @@ gameRouter.get("/season", requireAuth, async (request, response) => {
       progress: window.progress
     },
     player: publicPlayer(player),
+    dailyRewards: await getSeasonDailyRewardState(player.id, window),
     competitions
   });
+});
+
+gameRouter.post("/season/rewards/daily/claim", requireAuth, async (request, response) => {
+  const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
+  if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+  try {
+    return response.json(
+      await claimTodaySeasonReward(request.session!.userId, player.id, seasonWindow())
+    );
+  } catch (error) {
+    return response.status(409).json({
+      message: error instanceof Error ? error.message : "Récompense impossible à récupérer."
+    });
+  }
 });
 
 gameRouter.post("/season/:type/register", requireAuth, async (request, response) => {

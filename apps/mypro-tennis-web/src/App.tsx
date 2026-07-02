@@ -28,11 +28,13 @@ import {
   Flame,
   Gauge,
   Gem,
+  Gift,
   Hand,
   HelpCircle,
   HeartPulse,
   History,
   Image,
+  Lock,
   LogOut,
   LogIn,
   Menu,
@@ -102,6 +104,7 @@ function notificationTarget(notification: GameNotification) {
   if (type === "COLLECTION" || text.includes("collection") || text.includes("carte"))
     return "/collection";
   if (type === "CLUB" || text.includes("club")) return "/club";
+  if (type === "SEASON_REWARD") return "/season";
   if (type === "DEFI" || type === "DÉFI" || text.includes("défi") || text.includes("match"))
     return "/matches";
   if (type === "SAISON" || text.includes("tournoi") || text.includes("championnat"))
@@ -400,6 +403,21 @@ type SeasonCompetition = {
   rankingRange: { best: string; worst: string };
   entry: SeasonEntry | null;
 };
+type SeasonDailyReward = {
+  day: number;
+  type: "money" | "gems" | "chest";
+  money?: number;
+  gems?: number;
+  rarity?: ChestRarity;
+  label: string;
+  rewardValue: string;
+  claimed: boolean;
+  claimedAt: string | null;
+  claimable: boolean;
+  missed: boolean;
+  locked: boolean;
+  current: boolean;
+};
 type SeasonData = {
   season: {
     key: string;
@@ -411,6 +429,7 @@ type SeasonData = {
     progress: number;
   };
   player: Player;
+  dailyRewards: SeasonDailyReward[];
   competitions: SeasonCompetition[];
 };
 type CareerProfile = {
@@ -1304,7 +1323,17 @@ function TennisBagVisual({ rarity, opening = false }: { rarity: ChestRarity; ope
   );
 }
 
-function RewardModal({ rewards, onClose }: { rewards: ChestRewards; onClose: () => void }) {
+function RewardModal({
+  rewards,
+  onClose,
+  rarity = "Mythique",
+  eyebrow = "Sac ouvert"
+}: {
+  rewards: ChestRewards;
+  onClose: () => void;
+  rarity?: ChestRarity;
+  eyebrow?: string;
+}) {
   const unlockedCards = rewards.cards.filter((card) => card.bonus > 0);
   return createPortal(
     <div className="game-modal-overlay">
@@ -1318,10 +1347,10 @@ function RewardModal({ rewards, onClose }: { rewards: ChestRewards; onClose: () 
           <X size={18} />
         </button>
         <div className="mx-auto w-40">
-          <TennisBagVisual rarity="Mythique" opening />
+          <TennisBagVisual rarity={rarity} opening />
         </div>
         <p className="mt-3 text-sm font-bold uppercase tracking-[0.28em] text-emerald-300">
-          Sac ouvert
+          {eyebrow}
         </p>
         <h2 className="mt-1 text-3xl font-black">Récompenses obtenues</h2>
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
@@ -1332,31 +1361,33 @@ function RewardModal({ rewards, onClose }: { rewards: ChestRewards; onClose: () 
             value={`+${unlockedCards.reduce((sum, card) => sum + card.bonus, 0)}`}
           />
         </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {rewards.cards.map((card, index) => (
-            <div
-              key={`${card.statKey}-${index}`}
-              className={`reward-card ${card.bonus > 0 ? "reward-card-boost" : ""}`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                    Carte stat
+        {rewards.cards.length ? (
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {rewards.cards.map((card, index) => (
+              <div
+                key={`${card.statKey}-${index}`}
+                className={`reward-card ${card.bonus > 0 ? "reward-card-boost" : ""}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                      Carte stat
+                    </div>
+                    <div className="mt-1 text-lg font-black">{card.label}</div>
                   </div>
-                  <div className="mt-1 text-lg font-black">{card.label}</div>
+                  <StatIcon statKey={card.statKey} />
                 </div>
-                <StatIcon statKey={card.statKey} />
+                <div className="mt-2 text-sm text-emerald-200">+{card.copies} doublon(s)</div>
+                <div className="mt-1 text-xs text-slate-300">Palier atteint {card.levelAfter}</div>
+                {card.bonus > 0 ? (
+                  <div className="mt-2 rounded-md bg-emerald-300 px-2 py-1 text-sm font-black text-slate-950">
+                    À débloquer +{card.bonus}
+                  </div>
+                ) : null}
               </div>
-              <div className="mt-2 text-sm text-emerald-200">+{card.copies} doublon(s)</div>
-              <div className="mt-1 text-xs text-slate-300">Palier atteint {card.levelAfter}</div>
-              {card.bonus > 0 ? (
-                <div className="mt-2 rounded-md bg-emerald-300 px-2 py-1 text-sm font-black text-slate-950">
-                  À débloquer +{card.bonus}
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : null}
         {unlockedCards.length > 0 ? (
           <p className="mt-4 text-sm text-emerald-200">
             Palier prêt : {unlockedCards.map((card) => `${card.label} +${card.bonus}`).join(", ")}.
@@ -4157,11 +4188,102 @@ function BracketColumnTitle({ label }: { label: string }) {
   );
 }
 
+function DailyRewardIcon({ reward }: { reward: SeasonDailyReward }) {
+  if (reward.type === "money") return <span className="text-lg font-black">€</span>;
+  if (reward.type === "gems") return <Gem size={19} />;
+  return <PackageOpen size={19} />;
+}
+
+function SeasonDailyRewardsTimeline({
+  rewards,
+  onClaim,
+  busy
+}: {
+  rewards: SeasonDailyReward[];
+  onClaim: () => void;
+  busy: boolean;
+}) {
+  const current = rewards.find((reward) => reward.current);
+  const claimable = rewards.find((reward) => reward.claimable);
+  return (
+    <section className="panel overflow-hidden p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-300">
+            Récompense journalière
+          </p>
+          <h2 className="text-2xl font-black">
+            {claimable ? "Votre récompense est prête" : "Timeline de saison"}
+          </h2>
+          <p className="mt-1 text-sm text-slate-300">
+            Jour {current?.day ?? 1} · {current?.label ?? "Récompense à venir"} · le jour 30 offre
+            toujours un sac Mythique.
+          </p>
+        </div>
+        <Button
+          className={`min-h-12 px-5 ${claimable ? "season-reward-claim" : ""}`}
+          disabled={!claimable || busy}
+          onClick={onClaim}
+        >
+          <Gift size={18} /> {claimable ? "Récupérer" : "Déjà récupérée"}
+        </Button>
+      </div>
+      <div className="season-reward-timeline mt-5">
+        {rewards.map((reward) => (
+          <div
+            key={reward.day}
+            className={`season-reward-node ${
+              reward.claimed
+                ? "is-claimed"
+                : reward.claimable
+                  ? "is-claimable"
+                  : reward.missed
+                    ? "is-missed"
+                    : reward.locked
+                      ? "is-locked"
+                      : ""
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+                J{reward.day}
+              </span>
+              {reward.claimed ? (
+                <CheckCircle2 size={15} />
+              ) : reward.locked ? (
+                <Lock size={14} />
+              ) : null}
+            </div>
+            <div className="mt-3 grid h-10 w-10 place-items-center rounded-md bg-white/10 text-emerald-200">
+              <DailyRewardIcon reward={reward} />
+            </div>
+            <div className="mt-2 min-h-8 text-xs font-black leading-tight">{reward.label}</div>
+            <div className="mt-2 text-[10px] uppercase tracking-[0.14em] text-slate-500">
+              {reward.claimed
+                ? "Pris"
+                : reward.claimable
+                  ? "Prêt"
+                  : reward.missed
+                    ? "Manqué"
+                    : "Verrouillé"}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function SeasonPage() {
   const [data, setData] = useState<SeasonData | null>(null);
   const [message, setMessage] = useState("");
   const [seasonTab, setSeasonTab] = useState<SeasonCompetition["type"]>("daily");
   const [selectedCompetition, setSelectedCompetition] = useState<SeasonCompetition | null>(null);
+  const [dailyRewardOpening, setDailyRewardOpening] = useState<{
+    rewards: ChestRewards;
+    rarity: ChestRarity;
+  } | null>(null);
+  const [claimingReward, setClaimingReward] = useState(false);
   const refresh = useGameStore((state) => state.refresh);
   const navigate = useNavigate();
   async function load() {
@@ -4192,6 +4314,25 @@ function SeasonPage() {
       navigate(`/match/${result.match.id}`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Match impossible.");
+    }
+  }
+  async function claimDailyReward() {
+    setMessage("");
+    setClaimingReward(true);
+    try {
+      const result = await api<{ dailyReward: SeasonDailyReward; rewards: ChestRewards }>(
+        "/season/rewards/daily/claim",
+        { method: "POST" }
+      );
+      setDailyRewardOpening({
+        rewards: result.rewards,
+        rarity: result.dailyReward.type === "chest" ? (result.dailyReward.rarity ?? "Bronze") : "Bronze"
+      });
+      await Promise.all([load(), refresh()]);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Récompense impossible.");
+    } finally {
+      setClaimingReward(false);
     }
   }
   if (!data) return <section className="panel p-5">Chargement de la saison...</section>;
@@ -4229,6 +4370,11 @@ function SeasonPage() {
           </div>
         </div>
       </section>
+      <SeasonDailyRewardsTimeline
+        rewards={data.dailyRewards}
+        busy={claimingReward}
+        onClaim={() => void claimDailyReward()}
+      />
       {message ? <div className="panel p-4 text-sm text-emerald-100">{message}</div> : null}
       <div className="segmented-tabs">
         {data.competitions.map((competition) => (
@@ -4363,6 +4509,14 @@ function SeasonPage() {
           competition={selectedCompetition}
           player={data.player}
           onClose={() => setSelectedCompetition(null)}
+        />
+      ) : null}
+      {dailyRewardOpening ? (
+        <RewardModal
+          rewards={dailyRewardOpening.rewards}
+          rarity={dailyRewardOpening.rarity}
+          eyebrow="Récompense quotidienne"
+          onClose={() => setDailyRewardOpening(null)}
         />
       ) : null}
     </div>

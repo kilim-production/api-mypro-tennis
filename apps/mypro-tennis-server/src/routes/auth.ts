@@ -9,6 +9,8 @@ import { config } from "../config";
 import { validateBody } from "../middleware/validate";
 import { requireAuth } from "../middleware/auth";
 import { publicPlayerWithClubBonuses } from "../services/playerMapper";
+import { seasonWindow } from "../services/seasons";
+import { ensureDailySeasonRewardNotification } from "../services/seasonRewards";
 
 export const authRouter = Router();
 const googleProvider = "google";
@@ -281,9 +283,17 @@ authRouter.get("/me", requireAuth, async (request, response) => {
     }
   });
   if (!user) return response.status(404).json({ message: "Compte introuvable." });
+  if (user.player) {
+    await ensureDailySeasonRewardNotification(user.id, user.player.id, seasonWindow());
+  }
+  const notifications = await prisma.notification.findMany({
+    where: { userId: user.id },
+    orderBy: { createdAt: "desc" },
+    take: 8
+  });
   return response.json({
     user: publicUser(user),
     player: user.player ? await publicPlayerWithClubBonuses(user.player) : null,
-    notifications: user.notifications
+    notifications
   });
 });

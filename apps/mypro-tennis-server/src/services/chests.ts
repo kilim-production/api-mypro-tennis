@@ -34,7 +34,7 @@ type ChestRewardCard = {
   nextRequired: number;
 };
 
-type ChestRewards = {
+export type ChestRewards = {
   cards: ChestRewardCard[];
   money: number;
   gems: number;
@@ -289,7 +289,9 @@ export async function awardChestForWin(
   });
 }
 
-function rollRewards(chest: TennisBagChest): ChestRewards {
+function rollRewards(
+  chest: Pick<TennisBagChest, "id" | "playerId" | "rarity" | "createdAt">
+): ChestRewards {
   const definition = chestDefinitions[chest.rarity as ChestRarity] ?? chestDefinitions.Bronze;
   const random = randomFromSeed(
     `${chest.id}-${chest.playerId}-${chest.createdAt.toISOString()}-open`
@@ -350,76 +352,100 @@ export async function openChest(playerId: string, chestId: string) {
     if (chest.unlocksAt.getTime() > Date.now()) throw new Error("Ce sac n'est pas encore prêt.");
     const rewards = rollRewards(chest);
 
-    for (const rewardCard of rewards.cards) {
-      const existing = await tx.playerStatCard.findUnique({
-        where: { playerId_statKey: { playerId, statKey: rewardCard.statKey } }
-      });
-      const beforeCopies = existing?.copies ?? 0;
-      const beforeLevel = existing?.level ?? 0;
-      const beforeEarnedLevel = trainingCardLevelForCopies(beforeCopies);
-      const totalCopies = beforeCopies + rewardCard.copies;
-      const afterLevel = trainingCardLevelForCopies(totalCopies);
-      const bonus = Math.max(0, afterLevel - Math.max(beforeLevel, beforeEarnedLevel));
-      const progress = trainingCardProgress(totalCopies);
-      rewardCard.totalCopies = totalCopies;
-      rewardCard.levelBefore = beforeLevel;
-      rewardCard.levelAfter = afterLevel;
-      rewardCard.bonus = bonus;
-      rewardCard.nextRequired = progress.nextFloor;
-      await tx.playerStatCard.upsert({
-        where: { playerId_statKey: { playerId, statKey: rewardCard.statKey } },
-        update: { copies: totalCopies },
-        create: { playerId, statKey: rewardCard.statKey, copies: totalCopies, level: 0 }
-      });
-    }
-
-    for (const cosmetic of rewards.cosmetics) {
-      await tx.playerCosmetic.upsert({
-        where: { playerId_cosmeticId: { playerId, cosmeticId: cosmetic.id } },
-        update: {
-          name: cosmetic.name,
-          rarity: cosmetic.rarity,
-          bonuses: encodeJson(cosmetic.bonuses)
-        },
-        create: {
-          playerId,
-          cosmeticId: cosmetic.id,
-          name: cosmetic.name,
-          rarity: cosmetic.rarity,
-          bonuses: encodeJson(cosmetic.bonuses)
-        }
-      });
-    }
-
-    const readyCards = rewards.cards.filter((card) => card.bonus > 0);
-    const playerOwner = readyCards.length
-      ? await tx.player.findUnique({ where: { id: playerId }, select: { userId: true } })
-      : null;
-    if (playerOwner?.userId && readyCards.length) {
-      const cardList = readyCards.map((card) => `${card.label} +${card.bonus}`).join(", ");
-      await tx.notification.create({
-        data: {
-          userId: playerOwner.userId,
-          title: "Palier de carte atteint",
-          body: `${cardList} prêt à débloquer dans votre collection.`,
-          type: "COLLECTION"
-        }
-      });
-    }
-
-    await tx.player.update({
-      where: { id: playerId },
-      data: {
-        budget: { increment: rewards.money },
-        gems: { increment: rewards.gems }
-      }
-    });
+    await grantChestRewards(tx, playerId, rewards);
     const opened = await tx.tennisBagChest.update({
       where: { id: chest.id },
       data: { status: "OPENED", openedAt: new Date(), rewards: encodeJson(rewards) }
     });
     return { chest: summarizeChest(opened), rewards };
   });
+}
+
+export async function grantChestRewards(
+  tx: Prisma.TransactionClient,
+  playerId: string,
+  rewards: ChestRewards
+) {
+  for (const rewardCard of rewards.cards) {
+    const existing = await tx.playerStatCard.findUnique({
+      where: { playerId_statKey: { playerId, statKey: rewardCard.statKey } }
+    });
+    const beforeCopies = existing?.copies ?? 0;
+    const beforeLevel = existing?.level ?? 0;
+    const beforeEarnedLevel = trainingCardLevelForCopies(beforeCopies);
+    const totalCopies = beforeCopies + rewardCard.copies;
+    const afterLevel = trainingCardLevelForCopies(totalCopies);
+    const bonus = Math.max(0, afterLevel - Math.max(beforeLevel, beforeEarnedLevel));
+    const progress = trainingCardProgress(totalCopies);
+    rewardCard.totalCopies = totalCopies;
+    rewardCard.levelBefore = beforeLevel;
+    rewardCard.levelAfter = afterLevel;
+    rewardCard.bonus = bonus;
+    rewardCard.nextRequired = progress.nextFloor;
+    await tx.playerStatCard.upsert({
+      where: { playerId_statKey: { playerId, statKey: rewardCard.statKey } },
+      update: { copies: totalCopies },
+      create: { playerId, statKey: rewardCard.statKey, copies: totalCopies, level: 0 }
+    });
+  }
+
+  for (const cosmetic of rewards.cosmetics) {
+    await tx.playerCosmetic.upsert({
+      where: { playerId_cosmeticId: { playerId, cosmeticId: cosmetic.id } },
+      update: {
+        name: cosmetic.name,
+        rarity: cosmetic.rarity,
+        bonuses: encodeJson(cosmetic.bonuses)
+      },
+      create: {
+        playerId,
+        cosmeticId: cosmetic.id,
+        name: cosmetic.name,
+        rarity: cosmetic.rarity,
+        bonuses: encodeJson(cosmetic.bonuses)
+      }
+    });
+  }
+
+  const readyCards = rewards.cards.filter((card) => card.bonus > 0);
+  const playerOwner = readyCards.length
+    ? await tx.player.findUnique({ where: { id: playerId }, select: { userId: true } })
+    : null;
+  if (playerOwner?.userId && readyCards.length) {
+    const cardList = readyCards.map((card) => `${card.label} +${card.bonus}`).join(", ");
+    await tx.notification.create({
+      data: {
+        userId: playerOwner.userId,
+        title: "Palier de carte atteint",
+        body: `${cardList} prêt à débloquer dans votre collection.`,
+        type: "COLLECTION"
+      }
+    });
+  }
+
+  await tx.player.update({
+    where: { id: playerId },
+    data: {
+      budget: { increment: rewards.money },
+      gems: { increment: rewards.gems }
+    }
+  });
+}
+
+export async function openInstantChestReward(
+  tx: Prisma.TransactionClient,
+  playerId: string,
+  rarity: ChestRarity,
+  source: string
+) {
+  const rewards = rollRewards({
+    id: `instant-${source}`,
+    playerId,
+    rarity,
+    createdAt: new Date()
+  });
+  await grantChestRewards(tx, playerId, rewards);
+  return rewards;
 }
 
 export async function unlockStatCardBonus(playerId: string, statKey: string) {

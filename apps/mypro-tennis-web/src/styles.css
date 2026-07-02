@@ -512,6 +512,89 @@ button:disabled,
     rgba(2, 6, 23, 0.78);
 }
 
+.season-reward-timeline {
+  display: grid;
+  grid-template-columns: repeat(30, minmax(82px, 1fr));
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+}
+
+.season-reward-node {
+  min-height: 136px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.72);
+  padding: 10px;
+  color: #cbd5e1;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.season-reward-node.is-claimed {
+  border-color: rgba(52, 211, 153, 0.34);
+  background: rgba(16, 185, 129, 0.11);
+  color: #ecfdf5;
+}
+
+.season-reward-node.is-claimable {
+  border-color: rgba(94, 234, 212, 0.9);
+  background:
+    radial-gradient(circle at 80% 0%, rgba(94, 234, 212, 0.22), transparent 42%),
+    rgba(6, 78, 59, 0.28);
+  box-shadow:
+    0 0 0 1px rgba(94, 234, 212, 0.2),
+    0 0 30px rgba(45, 212, 191, 0.28);
+  color: #f8fafc;
+  transform: translateY(-2px);
+  animation: rewardPulse 1.8s ease-in-out infinite;
+}
+
+.season-reward-node.is-missed {
+  opacity: 0.56;
+}
+
+.season-reward-node.is-locked {
+  opacity: 0.46;
+}
+
+.season-reward-claim {
+  box-shadow:
+    0 0 0 1px rgba(190, 242, 100, 0.32),
+    0 0 28px rgba(52, 211, 153, 0.3);
+  animation: rewardButtonPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes rewardPulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(94, 234, 212, 0.2),
+      0 0 22px rgba(45, 212, 191, 0.22);
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(190, 242, 100, 0.44),
+      0 0 38px rgba(52, 211, 153, 0.42);
+  }
+}
+
+@keyframes rewardButtonPulse {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-1px);
+  }
+}
+
 .ranking-podium-card,
 .ranking-row-card,
 .match-history-card,

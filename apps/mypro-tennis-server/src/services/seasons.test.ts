@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { seasonWindow } from "./seasons";
+import { seasonDailyRewards } from "./seasonRewards";
 
 describe("saisons globales", () => {
   it("calcule la meme saison pour tous les joueurs au meme moment", () => {
@@ -21,5 +22,10 @@ describe("saisons globales", () => {
 
     expect(seasonTwo.key).toBe("saison-2");
     expect(seasonTwo.day).toBe(1);
+  });
+
+  it("garantit un calendrier de 30 recompenses avec un coffre mythique au jour 30", () => {
+    expect(seasonDailyRewards).toHaveLength(30);
+    expect(seasonDailyRewards.at(-1)).toEqual({ day: 30, type: "chest", rarity: "Mythique" });
   });
 });
