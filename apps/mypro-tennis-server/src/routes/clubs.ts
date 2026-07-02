@@ -19,6 +19,7 @@ import { requireAuth } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 import { encodeJson } from "../services/json";
 import { createServerMatch } from "../services/matches";
+import { orderPlayersForSingles } from "../services/teamLineup";
 import { teamChampionshipCashPrize } from "../services/teamChampionshipPrizes";
 
 export const clubsRouter = Router();
@@ -237,18 +238,6 @@ function winPercentage(player: { wins: number; losses: number }) {
   return total > 0 ? player.wins / total : 0;
 }
 
-function orderPlayersForSingles<
-  T extends { id: string; fftRanking: string; wins: number; losses: number }
->(players: T[], seed: string) {
-  return [...players].sort((left, right) => {
-    const rankingDelta = fftRankIndex(right.fftRanking) - fftRankIndex(left.fftRanking);
-    if (rankingDelta !== 0) return rankingDelta;
-    const winPctDelta = winPercentage(right) - winPercentage(left);
-    if (winPctDelta !== 0) return winPctDelta;
-    return seededHash(`${seed}-${right.id}`) - seededHash(`${seed}-${left.id}`);
-  });
-}
-
 function championshipWindow(now = new Date()) {
   const start = new Date(now);
   const day = start.getDay();
@@ -262,6 +251,28 @@ function championshipWindow(now = new Date()) {
   end.setDate(start.getDate() + 13);
   end.setHours(19, 0, 0, 0);
   return { startsAt: start, endsAt: end };
+}
+
+async function syncClubTeamLineup(teamId: string, clubId: string) {
+  const memberships = await prisma.clubMembership.findMany({
+    where: { clubId },
+    include: { player: true }
+  });
+  const starters = orderPlayersForSingles(
+    memberships.map((membership) => membership.player),
+    `${clubId}-${teamId}`
+  ).slice(0, teamSize);
+
+  await prisma.$transaction([
+    prisma.clubTeamMember.deleteMany({ where: { teamId } }),
+    prisma.clubTeamMember.createMany({
+      data: starters.map((starter, index) => ({
+        teamId,
+        playerId: starter.id,
+        slotIndex: index + 1
+      }))
+    })
+  ]);
 }
 
 function roundStart(startsAt: Date, round: number) {
@@ -1074,6 +1085,7 @@ clubsRouter.get("/team-championship", requireAuth, async (request, response) => 
     };
   }> | null = null;
   if (team) {
+    await syncClubTeamLineup(team.id, club.id);
     const latestEntry = await prisma.teamChampionshipEntry.findFirst({
       where: { teamId: team.id },
       include: { championship: true },
@@ -1266,6 +1278,7 @@ clubsRouter.post("/team/championship", requireAuth, async (request, response) =>
     return response.status(404).json({ message: "Le club n'a pas encore d'équipe." });
   if (membership.club.presidentId !== player.id)
     return response.status(403).json({ message: "Seul le président peut inscrire l'équipe." });
+  await syncClubTeamLineup(membership.club.team.id, membership.clubId);
   const latestEntry = await prisma.teamChampionshipEntry.findFirst({
     where: { teamId: membership.club.team.id },
     include: { championship: true },

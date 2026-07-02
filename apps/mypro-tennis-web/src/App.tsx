@@ -4809,7 +4809,8 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
           <p className="mt-2 max-w-2xl text-sm text-slate-300">
             Une équipe compte 5 joueurs. Le championnat réunit 13 équipes, avec une rencontre par
             jour à 18h30 et une éventuelle journée exempt. Chaque rencontre se joue en 5 simples, du
-            Simple 1 au Simple 5, selon la hiérarchie FFT des titulaires.
+            Simple 1 au Simple 5, selon la hiérarchie des titulaires : classement FFT, niveau du
+            joueur, puis budget.
           </p>
         </div>
         {!data.team ? (
