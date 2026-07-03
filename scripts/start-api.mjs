@@ -26,4 +26,9 @@ if (process.env.DATABASE_URL?.startsWith("postgres")) {
 } else {
   await run(npmCommand, ["run", "db:deploy"]);
 }
+
+if (process.env.DISABLE_XP_BACKFILL !== "1") {
+  await run(npmCommand, ["run", "xp:backfill"]);
+}
+
 await run(npmCommand, ["exec", "tsx", "apps/mypro-tennis-server/src/server.ts"]);
