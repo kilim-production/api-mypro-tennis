@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   ACTION_ENERGY_MAX,
+  PLAYER_MAX_LEVEL,
   calculateOverall,
   getActionEnergySnapshot,
+  playerLevelFromXp,
+  playerLevelProgress,
+  playerTotalXpForLevel,
+  playerXpForNextLevel,
   recoverVitals,
   scaleDevelopmentCost,
   scaleDevelopmentMinutes,
@@ -96,5 +101,19 @@ describe("progression carrière", () => {
     expect(trainingCardUnlockCost(1)).toBe(1);
     expect(trainingCardUnlockCost(2)).toBeGreaterThan(trainingCardUnlockCost(1));
     expect(Number.isInteger(trainingCardUnlockCost(4))).toBe(true);
+  });
+
+  it("calcule une progression joueur bornee avec une courbe RPG", () => {
+    expect(playerXpForNextLevel(1)).toBeGreaterThan(playerXpForNextLevel(0));
+    expect(playerTotalXpForLevel(2)).toBe(
+      playerXpForNextLevel(0) + playerXpForNextLevel(1)
+    );
+    expect(playerLevelFromXp(0)).toBe(0);
+    expect(playerLevelFromXp(playerTotalXpForLevel(1))).toBe(1);
+    expect(playerLevelFromXp(Number.MAX_SAFE_INTEGER)).toBe(PLAYER_MAX_LEVEL);
+    expect(playerLevelProgress(playerTotalXpForLevel(3) + 5)).toMatchObject({
+      level: 3,
+      xpIntoLevel: 5
+    });
   });
 });

@@ -28,6 +28,10 @@ export type Player = {
   budget: number;
   gems: number;
   careerCashPrizeWon: number;
+  playerLevel: number;
+  playerXp: number;
+  skillPoints: number;
+  spentSkillPoints: number;
   overall: number;
   rankingPoints: number;
   worldRank: number;

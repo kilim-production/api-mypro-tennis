@@ -71,6 +71,25 @@ export const cosmeticEquipSchema = z.object({
   slotIndex: z.number().int().min(0).max(3)
 });
 
+export const playableStatSchema = z.enum([
+  "service",
+  "return",
+  "forehand",
+  "backhand",
+  "volley",
+  "smash",
+  "dropShot",
+  "stamina",
+  "speed",
+  "explosiveness",
+  "strength",
+  "recovery"
+]);
+
+export const skillUpgradeSchema = z.object({
+  statKey: playableStatSchema
+});
+
 export const fftRankingValues = [
   "NC",
   "40/2",
@@ -196,6 +215,7 @@ export type PlayerCreationInput = z.infer<typeof playerCreationSchema>;
 export type PlayerProfileUpdateInput = z.infer<typeof playerProfileUpdateSchema>;
 export type AvatarUpdateInput = z.infer<typeof avatarUpdateSchema>;
 export type CosmeticEquipInput = z.infer<typeof cosmeticEquipSchema>;
+export type SkillUpgradeInput = z.infer<typeof skillUpgradeSchema>;
 export type ClubCreateInput = z.infer<typeof clubCreateSchema>;
 export type ClubUpdateInput = z.infer<typeof clubUpdateSchema>;
 export type ClubJoinRequestInput = z.infer<typeof clubJoinRequestSchema>;

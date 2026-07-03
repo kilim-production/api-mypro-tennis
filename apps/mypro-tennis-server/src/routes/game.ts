@@ -1,7 +1,12 @@
 ﻿import { Router } from "express";
 import { prisma } from "@mypro/database";
 import { calculateOverall } from "@mypro/core";
-import { challengeSchema, cosmeticEquipSchema, matchRequestSchema } from "@mypro/shared";
+import {
+  challengeSchema,
+  cosmeticEquipSchema,
+  matchRequestSchema,
+  skillUpgradeSchema
+} from "@mypro/shared";
 import {
   createStatsForArchetype,
   fftRankingPath,
@@ -21,6 +26,7 @@ import {
 import { equipCosmetic, unequipCosmetic, upgradeCosmetic } from "../services/equipment";
 import { createServerMatch } from "../services/matches";
 import { publicPlayer } from "../services/playerMapper";
+import { getPlayerSkillState, spendSkillPoint } from "../services/playerProgression";
 import { decodeJson, encodeJson } from "../services/json";
 import { DAY_MS, seasonWindow } from "../services/seasons";
 import { claimTodaySeasonReward, getSeasonDailyRewardState } from "../services/seasonRewards";
@@ -873,6 +879,30 @@ gameRouter.post("/cards/:statKey/unlock", requireAuth, async (request, response)
       .json({ message: error instanceof Error ? error.message : "Déblocage impossible." });
   }
 });
+
+gameRouter.get("/skills", requireAuth, async (request, response) => {
+  const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
+  if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+  return response.json(await getPlayerSkillState(player.id));
+});
+
+gameRouter.post(
+  "/skills/spend",
+  requireAuth,
+  validateBody(skillUpgradeSchema),
+  async (request, response) => {
+    const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
+    if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+    try {
+      return response.json(await spendSkillPoint(player.id, request.body.statKey));
+    } catch (error) {
+      return response.status(409).json({
+        message:
+          error instanceof Error ? error.message : "Point de compétence impossible à dépenser."
+      });
+    }
+  }
+);
 
 gameRouter.post(
   "/cosmetics/:id/equip",

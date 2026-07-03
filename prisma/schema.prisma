@@ -62,6 +62,11 @@ model Player {
   budget                   Int                      @default(5000)
   gems                     Int                      @default(0)
   careerCashPrizeWon       Int                      @default(0)
+  playerLevel              Int                      @default(0)
+  playerXp                 Int                      @default(0)
+  skillPoints              Int                      @default(0)
+  spentSkillPoints         Int                      @default(0)
+  skillAllocations         String                   @default("{}")
   overall                  Int
   rankingPoints            Int                      @default(0)
   worldRank                Int                      @default(999)

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { prisma } from "@mypro/database";
+import { calculateOverall } from "@mypro/core";
 import { avatarUpdateSchema, playerCreationSchema, playerProfileUpdateSchema } from "@mypro/shared";
 import {
   calculateFftRanking,
@@ -191,7 +192,12 @@ playersRouter.post(
           archetype: request.body.archetype,
           avatar,
           stats: encodeJson(stats),
-          overall: 0,
+          playerLevel: 0,
+          playerXp: 0,
+          skillPoints: 0,
+          spentSkillPoints: 0,
+          skillAllocations: encodeJson({}),
+          overall: calculateOverall(stats),
           rankingPoints: 0,
           worldRank: 999,
           fftRanking: "NC",

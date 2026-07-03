@@ -13,12 +13,16 @@ import {
   type FftRanking,
   type RiskMode,
   type TennisSurface,
-  type TennisStats,
   type TennisTactic
 } from "@mypro/sports-tennis";
 import type { Player } from "@prisma/client";
 import { awardChestForWin } from "./chests";
-import { decodeJson, encodeJson } from "./json";
+import { encodeJson } from "./json";
+import {
+  applyArchetypeMatchBonuses,
+  careerXpForMatch,
+  grantCareerXp
+} from "./playerProgression";
 
 function matchEnergyForPlayer(player: Player, seed: string, aiRange: [number, number]) {
   if (!player.isAi) {
@@ -34,16 +38,17 @@ export function toEnginePlayer(
   risk: RiskMode,
   matchEnergy: number
 ): EnginePlayer {
+  const stats = applyArchetypeMatchBonuses(player);
   return {
     id: player.id,
     name: `${player.firstName} ${player.lastName}`,
-    stats: decodeJson<TennisStats>(player.stats),
+    stats,
     matchEnergy,
     energy: player.energy,
     morale: player.morale,
     fatigue: player.fatigue,
     health: player.health,
-    confidence: decodeJson<TennisStats>(player.stats).confidence,
+    confidence: stats.confidence,
     recentForm: player.recentForm,
     tactic,
     risk
@@ -154,6 +159,21 @@ export async function createServerMatch(input: {
       };
     };
 
+    const winnerXp = careerXpForMatch({
+      won: true,
+      official: officialAmateur,
+      opponentRanking: loser.fftRanking,
+      playerRanking: winner.fftRanking,
+      type: input.type
+    });
+    const loserXp = careerXpForMatch({
+      won: false,
+      official: officialAmateur,
+      opponentRanking: winner.fftRanking,
+      playerRanking: loser.fftRanking,
+      type: input.type
+    });
+
     await tx.player.update({
       where: { id: winner.id },
       data: {
@@ -166,6 +186,7 @@ export async function createServerMatch(input: {
         ...(await refreshFft(winner))
       }
     });
+    await grantCareerXp(tx, winner, winnerXp);
     await tx.player.update({
       where: { id: loser.id },
       data: {
@@ -176,6 +197,7 @@ export async function createServerMatch(input: {
         ...(await refreshFft(loser))
       }
     });
+    await grantCareerXp(tx, loser, loserXp);
     if (input.awardChests ?? true) {
       await awardChestForWin(winner, tx, input.type);
       await awardChestForWin(loser, tx, `Défaite - ${input.type}`, "Bronze");

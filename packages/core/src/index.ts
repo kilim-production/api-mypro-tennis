@@ -167,3 +167,45 @@ export function trainingCardProgress(copies: number) {
 export function trainingCardUnlockCost(levelToUnlock: number) {
   return Math.ceil(Math.pow(TRAINING_CARD_UNLOCK_COST_GROWTH, Math.max(0, levelToUnlock - 1)));
 }
+
+export const PLAYER_MAX_LEVEL = 100;
+
+export function playerXpForNextLevel(level: number) {
+  const safeLevel = Math.max(0, Math.min(PLAYER_MAX_LEVEL - 1, Math.floor(level)));
+  return Math.round(100 + safeLevel * 45 + safeLevel * safeLevel * 6);
+}
+
+export function playerTotalXpForLevel(level: number) {
+  const safeLevel = Math.max(0, Math.min(PLAYER_MAX_LEVEL, Math.floor(level)));
+  let total = 0;
+  for (let current = 0; current < safeLevel; current += 1) {
+    total += playerXpForNextLevel(current);
+  }
+  return total;
+}
+
+export function playerLevelFromXp(xp: number) {
+  const safeXp = Math.max(0, Math.floor(xp));
+  let level = 0;
+  while (level < PLAYER_MAX_LEVEL && safeXp >= playerTotalXpForLevel(level + 1)) {
+    level += 1;
+  }
+  return level;
+}
+
+export function playerLevelProgress(xp: number) {
+  const level = playerLevelFromXp(xp);
+  const currentFloor = playerTotalXpForLevel(level);
+  const nextFloor =
+    level >= PLAYER_MAX_LEVEL ? currentFloor : playerTotalXpForLevel(level + 1);
+  return {
+    level,
+    xp: Math.max(0, Math.floor(xp)),
+    currentFloor,
+    nextFloor,
+    xpIntoLevel: Math.max(0, Math.floor(xp) - currentFloor),
+    xpNeeded: Math.max(0, nextFloor - currentFloor),
+    remaining: Math.max(0, nextFloor - Math.max(0, Math.floor(xp))),
+    maxLevel: PLAYER_MAX_LEVEL
+  };
+}
