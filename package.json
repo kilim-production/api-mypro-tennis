@@ -26,6 +26,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:push:postgres": "prisma db push --schema prisma/schema.postgres.prisma",
     "db:seed": "tsx prisma/seed.ts",
+    "xp:backfill": "tsx scripts/backfill-player-xp.ts",
     "discord:setup": "node scripts/setup-discord-server.mjs"
   },
   "devDependencies": {

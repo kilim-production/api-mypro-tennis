@@ -338,3 +338,66 @@ export async function spendSkillPoint(playerId: string, statKey: string) {
     return skillProgressPayload(updated);
   });
 }
+
+export async function recalculateExistingPlayerXp() {
+  const players = await prisma.player.findMany({
+    where: { isAi: false },
+    include: {
+      matchesAsA: {
+        include: { playerA: true, playerB: true }
+      },
+      matchesAsB: {
+        include: { playerA: true, playerB: true }
+      }
+    }
+  });
+
+  const summaries: Array<{
+    playerId: string;
+    name: string;
+    matchCount: number;
+    xp: number;
+    level: number;
+    skillPoints: number;
+    spentSkillPoints: number;
+  }> = [];
+
+  for (const player of players) {
+    const matchesById = new Map([...player.matchesAsA, ...player.matchesAsB].map((match) => [match.id, match]));
+    let xp = 0;
+
+    for (const match of matchesById.values()) {
+      const opponent = match.playerAId === player.id ? match.playerB : match.playerA;
+      xp += careerXpForMatch({
+        won: match.winnerId === player.id,
+        official: match.type.includes("officiel amateur") || match.type === "Tournoi",
+        opponentRanking: opponent.fftRanking,
+        playerRanking: player.fftRanking,
+        type: match.type
+      });
+    }
+
+    const level = playerLevelFromXp(xp);
+    const skillPoints = Math.max(0, level - player.spentSkillPoints);
+    await prisma.player.update({
+      where: { id: player.id },
+      data: {
+        playerXp: xp,
+        playerLevel: level,
+        skillPoints
+      }
+    });
+
+    summaries.push({
+      playerId: player.id,
+      name: `${player.firstName} ${player.lastName}`,
+      matchCount: matchesById.size,
+      xp,
+      level,
+      skillPoints,
+      spentSkillPoints: player.spentSkillPoints
+    });
+  }
+
+  return summaries;
+}
