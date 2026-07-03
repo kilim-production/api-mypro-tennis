@@ -13,6 +13,7 @@ import {
   useSearchParams
 } from "react-router-dom";
 import { io } from "socket.io-client";
+import type { LucideIcon } from "lucide-react";
 import {
   Activity,
   BarChart3,
@@ -111,6 +112,21 @@ function notificationTarget(notification: GameNotification) {
     return "/season";
   if (type === "TUTORIEL" || text.includes("bienvenue")) return "/dashboard";
   return "/dashboard";
+}
+
+function notificationBadgeTarget(notification: GameNotification, compactNav = false) {
+  const target: string = notificationTarget(notification);
+  if (!compactNav) return target;
+  if (target === "/matches") return "/duel";
+  if (target === "/rankings" || target === "/online" || target === "/community") return "/dashboard";
+  return target;
+}
+
+function notificationBelongsToPath(notification: GameNotification, path: string) {
+  return (
+    notificationTarget(notification) === path ||
+    notificationBadgeTarget(notification, true) === path
+  );
 }
 
 const statLabels: Record<string, string> = {
@@ -1751,6 +1767,7 @@ function NotificationCenter({ compact = false }: { compact?: boolean }) {
 
 function Shell({ children }: { children: React.ReactNode }) {
   const { user, player, notifications, logout } = useGameStore();
+  const refresh = useGameStore((state) => state.refresh);
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
@@ -1760,7 +1777,16 @@ function Shell({ children }: { children: React.ReactNode }) {
     const counts: Record<string, number> = {};
     for (const notification of notifications) {
       if (notification.readAt) continue;
-      const target = notificationTarget(notification);
+      const target = notificationBadgeTarget(notification, false);
+      counts[target] = (counts[target] ?? 0) + 1;
+    }
+    return counts;
+  }, [notifications]);
+  const mobileNavBadges = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const notification of notifications) {
+      if (notification.readAt) continue;
+      const target = notificationBadgeTarget(notification, true);
       counts[target] = (counts[target] ?? 0) + 1;
     }
     return counts;
@@ -1779,6 +1805,29 @@ function Shell({ children }: { children: React.ReactNode }) {
       setTutorialOpen(true);
     }
   }, [location.pathname, player]);
+
+  useEffect(() => {
+    if (!showGameNav || !user) return;
+    const pageNotifications = notifications.filter(
+      (notification) =>
+        !notification.readAt && notificationBelongsToPath(notification, location.pathname)
+    );
+    if (!pageNotifications.length) return;
+
+    let cancelled = false;
+    void (async () => {
+      await Promise.all(
+        pageNotifications.map((notification) =>
+          api(`/notifications/${notification.id}/read`, { method: "PATCH" })
+        )
+      );
+      if (!cancelled) await refresh();
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [location.pathname, notifications, refresh, showGameNav, user]);
 
   function openTutorial() {
     localStorage.setItem("mypro-tutorial-active", "1");
@@ -1867,7 +1916,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       <div className="app-shell-content mx-auto grid max-w-7xl gap-4 px-3 py-4 pb-24 sm:px-4 sm:py-5">
         <main className="min-w-0">{children}</main>
       </div>
-      {showGameNav ? <MobileBottomNav badges={navBadges} /> : null}
+      {showGameNav ? <MobileBottomNav badges={mobileNavBadges} /> : null}
       <footer className="app-footer mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-3 px-4 pb-24 text-center text-[11px] font-black uppercase tracking-[0.28em] text-slate-500 lg:pb-5">
         <span>KILIM GAMES PRODUCTION</span>
         <span className="text-slate-700">·</span>
@@ -2524,44 +2573,134 @@ function StatBars({ player }: { player: Player }) {
   );
 }
 
-const tutorialSteps = [
+type TutorialStep = {
+  title: string;
+  body: string;
+  action: string;
+  path: string;
+  icon: LucideIcon;
+};
+
+const baseTutorialSteps: TutorialStep[] = [
   {
     title: "Récupérer les sacs de départ",
     body: "Votre carrière commence avec 2 sacs Bronze, 1 sac Argent et 1 sac Or. Les Bronze sont ouvrables immédiatement, les autres suivent leur timer.",
     action: "Voir les sacs",
-    path: "/dashboard"
+    path: "/dashboard",
+    icon: PackageOpen
   },
   {
-    title: "Comprendre la collection",
-    body: "Les sacs donnent des cartes de statistiques. Les doublons remplissent des paliers exponentiels, puis chaque bonus +1 doit être débloqué avec de l'argent.",
+    title: "Faire évoluer la collection",
+    body: "Les sacs donnent des cartes de statistiques et des objets cosmétiques. Les cartes débloquent des bonus payants, les objets équipés peuvent être améliorés sur 3 niveaux.",
     action: "Ouvrir la collection",
-    path: "/collection"
+    path: "/collection",
+    icon: Sparkles
   },
   {
     title: "Lancer un duel",
-    body: "Le duel coûte 1 point d'énergie et propose 3 adversaires proches de votre classement. C'est le moyen rapide de tester votre fiche joueur.",
+    body: "Le duel coûte 1 point d'énergie et propose 3 adversaires proches de votre classement, avec au moins un profil IA pour progresser plus régulièrement.",
     action: "Choisir un adversaire",
-    path: "/duel"
+    path: "/duel",
+    icon: Swords
   },
   {
-    title: "Jouer la saison",
-    body: "La saison dure 30 jours réels. Les compétitions officielles servent à construire votre parcours FFT de NC jusqu'à -15.",
+    title: "Récupérer la récompense de saison",
+    body: "Chaque saison dure 30 jours pour tous les joueurs. Une récompense journalière peut être récupérée dans la timeline, sans utiliser de slot de sac.",
     action: "Voir la saison",
-    path: "/season"
+    path: "/season",
+    icon: Gift
   },
   {
-    title: "Suivre le classement",
-    body: "Dans Mon joueur, la simulation FFT reprend vos résultats officiels. Le but amateur est de valider -15 avant d'entrer dans le circuit pro.",
+    title: "Construire le parcours FFT",
+    body: "Les matchs officiels de saison et de championnat par équipe alimentent la simulation FFT. L'objectif amateur reste de valider -15 pour ouvrir le circuit pro.",
     action: "Voir mon joueur",
-    path: "/player"
+    path: "/player",
+    icon: Shield
+  },
+  {
+    title: "Rejoindre ou développer un club",
+    body: "Le club donne accès au championnat par équipe, aux cotisations et aux infrastructures comme le complexe, le centre de soins et le centre d'entraînement.",
+    action: "Voir mon club",
+    path: "/club",
+    icon: Users
   }
 ];
 
+function buildTutorialSteps(player: Player, notifications: GameNotification[]): TutorialStep[] {
+  const unread = notifications.filter((notification) => !notification.readAt);
+  const prioritySteps: TutorialStep[] = [];
+
+  if (unread.some((notification) => notificationTarget(notification) === "/season")) {
+    prioritySteps.push({
+      title: "Récompense disponible",
+      body: "Une nouveauté vous attend dans Saison en cours. Si c'est la récompense du jour, récupérez-la maintenant : elle s'ouvre immédiatement et ne prend aucun slot de sac.",
+      action: "Aller à la saison",
+      path: "/season",
+      icon: Gift
+    });
+  }
+
+  if (unread.some((notification) => notificationTarget(notification) === "/collection")) {
+    prioritySteps.push({
+      title: "Bonus de collection prêt",
+      body: "Un palier de carte ou une nouveauté de collection est disponible. Pensez à débloquer les bonus utiles et à équiper vos meilleurs objets cosmétiques.",
+      action: "Gérer la collection",
+      path: "/collection",
+      icon: PackageOpen
+    });
+  }
+
+  if (unread.some((notification) => notificationTarget(notification) === "/club")) {
+    prioritySteps.push({
+      title: "Activité de club",
+      body: "Votre club a une nouveauté : demande, cotisation, présidence, championnat ou infrastructure. Consultez la page club pour ne pas manquer l'action importante.",
+      action: "Voir le club",
+      path: "/club",
+      icon: Users
+    });
+  }
+
+  if (unread.some((notification) => notificationTarget(notification) === "/matches")) {
+    prioritySteps.push({
+      title: "Match à consulter",
+      body: "Un duel ou un match officiel vient d'être joué. Regardez le replay pour comprendre quelles statistiques ont décidé les points.",
+      action: "Voir les matchs",
+      path: "/matches",
+      icon: History
+    });
+  }
+
+  if (player.actionEnergy > 0) {
+    prioritySteps.push({
+      title: "Utiliser l'énergie disponible",
+      body: `Vous avez ${player.actionEnergy}/${player.actionEnergyMax} point(s) d'énergie. Dépensez-les en duel ou en compétition pour obtenir des sacs et construire votre classement.`,
+      action: "Lancer un duel",
+      path: "/duel",
+      icon: Zap
+    });
+  }
+
+  return [...prioritySteps, ...baseTutorialSteps].filter(
+    (step, index, steps) => steps.findIndex((item) => item.title === step.title) === index
+  );
+}
+
 function TutorialModal({ onClose }: { onClose: () => void }) {
+  const player = useGameStore((state) => state.player)!;
+  const notifications = useGameStore((state) => state.notifications);
+  const tutorialSteps = useMemo(
+    () => buildTutorialSteps(player, notifications),
+    [notifications, player]
+  );
   const [step, setStep] = useState(0);
   const navigate = useNavigate();
   const current = tutorialSteps[step] ?? tutorialSteps[0];
+  const CurrentIcon = current?.icon ?? CheckCircle2;
   const last = step >= tutorialSteps.length - 1;
+
+  useEffect(() => {
+    setStep((value) => Math.min(value, Math.max(0, tutorialSteps.length - 1)));
+  }, [tutorialSteps.length]);
 
   function close(done = false) {
     localStorage.removeItem("mypro-tutorial-active");
@@ -2583,7 +2722,7 @@ function TutorialModal({ onClose }: { onClose: () => void }) {
             <p className="text-sm font-bold uppercase tracking-[0.24em] text-emerald-300">
               Tutoriel
             </p>
-            <h2 className="mt-1 text-2xl font-black">Premiers pas dans MyPro</h2>
+            <h2 className="mt-1 text-2xl font-black">Coach de carrière</h2>
           </div>
           <button
             className="rounded-md bg-white/10 p-2 text-slate-200 hover:bg-white/15"
@@ -2605,7 +2744,7 @@ function TutorialModal({ onClose }: { onClose: () => void }) {
         </div>
         <div className="mt-6 rounded-md border border-white/10 bg-white/[0.04] p-5">
           <div className="mb-4 grid h-12 w-12 place-items-center rounded-full bg-emerald-300 text-slate-950">
-            <CheckCircle2 size={24} />
+            <CurrentIcon size={24} />
           </div>
           <p className="text-sm text-slate-400">
             Étape {step + 1}/{tutorialSteps.length}
@@ -2640,7 +2779,6 @@ function TutorialModal({ onClose }: { onClose: () => void }) {
     </div>
   );
 }
-
 function Dashboard() {
   const player = useGameStore((state) => state.player)!;
   const navigate = useNavigate();
