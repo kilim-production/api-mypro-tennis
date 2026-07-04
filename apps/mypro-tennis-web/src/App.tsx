@@ -2830,6 +2830,7 @@ function TutorialModal({ onClose }: { onClose: () => void }) {
     </div>
   );
 }
+
 function Dashboard() {
   const player = useGameStore((state) => state.player)!;
   const navigate = useNavigate();
@@ -2903,9 +2904,9 @@ function Dashboard() {
               </p>
               <p className="text-xs text-slate-400">0-100</p>
             </div>
-            <ResponsiveContainer width="100%" height={215}>
-              <RadarChart data={chart} outerRadius="66%">
-                <PolarGrid stroke="#ffffff22" />
+            <ResponsiveContainer width="100%" height={225}>
+              <RadarChart data={chart} outerRadius="60%">
+                <PolarGrid stroke="#ffffff1f" />
                 <PolarAngleAxis dataKey="name" tick={{ fill: "#d6e4ef", fontSize: 10 }} />
                 <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
                 <Tooltip
@@ -2921,10 +2922,11 @@ function Dashboard() {
                 <Radar
                   dataKey="value"
                   stroke="#5eead4"
-                  strokeWidth={2}
+                  strokeWidth={1.4}
                   fill="#34d399"
-                  fillOpacity={0.34}
-                  dot={{ r: 2, fill: "#ecfeff", stroke: "#0f766e", strokeWidth: 1 }}
+                  fillOpacity={0.3}
+                  dot={false}
+                  activeDot={false}
                 />
               </RadarChart>
             </ResponsiveContainer>
