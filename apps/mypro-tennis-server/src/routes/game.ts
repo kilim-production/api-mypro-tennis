@@ -193,6 +193,14 @@ function nextPlayableAt(type: SeasonCompetitionType, window: ReturnType<typeof s
   return window.endsAt;
 }
 
+function isInSeasonWindow(
+  date: Date,
+  window: Pick<ReturnType<typeof seasonWindow>, "startsAt" | "endsAt">
+) {
+  const timestamp = date.getTime();
+  return timestamp >= window.startsAt.getTime() && timestamp < window.endsAt.getTime();
+}
+
 function clampRankingIndex(index: number) {
   return Math.max(0, Math.min(fftRankingPath.length - 1, index));
 }
@@ -960,7 +968,14 @@ gameRouter.get("/season", requireAuth, async (request, response) => {
   const window = seasonWindow();
   const seasonKey = window.key;
   const entries = await prisma.seasonCompetitionEntry.findMany({
-    where: { playerId: player.id, seasonKey },
+    where: {
+      playerId: player.id,
+      seasonKey,
+      createdAt: {
+        gte: window.startsAt,
+        lt: window.endsAt
+      }
+    },
     orderBy: { createdAt: "desc" }
   });
   const entryMatchIds = entries.flatMap((entry) =>
@@ -1086,8 +1101,11 @@ gameRouter.post("/season/:type/register", requireAuth, async (request, response)
           }
         }
       });
-      if (already)
+      if (already && isInSeasonWindow(already.createdAt, window))
         throw new Error("Vous êtes déjà inscrit à cette compétition pour cette période.");
+      if (already) {
+        await tx.seasonCompetitionEntry.delete({ where: { id: already.id } });
+      }
       if (player.budget < economy.entryFee) {
         throw new Error(`Budget insuffisant. Inscription requise : ${economy.entryFee} €.`);
       }
