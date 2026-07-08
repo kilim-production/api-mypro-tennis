@@ -19,6 +19,26 @@ const equipmentStatKeys = [
   "recovery"
 ] as const;
 
+const cosmeticNames = [
+  "Poignets Émeraude",
+  "Casquette Académie",
+  "Surgrip Noir Premium",
+  "Sac Signature MYPRO",
+  "T-shirt Circuit Junior",
+  "Bandeau Nuit Centrale"
+];
+
+const marketRecipes: Record<
+  string,
+  { required: number; resultRarity?: string; money?: number; label: string }
+> = {
+  Bronze: { required: 3, resultRarity: "Argent", label: "3 Bronze = 1 Argent" },
+  Argent: { required: 6, resultRarity: "Or", label: "6 Argent = 1 Or" },
+  Or: { required: 9, resultRarity: "Légendaire", label: "9 Or = 1 Légendaire" },
+  Légendaire: { required: 12, resultRarity: "Mythique", label: "12 Légendaires = 1 Mythique" },
+  Mythique: { required: 1, money: 10_000, label: "1 Mythique = 10 000 €" }
+};
+
 type CosmeticBonusSource = Pick<PlayerCosmetic, "bonuses" | "cosmeticId" | "rarity"> & {
   upgradeLevel?: number;
 };
@@ -81,6 +101,10 @@ export function generateCosmeticBonuses(cosmeticId: string, rarity: string) {
   }
 
   return bonuses;
+}
+
+function pickCosmeticName(seed: string) {
+  return cosmeticNames[seededPick(seed, 0, cosmeticNames.length)] ?? "Style MYPRO";
 }
 
 function effectiveCosmeticBonuses(cosmetic: CosmeticBonusSource) {
@@ -230,5 +254,76 @@ export async function upgradeCosmetic(playerId: string, cosmeticId: string) {
     if (owned.equippedSlot !== null) await updatePlayerStatsForEquipment(tx, playerId, before);
 
     return cosmeticPublicPayload(updated);
+  });
+}
+
+export function cosmeticMarketCatalog() {
+  return Object.entries(marketRecipes).map(([rarity, recipe]) => ({
+    rarity,
+    ...recipe
+  }));
+}
+
+export async function exchangeCosmeticsOnMarket(playerId: string, rarity: string) {
+  const recipe = marketRecipes[rarity];
+  if (!recipe) throw new Error("Recette du marché inconnue.");
+
+  return prisma.$transaction(async (tx) => {
+    const available = await tx.playerCosmetic.findMany({
+      where: { playerId, rarity },
+      orderBy: { ownedAt: "asc" }
+    });
+    const owned = available
+      .sort((first, second) => {
+        if (first.equippedSlot === null && second.equippedSlot !== null) return -1;
+        if (first.equippedSlot !== null && second.equippedSlot === null) return 1;
+        return first.ownedAt.getTime() - second.ownedAt.getTime();
+      })
+      .slice(0, recipe.required);
+    if (owned.length < recipe.required) {
+      throw new Error(
+        `Marché impossible : ${recipe.required} objet(s) ${rarity} requis, ${owned.length} disponible(s).`
+      );
+    }
+
+    const before = sumBonuses(
+      await tx.playerCosmetic.findMany({ where: { playerId, equippedSlot: { not: null } } })
+    );
+
+    await tx.playerCosmetic.deleteMany({
+      where: { id: { in: owned.map((item) => item.id) }, playerId }
+    });
+
+    let created: PlayerCosmetic | null = null;
+    if (recipe.money) {
+      await tx.player.update({
+        where: { id: playerId },
+        data: { budget: { increment: recipe.money } }
+      });
+    } else if (recipe.resultRarity) {
+      const seed = `${playerId}-${rarity}-${recipe.resultRarity}-${Date.now()}`;
+      const cosmeticId = `market-${seededPick(seed, 1, 1_000_000_000)}-${Date.now()}`;
+      created = await tx.playerCosmetic.create({
+        data: {
+          playerId,
+          cosmeticId,
+          name: pickCosmeticName(cosmeticId),
+          rarity: recipe.resultRarity,
+          bonuses: encodeJson(generateCosmeticBonuses(cosmeticId, recipe.resultRarity)),
+          upgradeLevel: 0
+        }
+      });
+    }
+
+    await updatePlayerStatsForEquipment(tx, playerId, before);
+
+    return {
+      recipe: recipe.label,
+      consumed: owned.length,
+      rarity,
+      resultRarity: recipe.resultRarity ?? null,
+      money: recipe.money ?? 0,
+      cosmetic: created ? cosmeticPublicPayload(created) : null
+    };
   });
 }

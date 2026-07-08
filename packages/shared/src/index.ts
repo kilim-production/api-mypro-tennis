@@ -71,6 +71,10 @@ export const cosmeticEquipSchema = z.object({
   slotIndex: z.number().int().min(0).max(3)
 });
 
+export const cosmeticMarketSchema = z.object({
+  rarity: z.enum(["Bronze", "Argent", "Or", "Légendaire", "Mythique"])
+});
+
 export const playableStatSchema = z.enum([
   "service",
   "return",

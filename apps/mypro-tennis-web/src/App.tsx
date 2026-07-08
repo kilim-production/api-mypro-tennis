@@ -1059,6 +1059,25 @@ const rarityWeight: Record<ChestRarity, number> = {
   Argent: 2,
   Bronze: 1
 };
+const cosmeticMarketRecipes: Array<{
+  rarity: ChestRarity;
+  required: number;
+  resultRarity: ChestRarity | null;
+  money: number;
+  label: string;
+}> = [
+  { rarity: "Bronze", required: 3, resultRarity: "Argent", money: 0, label: "3 Bronze" },
+  { rarity: "Argent", required: 6, resultRarity: "Or", money: 0, label: "6 Argent" },
+  { rarity: "Or", required: 9, resultRarity: "Légendaire", money: 0, label: "9 Or" },
+  {
+    rarity: "Légendaire",
+    required: 12,
+    resultRarity: "Mythique",
+    money: 0,
+    label: "12 Légendaires"
+  },
+  { rarity: "Mythique", required: 1, resultRarity: null, money: 10_000, label: "1 Mythique" }
+];
 
 type TennisBagChest = {
   id: string;
@@ -1123,6 +1142,14 @@ type ChestState = {
   }>;
   cosmetics: PlayerCosmeticItem[];
   gems: number;
+};
+type CosmeticMarketResult = {
+  recipe: string;
+  consumed: number;
+  rarity: ChestRarity;
+  resultRarity: ChestRarity | null;
+  money: number;
+  cosmetic: PlayerCosmeticItem | null;
 };
 type SkillState = {
   level: number;
@@ -3807,10 +3834,11 @@ function CollectionPage() {
   const refreshPlayer = useGameStore((state) => state.refresh);
   const [busyCosmetic, setBusyCosmetic] = useState<string | null>(null);
   const [busyUpgrade, setBusyUpgrade] = useState<string | null>(null);
+  const [busyMarket, setBusyMarket] = useState<ChestRarity | null>(null);
   const [busyCard, setBusyCard] = useState<string | null>(null);
   const [slotPicker, setSlotPicker] = useState<number | null>(null);
   const [collectionMessage, setCollectionMessage] = useState("");
-  const [tab, setTab] = useState<"equipment" | "cards" | "cosmetics">("equipment");
+  const [tab, setTab] = useState<"equipment" | "cards" | "cosmetics" | "market">("equipment");
 
   async function loadCollection() {
     setData(await api<ChestState>("/chests"));
@@ -3873,11 +3901,43 @@ function CollectionPage() {
     }
   }
 
+  async function exchangeOnMarket(rarity: ChestRarity) {
+    setBusyMarket(rarity);
+    setCollectionMessage("");
+    try {
+      const result = await api<CosmeticMarketResult>("/cosmetics/market/exchange", {
+        method: "POST",
+        body: JSON.stringify({ rarity })
+      });
+      await loadCollection();
+      await refreshPlayer();
+      setCollectionMessage(
+        result.money > 0
+          ? `Marché validé : ${result.recipe}. Vous récupérez ${result.money.toLocaleString("fr-FR")} €.`
+          : `Marché validé : ${result.recipe}. Nouvel objet ${result.resultRarity} obtenu.`
+      );
+    } catch (error) {
+      setCollectionMessage(error instanceof Error ? error.message : "Échange impossible.");
+    } finally {
+      setBusyMarket(null);
+    }
+  }
+
   const equipped = Array.from({ length: 4 }, (_, slotIndex) => ({
     slotIndex,
     item: data?.cosmetics.find((cosmetic) => cosmetic.equippedSlot === slotIndex) ?? null
   }));
   const sortedCosmetics = sortCosmeticsByRarity(data?.cosmetics ?? []);
+  const marketCounts = cosmeticMarketRecipes.reduce<Record<ChestRarity, number>>(
+    (counts, recipe) => ({
+      ...counts,
+      [recipe.rarity]: sortedCosmetics.filter((item) => item.rarity === recipe.rarity).length
+    }),
+    { Bronze: 0, Argent: 0, Or: 0, Légendaire: 0, Mythique: 0 }
+  );
+  const marketReady = cosmeticMarketRecipes.filter(
+    (recipe) => marketCounts[recipe.rarity] >= recipe.required
+  ).length;
   const totalEquipmentBonus = (data?.cosmetics ?? [])
     .filter((item) => item.equippedSlot !== null)
     .reduce(
@@ -3913,7 +3973,8 @@ function CollectionPage() {
               totalEquipmentBonus ? `+${totalEquipmentBonus}` : "4 slots"
             ],
             ["cards", "Cartes", unlockableCards ? `${unlockableCards} prêt(s)` : "12 stats"],
-            ["cosmetics", "Objets", `${sortedCosmetics.length}`]
+            ["cosmetics", "Objets", `${sortedCosmetics.length}`],
+            ["market", "Marché", marketReady ? `${marketReady} prêt(s)` : "occasion"]
           ].map(([value, label, meta]) => (
             <button
               key={value}
@@ -4163,6 +4224,79 @@ function CollectionPage() {
                 Aucun cosmétique débloqué pour le moment.
               </div>
             )}
+          </div>
+        </section>
+      ) : null}
+      {tab === "market" ? (
+        <section className="panel p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm text-emerald-300">Marché de l'occasion</p>
+              <h2 className="font-bold">Recyclez vos objets pour monter en rareté</h2>
+              <p className="mt-1 max-w-2xl text-sm text-slate-300">
+                Le marché consomme de vrais objets de votre inventaire. Les objets non équipés sont
+                utilisés en priorité.
+              </p>
+            </div>
+            <div className="rounded-md bg-white/[0.08] px-3 py-1 text-sm font-black text-slate-200">
+              {marketReady} échange(s) prêt(s)
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {cosmeticMarketRecipes.map((recipe) => {
+              const owned = marketCounts[recipe.rarity];
+              const canExchange = owned >= recipe.required;
+              const progress = Math.min(100, (owned / Math.max(1, recipe.required)) * 100);
+              return (
+                <article key={recipe.rarity} className={`metric ${rarityClass(recipe.rarity)}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                        Recette
+                      </div>
+                      <h3 className="mt-1 text-lg font-black">{recipe.label}</h3>
+                    </div>
+                    <div className="rounded-md bg-white/[0.08] px-2 py-1 text-sm font-black">
+                      {owned}/{recipe.required}
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-center justify-between gap-3 rounded-md bg-slate-950/35 p-3">
+                    <div className="min-w-0">
+                      <div className="text-xs text-slate-400">Vous donnez</div>
+                      <div className="mt-1 font-black text-white">
+                        {recipe.required} objet(s) {recipe.rarity}
+                      </div>
+                    </div>
+                    <Repeat2 className="shrink-0 text-emerald-300" size={22} />
+                    <div className="min-w-0 text-right">
+                      <div className="text-xs text-slate-400">Vous recevez</div>
+                      <div className="mt-1 font-black text-emerald-200">
+                        {recipe.resultRarity
+                          ? `1 objet ${recipe.resultRarity}`
+                          : `${recipe.money.toLocaleString("fr-FR")} €`}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/[0.08]">
+                    <div
+                      className="h-full rounded-full bg-emerald-300 transition-all"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                  <Button
+                    className="mt-4 w-full"
+                    disabled={!canExchange || busyMarket !== null}
+                    onClick={() => exchangeOnMarket(recipe.rarity)}
+                  >
+                    {busyMarket === recipe.rarity
+                      ? "Échange en cours..."
+                      : canExchange
+                        ? "Échanger au marché"
+                        : `${recipe.required - owned} objet(s) manquant(s)`}
+                  </Button>
+                </article>
+              );
+            })}
           </div>
         </section>
       ) : null}

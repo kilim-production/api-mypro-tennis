@@ -4,6 +4,7 @@ import { calculateOverall } from "@mypro/core";
 import {
   challengeSchema,
   cosmeticEquipSchema,
+  cosmeticMarketSchema,
   matchRequestSchema,
   skillUpgradeSchema
 } from "@mypro/shared";
@@ -23,7 +24,12 @@ import {
   speedUpChest,
   unlockStatCardBonus
 } from "../services/chests";
-import { equipCosmetic, unequipCosmetic, upgradeCosmetic } from "../services/equipment";
+import {
+  exchangeCosmeticsOnMarket,
+  equipCosmetic,
+  unequipCosmetic,
+  upgradeCosmetic
+} from "../services/equipment";
 import { createServerMatch } from "../services/matches";
 import { publicPlayer } from "../services/playerMapper";
 import { getPlayerSkillState, spendSkillPoint } from "../services/playerProgression";
@@ -960,6 +966,23 @@ gameRouter.post("/cosmetics/:id/upgrade", requireAuth, async (request, response)
     });
   }
 });
+
+gameRouter.post(
+  "/cosmetics/market/exchange",
+  requireAuth,
+  validateBody(cosmeticMarketSchema),
+  async (request, response) => {
+    const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
+    if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+    try {
+      return response.json(await exchangeCosmeticsOnMarket(player.id, request.body.rarity));
+    } catch (error) {
+      return response.status(409).json({
+        message: error instanceof Error ? error.message : "Échange impossible."
+      });
+    }
+  }
+);
 
 gameRouter.get("/season", requireAuth, async (request, response) => {
   const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
