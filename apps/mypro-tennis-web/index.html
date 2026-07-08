@@ -7,6 +7,47 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <title>MYPRO - TENNIS</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #07111f;
+      }
+
+      #root:empty::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background:
+          linear-gradient(90deg, rgba(2, 6, 23, 0.9), rgba(2, 6, 23, 0.42), rgba(2, 6, 23, 0.88)),
+          linear-gradient(180deg, rgba(7, 17, 31, 0.1), rgba(7, 17, 31, 0.84)),
+          url("/visuals/mypro-loading-keyart.png") center / cover no-repeat;
+      }
+
+      #root:empty::after {
+        content: "MYPRO TENNIS";
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        width: min(420px, calc(100vw - 48px));
+        transform: translate(-50%, -50%);
+        border: 1px solid rgba(94, 234, 212, 0.34);
+        border-radius: 10px;
+        background: rgba(2, 6, 23, 0.78);
+        box-shadow:
+          0 24px 90px rgba(0, 0, 0, 0.58),
+          0 0 42px rgba(45, 212, 191, 0.18);
+        padding: 30px 24px;
+        color: #ffffff;
+        font:
+          1000 24px/1.1 Inter,
+          system-ui,
+          sans-serif;
+        letter-spacing: 0.28em;
+        text-align: center;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

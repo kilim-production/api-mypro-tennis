@@ -7,7 +7,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["offline.html", "icon-192.png", "icon-512.png", "apple-touch-icon.png"],
+      includeAssets: [
+        "offline.html",
+        "icon-192.png",
+        "icon-512.png",
+        "apple-touch-icon.png",
+        "visuals/mypro-loading-keyart.png"
+      ],
       manifest: {
         name: "MYPRO - TENNIS",
         short_name: "MYPRO Tennis",
@@ -24,6 +30,7 @@ export default defineConfig({
         ]
       },
       workbox: {
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,html,svg,png,ico}"],
         navigateFallback: "/index.html"
       }

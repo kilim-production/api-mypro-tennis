@@ -7655,6 +7655,47 @@ function useFitMobileModals() {
   }, []);
 }
 
+function LoadingScreen() {
+  const [slowServer, setSlowServer] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSlowServer(true), 4500);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  return (
+    <main className="loading-screen" aria-busy="true" aria-live="polite">
+      <img
+        className="loading-screen-image"
+        src="/visuals/mypro-loading-keyart.png"
+        alt=""
+        aria-hidden="true"
+      />
+      <div className="loading-screen-scrim" />
+      <section className="loading-screen-card">
+        <div className="loading-brand">
+          <span>MYPRO</span>
+          <strong>TENNIS</strong>
+        </div>
+        <div className="loading-progress" aria-hidden="true">
+          <span />
+        </div>
+        <h1>Préparation du court</h1>
+        <p>
+          {slowServer
+            ? "Le serveur persistant se réveille. Votre carrière arrive dans quelques instants."
+            : "Connexion à votre carrière, vos sacs et la saison en cours."}
+        </p>
+        <div className="loading-dots" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+      </section>
+    </main>
+  );
+}
+
 export function App() {
   const { booted, refresh } = useGameStore();
   useFitMobileModals();
@@ -7663,9 +7704,7 @@ export function App() {
     return (
       <>
         <OrientationGuard />
-        <div className="grid min-h-screen place-items-center text-lg font-bold">
-          Chargement de MYPRO - TENNIS...
-        </div>
+        <LoadingScreen />
       </>
     );
   return (
