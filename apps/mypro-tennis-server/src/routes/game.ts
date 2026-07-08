@@ -434,8 +434,7 @@ function buildSeasonBracket(
 ) {
   const definition = seasonDefinitions[type];
   if (type === "individual") {
-    const current = Math.max(0, fftRankingPath.indexOf(player.fftRanking as FftRanking));
-    const path = fftRankingPath.slice(current).map((ranking, index) => ({
+    const path = fftRankingPath.map((ranking, index) => ({
       round: index + 1,
       ranking,
       label:
