@@ -1727,7 +1727,11 @@ function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      <header className="app-header sticky top-0 z-20 border-b border-white/10 bg-midnight/92 backdrop-blur">
+      <header
+        className={`app-header sticky top-0 z-20 border-b border-white/10 bg-midnight/92 backdrop-blur ${
+          isDashboard ? "dashboard-header" : ""
+        }`}
+      >
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
           <Link to="/" className="leading-none">
             <div className="text-xl font-black tracking-[0.18em] text-white">MYPRO</div>
@@ -1805,11 +1809,13 @@ function Shell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <div
-        className={`app-shell-content mx-auto grid max-w-7xl gap-4 px-3 py-4 sm:px-4 sm:py-5 ${
-          isDashboard ? "pb-4" : "pb-24"
-        }`}
+        className={
+          isDashboard
+            ? "app-shell-content dashboard-shell-content mx-auto grid w-full max-w-none gap-0 p-0"
+            : "app-shell-content mx-auto grid max-w-7xl gap-4 px-3 py-4 pb-24 sm:px-4 sm:py-5"
+        }
       >
-        <main className="min-w-0">{children}</main>
+        <main className={`min-w-0 ${isDashboard ? "dashboard-main" : ""}`}>{children}</main>
       </div>
       {showGameNav && !isDashboard ? <MobileBottomNav badges={mobileNavBadges} /> : null}
       {!isDashboard ? (
@@ -2696,9 +2702,16 @@ function TutorialModal({ onClose }: { onClose: () => void }) {
 
 function Dashboard() {
   const player = useGameStore((state) => state.player)!;
+  const refreshPlayer = useGameStore((state) => state.refresh);
   const navigate = useNavigate();
   const [chests, setChests] = useState<ChestState | null>(null);
   const [season, setSeason] = useState<SeasonData | null>(null);
+  const [rewardOpening, setRewardOpening] = useState<{
+    rewards: ChestRewards;
+    rarity: ChestRarity;
+  } | null>(null);
+  const [busyChest, setBusyChest] = useState<string | null>(null);
+  const [hubMessage, setHubMessage] = useState("");
   const chart = useMemo(
     () =>
       profileStatKeys.map((key) => ({
@@ -2725,88 +2738,169 @@ function Dashboard() {
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.allSettled([api<ChestState>("/chests"), api<SeasonData>("/season")]).then(
-      ([chestResult, seasonResult]) => {
-        if (cancelled) return;
-        if (chestResult.status === "fulfilled") setChests(chestResult.value);
-        if (seasonResult.status === "fulfilled") setSeason(seasonResult.value);
-      }
-    );
+    void loadDashboard().catch(() => undefined);
     return () => {
       cancelled = true;
     };
+
+    async function loadDashboard() {
+      const [chestResult, seasonResult] = await Promise.allSettled([
+        api<ChestState>("/chests"),
+        api<SeasonData>("/season")
+      ]);
+      if (cancelled) return;
+      if (chestResult.status === "fulfilled") setChests(chestResult.value);
+      if (seasonResult.status === "fulfilled") setSeason(seasonResult.value);
+    }
   }, []);
+
+  async function reloadDashboard() {
+    const [chestState, seasonState] = await Promise.all([
+      api<ChestState>("/chests"),
+      api<SeasonData>("/season")
+    ]);
+    setChests(chestState);
+    setSeason(seasonState);
+  }
+
+  async function openHubChest(chest: TennisBagChest) {
+    if (!chest.canOpen || busyChest) return;
+    setBusyChest(chest.id);
+    setHubMessage("");
+    try {
+      const result = await api<{ chest: TennisBagChest; rewards: ChestRewards }>(
+        `/chests/${chest.id}/open`,
+        { method: "POST" }
+      );
+      await reloadDashboard();
+      await refreshPlayer();
+      setRewardOpening({ rewards: result.rewards, rarity: chest.rarity });
+    } catch (error) {
+      setHubMessage(error instanceof Error ? error.message : "Ouverture du sac impossible.");
+    } finally {
+      setBusyChest(null);
+    }
+  }
 
   return (
     <div className="dashboard-lobby">
       <section className="lobby-stage">
         <div className="lobby-topbar">
-          <button className="lobby-profile-button" onClick={() => navigate("/player")} type="button">
-            <ProfilePicture avatar={player.avatar} size="sm" />
-            <span>
-              <strong>{player.name}</strong>
-              <small>
-                {nationalityLabel(player.nationality)} · {player.fftRanking} · Niv.{" "}
-                {player.playerLevel}
-              </small>
-            </span>
+          <button className="lobby-brand" onClick={() => navigate("/dashboard")} type="button">
+            <span>MYPRO</span>
+            <strong>TENNIS</strong>
           </button>
-          <button className="lobby-season-pill" onClick={() => navigate("/season")} type="button">
-            <Trophy size={22} />
-            <span>
+          <button className="lobby-season-track" onClick={() => navigate("/season")} type="button">
+            <div className="lobby-season-title">
               <strong>Saison {season?.season.key.replace("saison-", "") ?? "..."}</strong>
-              <small>
-                Jour {season?.season.day ?? "..."} / 30
-                {season ? ` · ${season.season.progress}%` : ""}
-              </small>
-            </span>
+              <span>Jour {season?.season.day ?? "..."} / 30</span>
+            </div>
+            <div className="lobby-season-progress">
+              {[0, 1, 2, 3, 4].map((index) => (
+                <span
+                  key={index}
+                  className={
+                    season && index < Math.ceil((season.season.progress / 100) * 5)
+                      ? "is-done"
+                      : ""
+                  }
+                />
+              ))}
+            </div>
+            <div className="lobby-daily-reward">
+              <span>Récompense du jour</span>
+              <strong>{season ? "Disponible dans Saison" : "Chargement"}</strong>
+            </div>
           </button>
-          <div className="lobby-resource-row">
-            <button
-              className="lobby-resource-pill lobby-energy"
-              onClick={() => navigate("/duel")}
-              type="button"
-            >
-              <Zap size={16} />
-              <strong>
-                {player.actionEnergy}/{player.actionEnergyMax}
-              </strong>
-              <small>Énergie</small>
-            </button>
-            <button
-              className="lobby-resource-pill lobby-gems"
-              onClick={() => navigate("/collection")}
-              type="button"
-            >
-              <Gem size={16} />
-              <strong>{player.gems}</strong>
-              <small>Gemmes</small>
-            </button>
-            <button
-              className="lobby-resource-pill lobby-money"
-              onClick={() => navigate("/player")}
-              type="button"
-            >
-              <span className="font-black">€</span>
-              <strong>{player.budget.toLocaleString("fr-FR")}</strong>
-              <small>Budget</small>
-            </button>
+          <div className="lobby-top-actions">
+            <div className="lobby-resource-row">
+              <button
+                className="lobby-resource-pill lobby-energy"
+                onClick={() => navigate("/duel")}
+                type="button"
+              >
+                <Zap size={18} />
+                <span>
+                  <small>Énergie</small>
+                  <strong>
+                    {player.actionEnergy}/{player.actionEnergyMax}
+                  </strong>
+                </span>
+              </button>
+              <button
+                className="lobby-resource-pill lobby-gems"
+                onClick={() => navigate("/collection")}
+                type="button"
+              >
+                <Gem size={18} />
+                <span>
+                  <small>Gemmes</small>
+                  <strong>{player.gems}</strong>
+                </span>
+              </button>
+              <button
+                className="lobby-resource-pill lobby-money"
+                onClick={() => navigate("/player")}
+                type="button"
+              >
+                <span className="text-xl font-black">€</span>
+                <span>
+                  <small>Budget</small>
+                  <strong>{player.budget.toLocaleString("fr-FR")} €</strong>
+                </span>
+              </button>
+            </div>
+            <div className="lobby-system-buttons">
+              <NotificationCenter compact />
+              <button
+                className="header-icon-button"
+                onClick={() => navigate("/community")}
+                type="button"
+                aria-label="Aide et communauté"
+              >
+                <HelpCircle size={18} />
+              </button>
+              <button
+                className="header-icon-button"
+                onClick={() => navigate("/settings")}
+                type="button"
+                aria-label="Réglages"
+              >
+                <Settings size={18} />
+              </button>
+            </div>
           </div>
         </div>
+
+        <button className="lobby-profile-button" onClick={() => navigate("/player")} type="button">
+          <ProfilePicture avatar={player.avatar} size="sm" />
+          <span>
+            <strong>{player.name}</strong>
+            <small>
+              {player.fftRanking} classement · Niv. {player.playerLevel}
+            </small>
+            <i>
+              <b style={{ width: `${Math.min(100, Math.max(6, player.playerLevel * 8))}%` }} />
+            </i>
+          </span>
+          <span className="lobby-level-badge">
+            <small>Niv.</small>
+            <strong>{player.playerLevel}</strong>
+          </span>
+        </button>
 
         <div className="lobby-grid">
           <aside className="lobby-side lobby-side-left">
             <LobbyActionButton
-              icon={Shield}
-              label="Mon joueur"
-              detail={`${player.fftRanking} · Général ${player.overall}`}
-              badge="Profil"
+              icon={Trophy}
+              label="Palmarès"
+              detail="Titres & records"
               onClick={() => navigate("/player")}
             />
             <LobbyActionButton
               icon={PackageOpen}
               label="Collection"
-              detail={`${readyBags} sac(s) prêt(s)`}
+              detail="Joueurs & équipements"
               badge={emptyBags ? `${emptyBags} slot(s)` : undefined}
               onClick={() => navigate("/collection")}
             />
@@ -2820,7 +2914,7 @@ function Dashboard() {
             <LobbyActionButton
               icon={Repeat2}
               label="Marché"
-              detail="Objets d'occasion"
+              detail="Occasion & offres"
               onClick={() => navigate("/collection")}
             />
           </aside>
@@ -2849,9 +2943,9 @@ function Dashboard() {
 
             <div className="lobby-main-mode">
               <div className="lobby-mode-info">
-                <p>Mode recommandé</p>
-                <h2>Duel</h2>
-                <span>Pool de 3 adversaires · coût 1 énergie</span>
+                <p>Duel · saison</p>
+                <h2>Bassin d'adversaires</h2>
+                <span>{player.fftRanking} · coût 1 énergie</span>
               </div>
               <Button className="lobby-play-button" onClick={() => navigate("/duel")}>
                 <Swords size={24} /> Jouer duel
@@ -2863,31 +2957,26 @@ function Dashboard() {
             <LobbyActionButton
               icon={Users}
               label="Mon club"
-              detail="Equipe et bâtiments"
+              detail="Membres & gestion"
               onClick={() => navigate("/club")}
-            />
-            <LobbyActionButton
-              icon={Trophy}
-              label="Saison"
-              detail={
-                seasonCompetition
-                  ? `${seasonCompetition.title} · ${seasonCompetition.energyCost} énergie`
-                  : "Tournois"
-              }
-              badge={seasonCompetition?.playableNow ? "Jouable" : undefined}
-              onClick={() => navigate("/season")}
             />
             <LobbyActionButton
               icon={BarChart3}
               label="Classement"
-              detail={`Rang ${player.worldRank}`}
+              detail={`Global · rang ${player.worldRank}`}
               onClick={() => navigate("/rankings")}
             />
             <LobbyActionButton
               icon={MessageCircle}
               label="Communauté"
-              detail="Discord et infos"
+              detail="Actualités & défis"
               onClick={() => navigate("/community")}
+            />
+            <LobbyActionButton
+              icon={Wifi}
+              label="Joueurs en ligne"
+              detail="Présence MMO"
+              onClick={() => navigate("/online")}
             />
           </aside>
         </div>
@@ -2931,30 +3020,76 @@ function Dashboard() {
             </ResponsiveContainer>
           </div>
 
-          <button className="lobby-bags-card" onClick={() => navigate("/collection")} type="button">
+          <div className="lobby-bags-card">
             <div className="flex items-start justify-between gap-3">
               <span>
                 <span className="lobby-card-kicker">Sacs</span>
                 <strong>{readyBags ? `${readyBags} prêt(s)` : "4 slots"}</strong>
               </span>
-              <PackageOpen size={20} />
+              <button
+                className="lobby-bags-link"
+                onClick={() => navigate("/collection")}
+                type="button"
+                aria-label="Voir la collection"
+              >
+                <PackageOpen size={20} />
+              </button>
             </div>
             <div className="lobby-bag-row">
               {(
                 chests?.slots ??
                 Array.from({ length: 4 }, (_, slotIndex) => ({ slotIndex, chest: null }))
               ).map(({ slotIndex, chest }) => (
-                <div
+                <button
                   key={slotIndex}
-                  className={`lobby-mini-bag ${chest ? rarityClass(chest.rarity) : ""}`}
+                  className={`lobby-mini-bag ${chest ? rarityClass(chest.rarity) : ""} ${
+                    chest?.canOpen ? "is-ready" : ""
+                  }`}
+                  disabled={!chest?.canOpen || busyChest !== null}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (chest) void openHubChest(chest);
+                  }}
+                  type="button"
                 >
-                  {chest ? <TennisBagVisual rarity={chest.rarity} /> : <span>+</span>}
-                </div>
+                  {chest ? (
+                    <>
+                      <TennisBagVisual rarity={chest.rarity} />
+                      <strong>
+                        {busyChest === chest.id
+                          ? "..."
+                          : chest.canOpen
+                            ? "Ouvrir"
+                            : chest.remainingMs > 0
+                              ? "Déverrouillage"
+                              : "Verrouillé"}
+                      </strong>
+                      {chest.remainingMs > 0 ? (
+                        <small>{formatRemaining(chest.remainingMs)}</small>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <span>
+                        <Lock size={15} />
+                      </span>
+                      <strong>Slot vide</strong>
+                    </>
+                  )}
+                </button>
               ))}
             </div>
-          </button>
+          </div>
         </div>
+        {hubMessage ? <div className="lobby-toast">{hubMessage}</div> : null}
       </section>
+      {rewardOpening ? (
+        <RewardModal
+          rewards={rewardOpening.rewards}
+          rarity={rewardOpening.rarity}
+          onClose={() => setRewardOpening(null)}
+        />
+      ) : null}
     </div>
   );
 }
