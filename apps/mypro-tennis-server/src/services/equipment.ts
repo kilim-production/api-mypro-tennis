@@ -85,6 +85,23 @@ export function cosmeticUpgradeCost(rarity: string, levelToUnlock: number) {
   return cosmeticUpgradeBaseCost(rarity) * Math.max(1, Math.min(3, levelToUnlock));
 }
 
+export function cosmeticUpgradeInvestment(rarity: string, upgradeLevel: number) {
+  const safeLevel = Math.max(0, Math.min(3, Math.floor(upgradeLevel)));
+  let total = 0;
+  for (let level = 1; level <= safeLevel; level += 1) {
+    total += cosmeticUpgradeCost(rarity, level);
+  }
+  return total;
+}
+
+export function cosmeticMarketRefundForItems(items: Array<Pick<PlayerCosmetic, "rarity" | "upgradeLevel">>) {
+  const invested = items.reduce(
+    (sum, item) => sum + cosmeticUpgradeInvestment(item.rarity, item.upgradeLevel),
+    0
+  );
+  return Math.round(invested * 0.3);
+}
+
 export function generateCosmeticBonuses(cosmeticId: string, rarity: string) {
   const points = cosmeticBonusPoints(rarity);
   const bonuses: Partial<TennisStats> = {};
@@ -289,18 +306,21 @@ export async function exchangeCosmeticsOnMarket(playerId: string, rarity: string
     const before = sumBonuses(
       await tx.playerCosmetic.findMany({ where: { playerId, equippedSlot: { not: null } } })
     );
+    const refund = cosmeticMarketRefundForItems(owned);
+    const totalMoney = (recipe.money ?? 0) + refund;
 
     await tx.playerCosmetic.deleteMany({
       where: { id: { in: owned.map((item) => item.id) }, playerId }
     });
 
     let created: PlayerCosmetic | null = null;
-    if (recipe.money) {
+    if (totalMoney > 0) {
       await tx.player.update({
         where: { id: playerId },
-        data: { budget: { increment: recipe.money } }
+        data: { budget: { increment: totalMoney } }
       });
-    } else if (recipe.resultRarity) {
+    }
+    if (recipe.resultRarity) {
       const seed = `${playerId}-${rarity}-${recipe.resultRarity}-${Date.now()}`;
       const cosmeticId = `market-${seededPick(seed, 1, 1_000_000_000)}-${Date.now()}`;
       created = await tx.playerCosmetic.create({
@@ -323,6 +343,8 @@ export async function exchangeCosmeticsOnMarket(playerId: string, rarity: string
       rarity,
       resultRarity: recipe.resultRarity ?? null,
       money: recipe.money ?? 0,
+      refund,
+      totalMoney,
       cosmetic: created ? cosmeticPublicPayload(created) : null
     };
   });

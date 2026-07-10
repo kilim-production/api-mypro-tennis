@@ -68,8 +68,7 @@ import {
   PolarRadiusAxis,
   Radar,
   RadarChart,
-  ResponsiveContainer,
-  Tooltip
+  ResponsiveContainer
 } from "recharts";
 import { countries, countryLabel, normalizeCountryCode, type Country } from "@mypro/shared";
 import { API_URL, api, saveToken } from "./api";
@@ -1149,6 +1148,8 @@ type CosmeticMarketResult = {
   rarity: ChestRarity;
   resultRarity: ChestRarity | null;
   money: number;
+  refund: number;
+  totalMoney: number;
   cosmetic: PlayerCosmeticItem | null;
 };
 type SkillState = {
@@ -1325,47 +1326,6 @@ function CareerPathCard({ player }: { player: Player }) {
           Accès pro bloqué : validez -15 pour entrer dans le circuit professionnel MyPro.
         </div>
       ) : null}
-    </article>
-  );
-}
-
-function ActionEnergyCard({ player }: { player: Player }) {
-  const now = useNow();
-  const rechargeMinutes = player.actionEnergyRechargeMinutes ?? 30;
-  const formattedRecharge = Number.isInteger(rechargeMinutes)
-    ? `${rechargeMinutes}`
-    : rechargeMinutes.toFixed(1);
-  const next = player.actionEnergyNextAt
-    ? new Date(player.actionEnergyNextAt).toLocaleTimeString("fr-FR", {
-        hour: "2-digit",
-        minute: "2-digit"
-      })
-    : null;
-  const remaining = player.actionEnergyNextAt
-    ? new Date(player.actionEnergyNextAt).getTime() - now
-    : 0;
-  const ratio = Math.round((player.actionEnergy / player.actionEnergyMax) * 100);
-  return (
-    <article className="panel p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm text-emerald-300">Énergie carrière</p>
-          <h2 className="text-2xl font-black">
-            {player.actionEnergy}/{player.actionEnergyMax}
-          </h2>
-        </div>
-        <Activity size={24} />
-      </div>
-      <p className="mt-3 text-sm text-slate-300">
-        Chaque action de carrière coûte 1 point. La réserve se recharge de 1 point toutes les{" "}
-        {formattedRecharge} minutes.
-      </p>
-      <div className="mt-4 h-2 rounded-full bg-white/[0.08]">
-        <div className="h-full rounded-full bg-sky-300" style={{ width: `${ratio}%` }} />
-      </div>
-      <p className="mt-3 text-sm text-slate-300">
-        {next ? `Prochain point vers ${next} · ${formatRemaining(remaining)}` : "Réserve complète"}
-      </p>
     </article>
   );
 }
@@ -1564,137 +1524,6 @@ function RewardModal({
   );
 }
 
-function TennisBagSlots() {
-  const [data, setData] = useState<ChestState | null>(null);
-  const [opening, setOpening] = useState<ChestRewards | null>(null);
-  const [busy, setBusy] = useState("");
-  const refresh = useGameStore((state) => state.refresh);
-  const now = useNow();
-
-  async function load() {
-    setData(await api<ChestState>("/chests"));
-  }
-
-  useEffect(() => void load(), []);
-
-  async function openBag(chestId: string) {
-    setBusy(chestId);
-    try {
-      const result = await api<{ rewards: ChestRewards }>(`/chests/${chestId}/open`, {
-        method: "POST"
-      });
-      setOpening(result.rewards);
-      await load();
-      await refresh();
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function speedUp(chestId: string) {
-    setBusy(chestId);
-    try {
-      await api(`/chests/${chestId}/speedup`, { method: "POST" });
-      await load();
-      await refresh();
-    } finally {
-      setBusy("");
-    }
-  }
-
-  return (
-    <article className="panel p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-sm text-emerald-300">Sacs de tennis</p>
-          <h2 className="text-xl font-black">Coffres d'entraînement</h2>
-        </div>
-        <div className="inline-flex items-center gap-2 rounded-md bg-white/[0.08] px-3 py-1 text-sm text-slate-200">
-          <Gem size={15} /> {data?.gems ?? 0} gemmes
-        </div>
-      </div>
-      <p className="mt-2 text-sm text-slate-300">
-        Gagnez un match pour obtenir un sac. Les 4 emplacements doivent être libérés régulièrement.
-      </p>
-      <div className="mt-4 grid grid-cols-4 gap-1.5 sm:gap-3">
-        {(
-          data?.slots ?? Array.from({ length: 4 }, (_, slotIndex) => ({ slotIndex, chest: null }))
-        ).map(({ slotIndex, chest }) => {
-          const remaining = chest ? new Date(chest.unlocksAt).getTime() - now : 0;
-          const ready = !!chest && remaining <= 0;
-          const speedCost = Math.max(1, Math.ceil(Math.max(0, remaining) / (10 * 60_000)));
-          return (
-            <div
-              key={slotIndex}
-              className={`bag-slot min-w-0 ${chest ? rarityClass(chest.rarity) : ""}`}
-            >
-              {chest ? (
-                <>
-                  <TennisBagVisual rarity={chest.rarity} />
-                  <div className="mt-2 grid gap-0.5 sm:mt-3 sm:flex sm:items-center sm:justify-between sm:gap-2">
-                    <span className="truncate text-center text-[11px] font-black sm:text-left sm:text-base">
-                      {chest.rarity}
-                    </span>
-                    <span className="text-center text-[10px] text-slate-400 sm:text-left sm:text-xs">
-                      S{slotIndex + 1}
-                    </span>
-                  </div>
-                  <div className="mt-1 min-h-8 text-center text-[10px] leading-tight text-slate-300 sm:mt-2 sm:text-left sm:text-sm">
-                    {ready ? (
-                      "Prêt à ouvrir"
-                    ) : (
-                      <Countdown endAt={chest.unlocksAt} doneLabel="Prêt" />
-                    )}
-                  </div>
-                  <div className="mt-2 hidden grid-cols-4 gap-2 rounded-md border border-white/10 bg-slate-950/45 p-2 sm:grid">
-                    <StatIcon statKey="service" size="sm" />
-                    <span className="grid h-8 w-8 place-items-center rounded-md border border-white/10 bg-slate-950/75 text-xs font-black text-emerald-200">
-                      €
-                    </span>
-                    <span className="grid h-8 w-8 place-items-center rounded-md border border-white/10 bg-slate-950/75 text-emerald-200">
-                      <Image size={16} />
-                    </span>
-                    <span className="grid h-8 w-8 place-items-center rounded-md border border-white/10 bg-slate-950/75 text-cyan-200">
-                      <Gem size={16} />
-                    </span>
-                  </div>
-                  <div className="mt-2 grid gap-1 sm:mt-3 sm:gap-2">
-                    <button
-                      className="inline-flex min-h-8 items-center justify-center gap-1 rounded-md bg-emerald-400 px-1.5 py-1 text-[10px] font-black text-slate-950 transition hover:bg-emerald-300 disabled:opacity-50 sm:min-h-10 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm"
-                      disabled={!ready || busy === chest.id}
-                      onClick={() => openBag(chest.id)}
-                      type="button"
-                    >
-                      <PackageOpen size={14} />
-                      <span className="hidden sm:inline">Ouvrir</span>
-                    </button>
-                    {!ready ? (
-                      <button
-                        className="inline-flex min-h-8 items-center justify-center gap-1 rounded-md bg-white/10 px-1.5 py-1 text-[10px] font-black text-white transition hover:bg-white/15 disabled:opacity-50 sm:min-h-10 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm"
-                        disabled={busy === chest.id}
-                        onClick={() => speedUp(chest.id)}
-                        type="button"
-                      >
-                        <Sparkles size={14} />
-                        <span>{speedCost}</span>
-                      </button>
-                    ) : null}
-                  </div>
-                </>
-              ) : (
-                <div className="grid h-full min-h-24 place-items-center rounded-md border border-dashed border-white/15 px-1 text-center text-[10px] text-slate-400 sm:min-h-[210px] sm:text-sm">
-                  Slot vide
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      {opening ? <RewardModal rewards={opening} onClose={() => setOpening(null)} /> : null}
-    </article>
-  );
-}
-
 function Button(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
@@ -1834,6 +1663,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const showGameNav =
     user && !["/", "/login", "/signup", "/oauth/google"].includes(location.pathname);
+  const isDashboard = location.pathname === "/dashboard";
   const navBadges = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const notification of notifications) {
@@ -1974,17 +1804,23 @@ function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
-      <div className="app-shell-content mx-auto grid max-w-7xl gap-4 px-3 py-4 pb-24 sm:px-4 sm:py-5">
+      <div
+        className={`app-shell-content mx-auto grid max-w-7xl gap-4 px-3 py-4 sm:px-4 sm:py-5 ${
+          isDashboard ? "pb-4" : "pb-24"
+        }`}
+      >
         <main className="min-w-0">{children}</main>
       </div>
-      {showGameNav ? <MobileBottomNav badges={mobileNavBadges} /> : null}
-      <footer className="app-footer mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-3 px-4 pb-24 text-center text-[11px] font-black uppercase tracking-[0.28em] text-slate-500 lg:pb-5">
-        <span>KILIM GAMES PRODUCTION</span>
-        <span className="text-slate-700">·</span>
-        <Link className="transition hover:text-emerald-300" to="/community">
-          Communauté
-        </Link>
-      </footer>
+      {showGameNav && !isDashboard ? <MobileBottomNav badges={mobileNavBadges} /> : null}
+      {!isDashboard ? (
+        <footer className="app-footer mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-3 px-4 pb-24 text-center text-[11px] font-black uppercase tracking-[0.28em] text-slate-500 lg:pb-5">
+          <span>KILIM GAMES PRODUCTION</span>
+          <span className="text-slate-700">·</span>
+          <Link className="transition hover:text-emerald-300" to="/community">
+            Communauté
+          </Link>
+        </footer>
+      ) : null}
       {showGameNav && menuOpen
         ? createPortal(
             <div
@@ -2861,6 +2697,8 @@ function TutorialModal({ onClose }: { onClose: () => void }) {
 function Dashboard() {
   const player = useGameStore((state) => state.player)!;
   const navigate = useNavigate();
+  const [chests, setChests] = useState<ChestState | null>(null);
+  const [season, setSeason] = useState<SeasonData | null>(null);
   const chart = useMemo(
     () =>
       profileStatKeys.map((key) => ({
@@ -2870,118 +2708,281 @@ function Dashboard() {
       })),
     [player]
   );
+  const topStats = useMemo(
+    () =>
+      profileStatKeys
+        .map((key) => ({ key, value: stat(player, key) }))
+        .sort((first, second) => second.value - first.value)
+        .slice(0, 3),
+    [player]
+  );
+  const seasonCompetition =
+    season?.competitions.find((competition) => competition.type === "daily") ??
+    season?.competitions[0] ??
+    null;
+  const readyBags = chests?.slots.filter((slot) => slot.chest?.canOpen).length ?? 0;
+  const emptyBags = chests?.slots.filter((slot) => !slot.chest).length ?? 4;
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.allSettled([api<ChestState>("/chests"), api<SeasonData>("/season")]).then(
+      ([chestResult, seasonResult]) => {
+        if (cancelled) return;
+        if (chestResult.status === "fulfilled") setChests(chestResult.value);
+        if (seasonResult.status === "fulfilled") setSeason(seasonResult.value);
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
-    <div className="grid gap-4">
-      <section className="game-hub panel overflow-hidden p-4 sm:p-5">
-        <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
-          <div className="grid gap-4">
-            <div className="flex items-center gap-4">
-              <ProfilePicture avatar={player.avatar} size="md" />
-              <div className="min-w-0">
-                <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-300">
-                  Carrière active
-                </p>
-                <h1 className="truncate text-3xl font-black">{player.name}</h1>
-                <p className="text-sm text-slate-300">
-                  {nationalityLabel(player.nationality)} · {player.fftRanking} · Niveau joueur{" "}
-                  {player.playerLevel} · Général {player.overall}
-                </p>
+    <div className="dashboard-lobby">
+      <section className="lobby-stage">
+        <div className="lobby-topbar">
+          <button className="lobby-profile-button" onClick={() => navigate("/player")} type="button">
+            <ProfilePicture avatar={player.avatar} size="sm" />
+            <span>
+              <strong>{player.name}</strong>
+              <small>
+                {nationalityLabel(player.nationality)} · {player.fftRanking} · Niv.{" "}
+                {player.playerLevel}
+              </small>
+            </span>
+          </button>
+          <button className="lobby-season-pill" onClick={() => navigate("/season")} type="button">
+            <Trophy size={22} />
+            <span>
+              <strong>Saison {season?.season.key.replace("saison-", "") ?? "..."}</strong>
+              <small>
+                Jour {season?.season.day ?? "..."} / 30
+                {season ? ` · ${season.season.progress}%` : ""}
+              </small>
+            </span>
+          </button>
+          <div className="lobby-resource-row">
+            <button
+              className="lobby-resource-pill lobby-energy"
+              onClick={() => navigate("/duel")}
+              type="button"
+            >
+              <Zap size={16} />
+              <strong>
+                {player.actionEnergy}/{player.actionEnergyMax}
+              </strong>
+              <small>Énergie</small>
+            </button>
+            <button
+              className="lobby-resource-pill lobby-gems"
+              onClick={() => navigate("/collection")}
+              type="button"
+            >
+              <Gem size={16} />
+              <strong>{player.gems}</strong>
+              <small>Gemmes</small>
+            </button>
+            <button
+              className="lobby-resource-pill lobby-money"
+              onClick={() => navigate("/player")}
+              type="button"
+            >
+              <span className="font-black">€</span>
+              <strong>{player.budget.toLocaleString("fr-FR")}</strong>
+              <small>Budget</small>
+            </button>
+          </div>
+        </div>
+
+        <div className="lobby-grid">
+          <aside className="lobby-side lobby-side-left">
+            <LobbyActionButton
+              icon={Shield}
+              label="Mon joueur"
+              detail={`${player.fftRanking} · Général ${player.overall}`}
+              badge="Profil"
+              onClick={() => navigate("/player")}
+            />
+            <LobbyActionButton
+              icon={PackageOpen}
+              label="Collection"
+              detail={`${readyBags} sac(s) prêt(s)`}
+              badge={emptyBags ? `${emptyBags} slot(s)` : undefined}
+              onClick={() => navigate("/collection")}
+            />
+            <LobbyActionButton
+              icon={Target}
+              label="Compétences"
+              detail={`${player.skillPoints} point(s) à placer`}
+              badge={player.skillPoints ? "!" : undefined}
+              onClick={() => navigate("/skills")}
+            />
+            <LobbyActionButton
+              icon={Repeat2}
+              label="Marché"
+              detail="Objets d'occasion"
+              onClick={() => navigate("/collection")}
+            />
+          </aside>
+
+          <main className="lobby-center">
+            <div className="lobby-player-card">
+              <div className="lobby-player-glow" />
+              <ProfilePicture avatar={player.avatar} size="lg" />
+              <div className="lobby-player-rank">
+                <span>{player.fftRanking}</span>
+                <small>Classement</small>
+              </div>
+              <div className="lobby-player-name">
+                <p>Carrière active</p>
+                <h1>{player.name}</h1>
+              </div>
+              <div className="lobby-stat-chips">
+                {topStats.map((item) => (
+                  <span key={item.key}>
+                    <StatIcon statKey={item.key} size="sm" />
+                    <strong>{Math.round(item.value)}</strong>
+                  </span>
+                ))}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <GameMiniMetric
-                label="Énergie"
-                value={`${player.actionEnergy}/${player.actionEnergyMax}`}
-              />
-              <GameMiniMetric label="Niveau joueur" value={player.playerLevel} />
-              <GameMiniMetric label="Général" value={player.overall} />
-              <GameMiniMetric label="Budget" value={`${player.budget.toLocaleString("fr-FR")} €`} />
+
+            <div className="lobby-main-mode">
+              <div className="lobby-mode-info">
+                <p>Mode recommandé</p>
+                <h2>Duel</h2>
+                <span>Pool de 3 adversaires · coût 1 énergie</span>
+              </div>
+              <Button className="lobby-play-button" onClick={() => navigate("/duel")}>
+                <Swords size={24} /> Jouer duel
+              </Button>
             </div>
-            <div className="grid gap-2 sm:grid-cols-4">
-              <QuickActionButton
-                icon={Shield}
-                label="Mon joueur"
-                detail="Fiche"
-                onClick={() => navigate("/player")}
-              />
-              <QuickActionButton
-                icon={Swords}
-                label="Duel"
-                detail="1 énergie"
-                onClick={() => navigate("/duel")}
-              />
-              <QuickActionButton
-                icon={Target}
-                label="Compétences"
-                detail={`${player.skillPoints} point(s)`}
-                onClick={() => navigate("/skills")}
-              />
-              <QuickActionButton
-                icon={Trophy}
-                label="Saison"
-                detail="Tournois"
-                onClick={() => navigate("/season")}
-              />
+          </main>
+
+          <aside className="lobby-side lobby-side-right">
+            <LobbyActionButton
+              icon={Users}
+              label="Mon club"
+              detail="Equipe et bâtiments"
+              onClick={() => navigate("/club")}
+            />
+            <LobbyActionButton
+              icon={Trophy}
+              label="Saison"
+              detail={
+                seasonCompetition
+                  ? `${seasonCompetition.title} · ${seasonCompetition.energyCost} énergie`
+                  : "Tournois"
+              }
+              badge={seasonCompetition?.playableNow ? "Jouable" : undefined}
+              onClick={() => navigate("/season")}
+            />
+            <LobbyActionButton
+              icon={BarChart3}
+              label="Classement"
+              detail={`Rang ${player.worldRank}`}
+              onClick={() => navigate("/rankings")}
+            />
+            <LobbyActionButton
+              icon={MessageCircle}
+              label="Communauté"
+              detail="Discord et infos"
+              onClick={() => navigate("/community")}
+            />
+          </aside>
+        </div>
+
+        <div className="lobby-bottom">
+          <button className="lobby-season-card" onClick={() => navigate("/season")} type="button">
+            <span className="lobby-card-kicker">Saison en cours</span>
+            <strong>
+              Jour {season?.season.day ?? "..."} · fin le{" "}
+              {season ? new Date(season.season.endsAt).toLocaleDateString("fr-FR") : "..."}
+            </strong>
+            <small>
+              {seasonCompetition?.entry
+                ? "Compétition inscrite"
+                : seasonCompetition?.playableNow
+                  ? "Inscription disponible"
+                  : "Prochaine fenêtre à venir"}
+            </small>
+          </button>
+
+          <div className="lobby-radar-card">
+            <div>
+              <span className="lobby-card-kicker">Radar</span>
+              <strong>12 stats</strong>
             </div>
-          </div>
-          <div className="min-h-[240px] rounded-md border border-white/10 bg-slate-950/34 p-3">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-300">
-                Radar des 12 stats
-              </p>
-              <p className="text-xs text-slate-400">0-100</p>
-            </div>
-            <ResponsiveContainer width="100%" height={225}>
-              <RadarChart data={chart} outerRadius="60%">
+            <ResponsiveContainer width="100%" height={130}>
+              <RadarChart data={chart} outerRadius="58%">
                 <PolarGrid stroke="#ffffff1f" />
-                <PolarAngleAxis dataKey="name" tick={{ fill: "#d6e4ef", fontSize: 10 }} />
+                <PolarAngleAxis dataKey="name" tick={false} />
                 <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    background: "#0f172a",
-                    border: "1px solid #1f4f5a",
-                    borderRadius: 8,
-                    color: "#f8fafc"
-                  }}
-                  formatter={(value) => [`${value}/100`, "Valeur"]}
-                  labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName ?? ""}
-                />
                 <Radar
                   dataKey="value"
                   stroke="#5eead4"
-                  strokeWidth={1.4}
+                  strokeWidth={1.2}
                   fill="#34d399"
-                  fillOpacity={0.3}
+                  fillOpacity={0.34}
                   dot={false}
                   activeDot={false}
                 />
               </RadarChart>
             </ResponsiveContainer>
           </div>
+
+          <button className="lobby-bags-card" onClick={() => navigate("/collection")} type="button">
+            <div className="flex items-start justify-between gap-3">
+              <span>
+                <span className="lobby-card-kicker">Sacs</span>
+                <strong>{readyBags ? `${readyBags} prêt(s)` : "4 slots"}</strong>
+              </span>
+              <PackageOpen size={20} />
+            </div>
+            <div className="lobby-bag-row">
+              {(
+                chests?.slots ??
+                Array.from({ length: 4 }, (_, slotIndex) => ({ slotIndex, chest: null }))
+              ).map(({ slotIndex, chest }) => (
+                <div
+                  key={slotIndex}
+                  className={`lobby-mini-bag ${chest ? rarityClass(chest.rarity) : ""}`}
+                >
+                  {chest ? <TennisBagVisual rarity={chest.rarity} /> : <span>+</span>}
+                </div>
+              ))}
+            </div>
+          </button>
         </div>
       </section>
-      <TennisBagSlots />
-      <CareerPathCard player={player} />
-      <section className="grid gap-4 lg:grid-cols-2">
-        <ActionEnergyCard player={player} />
-        <article className="panel p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm text-emerald-300">Action recommandée</p>
-              <h2 className="text-xl font-black">Trouver un adversaire</h2>
-            </div>
-            <Swords className="text-emerald-200" size={24} />
-          </div>
-          <p className="mt-2 text-sm text-slate-300">
-            Le duel est la boucle la plus rapide pour tester vos cartes, votre énergie et vos
-            équipements.
-          </p>
-          <Button className="mt-4 w-full" onClick={() => navigate("/duel")}>
-            Lancer un duel
-          </Button>
-        </article>
-      </section>
     </div>
+  );
+}
+
+function LobbyActionButton({
+  icon: Icon,
+  label,
+  detail,
+  badge,
+  onClick
+}: {
+  icon: LucideIcon;
+  label: string;
+  detail: string;
+  badge?: string | undefined;
+  onClick: () => void;
+}) {
+  return (
+    <button className="lobby-action-button" onClick={onClick} type="button">
+      <span className="lobby-action-icon">
+        <Icon size={22} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <strong>{label}</strong>
+        <small>{detail}</small>
+      </span>
+      {badge ? <span className="lobby-action-badge">{badge}</span> : null}
+    </button>
   );
 }
 
@@ -2991,28 +2992,6 @@ function GameMiniMetric({ label, value }: { label: string; value: React.ReactNod
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
-  );
-}
-
-function QuickActionButton({
-  icon: Icon,
-  label,
-  detail,
-  onClick
-}: {
-  icon: typeof Activity;
-  label: string;
-  detail: string;
-  onClick: () => void;
-}) {
-  return (
-    <button className="quick-action-button" onClick={onClick} type="button">
-      <Icon size={20} />
-      <span>
-        <strong>{label}</strong>
-        <small>{detail}</small>
-      </span>
-    </button>
   );
 }
 
@@ -3911,10 +3890,14 @@ function CollectionPage() {
       });
       await loadCollection();
       await refreshPlayer();
+      const refundLabel =
+        result.refund > 0
+          ? ` Remboursement amélioration : ${result.refund.toLocaleString("fr-FR")} €.`
+          : "";
       setCollectionMessage(
         result.money > 0
-          ? `Marché validé : ${result.recipe}. Vous récupérez ${result.money.toLocaleString("fr-FR")} €.`
-          : `Marché validé : ${result.recipe}. Nouvel objet ${result.resultRarity} obtenu.`
+          ? `Marché validé : ${result.recipe}. Vous récupérez ${result.totalMoney.toLocaleString("fr-FR")} €.${refundLabel}`
+          : `Marché validé : ${result.recipe}. Nouvel objet ${result.resultRarity} obtenu.${refundLabel}`
       );
     } catch (error) {
       setCollectionMessage(error instanceof Error ? error.message : "Échange impossible.");
@@ -4235,7 +4218,8 @@ function CollectionPage() {
               <h2 className="font-bold">Recyclez vos objets pour monter en rareté</h2>
               <p className="mt-1 max-w-2xl text-sm text-slate-300">
                 Le marché consomme de vrais objets de votre inventaire. Les objets non équipés sont
-                utilisés en priorité.
+                utilisés en priorité. 30 % de l'argent investi dans leurs améliorations est rendu
+                au moment de l'échange.
               </p>
             </div>
             <div className="rounded-md bg-white/[0.08] px-3 py-1 text-sm font-black text-slate-200">
