@@ -62,14 +62,6 @@ import {
   X,
   Zap
 } from "lucide-react";
-import {
-  PolarAngleAxis,
-  PolarGrid,
-  PolarRadiusAxis,
-  Radar,
-  RadarChart,
-  ResponsiveContainer
-} from "recharts";
 import { countries, countryLabel, normalizeCountryCode, type Country } from "@mypro/shared";
 import { API_URL, api, saveToken } from "./api";
 import { useGameStore, type GameNotification, type Player } from "./store";
@@ -171,21 +163,6 @@ const profileStatKeys = [
   "strength",
   "recovery"
 ] as const;
-
-const dashboardRadarLabels: Record<(typeof profileStatKeys)[number], string> = {
-  service: "Service",
-  return: "Retour",
-  forehand: "C. droit",
-  backhand: "Revers",
-  volley: "Volée",
-  smash: "Smash",
-  dropShot: "Amortie",
-  stamina: "Endurance",
-  speed: "Vitesse",
-  explosiveness: "Explos.",
-  strength: "Force",
-  recovery: "Récup."
-};
 
 const statVisuals: Record<
   (typeof profileStatKeys)[number],
@@ -2712,23 +2689,15 @@ function Dashboard() {
   } | null>(null);
   const [busyChest, setBusyChest] = useState<string | null>(null);
   const [hubMessage, setHubMessage] = useState("");
-  const chart = useMemo(
-    () =>
-      profileStatKeys.map((key) => ({
-        name: dashboardRadarLabels[key],
-        fullName: statLabels[key],
-        value: Math.round(stat(player, key))
-      })),
-    [player]
-  );
-  const topStats = useMemo(
+  const topSixStats = useMemo(
     () =>
       profileStatKeys
-        .map((key) => ({ key, value: stat(player, key) }))
+        .map((key) => ({ key, label: statLabels[key], value: stat(player, key) }))
         .sort((first, second) => second.value - first.value)
-        .slice(0, 3),
+        .slice(0, 6),
     [player]
   );
+  const topStats = topSixStats.slice(0, 3);
   const seasonCompetition =
     season?.competitions.find((competition) => competition.type === "daily") ??
     season?.competitions[0] ??
@@ -2892,16 +2861,16 @@ function Dashboard() {
         <div className="lobby-grid">
           <aside className="lobby-side lobby-side-left">
             <LobbyActionButton
-              icon={Trophy}
-              label="Palmarès"
-              detail="Titres & records"
-              onClick={() => navigate("/player")}
-            />
-            <LobbyActionButton
               icon={PackageOpen}
               label="Collection"
               detail="Joueurs & équipements"
               badge={emptyBags ? `${emptyBags} slot(s)` : undefined}
+              onClick={() => navigate("/collection")}
+            />
+            <LobbyActionButton
+              icon={Repeat2}
+              label="Marché"
+              detail="Occasion & offres"
               onClick={() => navigate("/collection")}
             />
             <LobbyActionButton
@@ -2912,10 +2881,10 @@ function Dashboard() {
               onClick={() => navigate("/skills")}
             />
             <LobbyActionButton
-              icon={Repeat2}
-              label="Marché"
-              detail="Occasion & offres"
-              onClick={() => navigate("/collection")}
+              icon={Trophy}
+              label="Palmarès"
+              detail="Titres & records"
+              onClick={() => navigate("/player")}
             />
           </aside>
 
@@ -2997,28 +2966,31 @@ function Dashboard() {
             </small>
           </button>
 
-          <div className="lobby-radar-card">
-            <div>
-              <span className="lobby-card-kicker">Radar</span>
-              <strong>12 stats</strong>
+          <button
+            className="lobby-stats-card"
+            onClick={() => navigate("/player?tab=stats")}
+            type="button"
+          >
+            <div className="lobby-stats-head">
+              <span>
+                <span className="lobby-card-kicker">Note globale</span>
+                <strong>{player.overall}</strong>
+              </span>
+              <ChevronRight size={18} />
             </div>
-            <ResponsiveContainer width="100%" height={130}>
-              <RadarChart data={chart} outerRadius="58%">
-                <PolarGrid stroke="#ffffff1f" />
-                <PolarAngleAxis dataKey="name" tick={false} />
-                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
-                <Radar
-                  dataKey="value"
-                  stroke="#5eead4"
-                  strokeWidth={1.2}
-                  fill="#34d399"
-                  fillOpacity={0.34}
-                  dot={false}
-                  activeDot={false}
-                />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
+            <div className="lobby-stat-bars">
+              {topSixStats.map((item) => (
+                <div className="lobby-stat-row" key={item.key}>
+                  <span>{item.label}</span>
+                  <i>
+                    <b style={{ width: `${Math.max(4, Math.min(100, item.value))}%` }} />
+                  </i>
+                  <strong>{Math.round(item.value)}</strong>
+                </div>
+              ))}
+            </div>
+            <small>Voir toutes les stats</small>
+          </button>
 
           <div className="lobby-bags-card">
             <div className="flex items-start justify-between gap-3">
@@ -3142,15 +3114,32 @@ function Metric({ label, value }: { label: string; value: React.ReactNode }) {
 function PlayerPage() {
   const player = useGameStore((state) => state.player)!;
   const refresh = useGameStore((state) => state.refresh);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [career, setCareer] = useState<CareerProfile | null>(null);
   const [avatarEditorOpen, setAvatarEditorOpen] = useState(false);
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
-  const [tab, setTab] = useState<"overview" | "stats" | "palmares">("overview");
+  const requestedTab = searchParams.get("tab");
+  const initialTab: "overview" | "stats" | "palmares" =
+    requestedTab === "stats" || requestedTab === "palmares" ? requestedTab : "overview";
+  const [tab, setTab] = useState<"overview" | "stats" | "palmares">(initialTab);
   const topStats = profileStatKeys
     .map((key) => ({ key, value: stat(player, key) }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 3);
   useEffect(() => void api<CareerProfile>("/players/me/career").then(setCareer), []);
+  useEffect(() => {
+    const nextTab = searchParams.get("tab");
+    if ((nextTab === "stats" || nextTab === "palmares") && nextTab !== tab) {
+      setTab(nextTab);
+    }
+    if (!nextTab && tab !== "overview") setTab("overview");
+  }, [searchParams, tab]);
+
+  function selectPlayerTab(nextTab: "overview" | "stats" | "palmares") {
+    setTab(nextTab);
+    setSearchParams(nextTab === "overview" ? {} : { tab: nextTab }, { replace: true });
+  }
+
   return (
     <div className="grid gap-4">
       <section className="panel p-4 sm:p-5">
@@ -3200,7 +3189,7 @@ function PlayerPage() {
             <button
               key={value}
               className={tab === value ? "is-active" : ""}
-              onClick={() => setTab(value as typeof tab)}
+              onClick={() => selectPlayerTab(value as typeof tab)}
               type="button"
             >
               <span>{label}</span>
