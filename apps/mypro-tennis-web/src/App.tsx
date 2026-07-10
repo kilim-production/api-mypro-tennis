@@ -1314,6 +1314,10 @@ function rarityClass(rarity: ChestRarity) {
     .replace(/[\u0300-\u036f]/g, "")}`;
 }
 
+function tennisBagImagePath(rarity: ChestRarity) {
+  return `/visuals/chests/tennis-bag-${rarityClass(rarity).replace("rarity-", "")}.png`;
+}
+
 function sortCosmeticsByRarity(items: PlayerCosmeticItem[]) {
   return [...items].sort((a, b) => {
     const rarityDelta = (rarityWeight[b.rarity] ?? 0) - (rarityWeight[a.rarity] ?? 0);
@@ -1391,9 +1395,7 @@ function CosmeticUpgradeMeta({ item }: { item: PlayerCosmeticItem }) {
 function TennisBagVisual({ rarity, opening = false }: { rarity: ChestRarity; opening?: boolean }) {
   return (
     <div className={`tennis-bag ${rarityClass(rarity)} ${opening ? "tennis-bag-opening" : ""}`}>
-      <div className="tennis-bag-handle" />
-      <div className="tennis-bag-flap" />
-      <div className="tennis-bag-mark">MYPRO</div>
+      <img alt={`Sac ${rarity}`} draggable={false} src={tennisBagImagePath(rarity)} />
     </div>
   );
 }
