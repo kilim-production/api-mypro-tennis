@@ -527,7 +527,13 @@ button:disabled,
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(90deg, rgba(2, 6, 23, 0.56), transparent 28%, transparent 72%, rgba(2, 6, 23, 0.56)),
+    linear-gradient(
+      90deg,
+      rgba(2, 6, 23, 0.56),
+      transparent 28%,
+      transparent 72%,
+      rgba(2, 6, 23, 0.56)
+    ),
     linear-gradient(180deg, rgba(2, 6, 23, 0.38), transparent 34%, rgba(2, 6, 23, 0.7));
 }
 
@@ -1976,8 +1982,7 @@ button:disabled,
   width: 100%;
   height: 100%;
   object-fit: contain;
-  filter:
-    drop-shadow(0 14px 18px rgba(0, 0, 0, 0.42))
+  filter: drop-shadow(0 14px 18px rgba(0, 0, 0, 0.42))
     drop-shadow(0 0 14px var(--bag-glow, rgba(94, 234, 212, 0.12)));
   transform: translateZ(0);
   user-select: none;
@@ -5177,6 +5182,687 @@ button:disabled,
 
   .lobby-mini-bag small {
     display: none;
+  }
+}
+
+/* Cinematic lobby v2 ------------------------------------------------------ */
+
+.lobby-cinematic {
+  --lobby-panel: linear-gradient(180deg, rgba(8, 24, 38, 0.92), rgba(2, 10, 21, 0.88));
+  --lobby-panel-soft: linear-gradient(180deg, rgba(12, 33, 49, 0.84), rgba(3, 13, 25, 0.78));
+  --lobby-border: rgba(80, 224, 196, 0.42);
+  --lobby-border-soft: rgba(145, 208, 207, 0.24);
+  --lobby-green: #42e7af;
+  --lobby-cyan: #42dcd5;
+  --lobby-muted: #9baebd;
+}
+
+.lobby-cinematic .lobby-stage {
+  background:
+    radial-gradient(circle at 50% 43%, rgba(25, 210, 174, 0.08), transparent 27%),
+    linear-gradient(180deg, rgba(1, 7, 17, 0.12), rgba(1, 8, 18, 0.7)),
+    url("/visuals/lobby-stadium.png") center / cover,
+    #03101e;
+}
+
+.lobby-cinematic .lobby-stage::before {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(0, 7, 18, 0.55),
+      transparent 32%,
+      transparent 68%,
+      rgba(0, 7, 18, 0.55)
+    ),
+    linear-gradient(180deg, rgba(0, 5, 15, 0.26), transparent 45%, rgba(0, 7, 16, 0.42));
+}
+
+.lobby-cinematic .lobby-profile-button,
+.lobby-cinematic .lobby-season-track,
+.lobby-cinematic .lobby-resource-pill,
+.lobby-cinematic .lobby-action-button,
+.lobby-cinematic .lobby-mode-info,
+.lobby-cinematic .lobby-season-card,
+.lobby-cinematic .lobby-stats-card,
+.lobby-cinematic .lobby-bags-card {
+  border: 1px solid var(--lobby-border-soft);
+  border-radius: 10px;
+  background: var(--lobby-panel);
+  box-shadow:
+    0 14px 36px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(8px);
+}
+
+.lobby-cinematic .lobby-action-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.lobby-cinematic .lobby-player-visual {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.lobby-cinematic .lobby-player-visual img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  filter: drop-shadow(0 24px 24px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 20px rgba(25, 205, 173, 0.18));
+}
+
+.lobby-cinematic .lobby-player-visual.has-cutout {
+  top: -2.4vh;
+  bottom: auto;
+  height: 51vh;
+}
+
+.lobby-cinematic .lobby-player-visual.has-cutout img {
+  width: auto;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+}
+
+.lobby-cinematic .lobby-player-visual.is-portrait-fallback img {
+  width: min(88%, 30vh);
+  aspect-ratio: 1;
+  border: 2px solid rgba(92, 232, 209, 0.28);
+  border-radius: 50%;
+  object-fit: cover;
+  transform: translateY(-2vh) scale(1.12);
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.42);
+}
+
+.lobby-cinematic .lobby-mode-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  border: 1px solid rgba(117, 176, 181, 0.2);
+  border-radius: 8px;
+  background: rgba(0, 8, 19, 0.58);
+}
+
+.lobby-cinematic .lobby-mode-metrics > span {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: center;
+  gap: 0 0.55vw;
+  padding: 0.7vh 0.9vw;
+  text-align: left;
+}
+
+.lobby-cinematic .lobby-mode-metrics > span + span {
+  border-left: 1px solid rgba(117, 176, 181, 0.2);
+}
+
+.lobby-cinematic .lobby-mode-metrics svg {
+  grid-row: 1 / 3;
+  align-self: center;
+  color: #e5eef4;
+}
+
+.lobby-cinematic .lobby-mode-metrics > span:last-child svg {
+  color: #ffc928;
+}
+
+.lobby-cinematic .lobby-mode-metrics small {
+  overflow: hidden;
+  color: var(--lobby-muted);
+  font-weight: 850;
+  letter-spacing: 0.03em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lobby-cinematic .lobby-mode-metrics strong {
+  overflow: hidden;
+  color: #f7fbff;
+  font-weight: 1000;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lobby-cinematic .lobby-season-card {
+  display: flex;
+  align-items: center;
+  gap: 1vw;
+}
+
+.lobby-cinematic .lobby-season-trophy {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #d4b06a;
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.5));
+}
+
+.lobby-cinematic .lobby-season-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 0.4vh;
+}
+
+.lobby-cinematic .lobby-season-chevron {
+  flex: 0 0 auto;
+  color: #d5e0e8;
+}
+
+@media (orientation: landscape) {
+  .lobby-cinematic .lobby-brand {
+    top: 2.5vh;
+    left: max(1.7vw, env(safe-area-inset-left));
+  }
+
+  .lobby-cinematic .lobby-brand span {
+    font-size: min(3.55vw, 7.2vh);
+    font-style: italic;
+    letter-spacing: 0.025em;
+  }
+
+  .lobby-cinematic .lobby-brand strong {
+    font-size: min(1.9vw, 3.85vh);
+    font-style: italic;
+    letter-spacing: 0.035em;
+  }
+
+  .lobby-cinematic .lobby-top-actions {
+    top: 2.25vh;
+    right: max(1.3vw, env(safe-area-inset-right));
+    gap: 0.55vw;
+  }
+
+  .lobby-cinematic .lobby-top-actions .lobby-resource-row {
+    gap: 0.55vw;
+  }
+
+  .lobby-cinematic .lobby-top-actions .lobby-resource-pill {
+    position: relative;
+    min-width: 9.8vw;
+    height: 6.3vh;
+    min-height: 0;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.55vw;
+    overflow: visible;
+    padding: 0.6vh 0.7vw;
+    background: var(--lobby-panel);
+  }
+
+  .lobby-cinematic .lobby-top-actions .lobby-resource-pill::after {
+    content: "+";
+    display: grid;
+    width: min(2vw, 4.5vh);
+    height: min(2vw, 4.5vh);
+    place-items: center;
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--lobby-green);
+    font-size: min(1.5vw, 3.2vh);
+    font-weight: 1000;
+  }
+
+  .lobby-cinematic .lobby-top-actions .lobby-resource-pill svg,
+  .lobby-cinematic .lobby-top-actions .lobby-resource-pill > .text-xl {
+    color: #ffc928;
+    filter: drop-shadow(0 0 10px rgba(255, 201, 40, 0.26));
+  }
+
+  .lobby-cinematic .lobby-top-actions .lobby-gems svg {
+    color: #d85cff;
+  }
+
+  .lobby-cinematic .lobby-top-actions .lobby-resource-pill small {
+    color: #a9b8c4;
+    font-size: min(0.7vw, 1.45vh);
+  }
+
+  .lobby-cinematic .lobby-top-actions .lobby-resource-pill strong {
+    color: #ffffff;
+    font-size: min(1.18vw, 2.45vh);
+    white-space: nowrap;
+  }
+
+  .lobby-cinematic .lobby-system-buttons {
+    gap: 0.45vw;
+  }
+
+  .lobby-cinematic .lobby-system-buttons .header-icon-button,
+  .lobby-cinematic .lobby-system-buttons .relative > button[aria-label="Notifications"] {
+    width: min(3.8vw, 7.8vh);
+    height: min(3.8vw, 7.8vh);
+    border-color: var(--lobby-border-soft);
+    border-radius: 10px;
+    background: var(--lobby-panel);
+  }
+
+  .lobby-cinematic .lobby-season-track {
+    top: 8.8vh;
+    left: 33.7vw;
+    width: 32.7vw;
+    height: 17.1vh;
+    min-height: 0;
+    gap: 0.65vh;
+    padding: 1.15vh 1.7vw;
+  }
+
+  .lobby-cinematic .lobby-season-title {
+    font-size: min(1.1vw, 2.2vh);
+  }
+
+  .lobby-cinematic .lobby-season-title strong {
+    font-size: min(1.38vw, 2.8vh);
+  }
+
+  .lobby-cinematic .lobby-season-progress {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0;
+    align-items: center;
+    padding-inline: 0.2vw;
+  }
+
+  .lobby-cinematic .lobby-season-progress > i {
+    position: absolute;
+    right: 7%;
+    left: 7%;
+    z-index: 0;
+    height: 3px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--lobby-green) 0 66%, rgba(150, 177, 187, 0.32) 66%);
+  }
+
+  .lobby-cinematic .lobby-season-progress > span {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    width: min(2.2vw, 4.8vh);
+    height: min(2.2vw, 4.8vh);
+    place-self: center;
+    place-items: center;
+    border: 2px solid rgba(125, 162, 171, 0.5);
+    border-radius: 50%;
+    background: #071625;
+    color: #a9b7c1;
+    font-size: min(0.82vw, 1.7vh);
+    font-weight: 1000;
+  }
+
+  .lobby-cinematic .lobby-season-progress > span.is-done,
+  .lobby-cinematic .lobby-season-progress > span.is-current {
+    border-color: var(--lobby-green);
+    background: var(--lobby-green);
+    color: #062018;
+    box-shadow: 0 0 14px rgba(66, 231, 175, 0.26);
+  }
+
+  .lobby-cinematic .lobby-season-progress > span.is-current {
+    background: #0b2932;
+    color: #eafff8;
+  }
+
+  .lobby-cinematic .lobby-season-progress > span.is-reward {
+    border: 0;
+    background: linear-gradient(145deg, #d39b42, #76501f);
+    color: #fff0ba;
+  }
+
+  .lobby-cinematic .lobby-daily-reward {
+    min-height: 4.8vh;
+    padding: 0.55vh 0.85vw;
+    background: rgba(7, 38, 46, 0.78);
+    color: var(--lobby-green);
+    font-size: min(0.9vw, 1.8vh);
+  }
+
+  .lobby-cinematic .lobby-daily-reward strong {
+    border-radius: 6px;
+    background: var(--lobby-green);
+    padding: 0.55vh 1.25vw;
+    color: #062018;
+  }
+
+  .lobby-cinematic .lobby-profile-button {
+    top: 12.1vh;
+    left: max(1.25vw, env(safe-area-inset-left));
+    width: 29.4vw;
+    height: 15.1vh;
+    min-height: 0;
+    gap: 1vw;
+    padding: 1.15vh 1vw;
+  }
+
+  .lobby-cinematic .lobby-profile-button .profile-picture {
+    width: min(8.9vh, 5vw);
+    height: min(8.9vh, 5vw);
+  }
+
+  .lobby-cinematic .lobby-profile-button strong {
+    font-size: min(1.55vw, 3.1vh);
+  }
+
+  .lobby-cinematic .lobby-profile-button small {
+    color: #aab7c3;
+    font-size: min(0.92vw, 1.8vh);
+  }
+
+  .lobby-cinematic .lobby-level-badge {
+    min-width: 4.1vw;
+    border-color: var(--lobby-border);
+    background: rgba(4, 24, 34, 0.82);
+    clip-path: polygon(50% 0, 94% 20%, 94% 74%, 50% 100%, 6% 74%, 6% 20%);
+  }
+
+  .lobby-cinematic .lobby-level-badge strong {
+    font-size: min(2vw, 4.1vh);
+  }
+
+  .lobby-cinematic .lobby-side-left,
+  .lobby-cinematic .lobby-side-right {
+    top: 30.7vh;
+    width: 19.5vw;
+    gap: 1.55vh;
+  }
+
+  .lobby-cinematic .lobby-side-left {
+    left: max(2.2vw, env(safe-area-inset-left));
+  }
+
+  .lobby-cinematic .lobby-side-right {
+    right: max(3.25vw, env(safe-area-inset-right));
+    width: 20.4vw;
+  }
+
+  .lobby-cinematic .lobby-action-button {
+    height: 9.15vh;
+    min-height: 0;
+    gap: 1vw;
+    padding: 0.8vh 1vw;
+    background: var(--lobby-panel-soft);
+  }
+
+  .lobby-cinematic .lobby-action-button:hover,
+  .lobby-cinematic .lobby-action-button:focus-visible {
+    border-color: var(--lobby-green);
+    background: linear-gradient(180deg, rgba(12, 49, 57, 0.94), rgba(2, 18, 29, 0.9));
+  }
+
+  .lobby-cinematic .lobby-action-icon {
+    width: min(4vw, 8vh);
+    height: min(4vw, 8vh);
+    border-radius: 6px;
+    background: transparent;
+    color: #eefbff;
+    box-shadow: none;
+  }
+
+  .lobby-cinematic .lobby-action-icon svg {
+    width: min(2.4vw, 5vh);
+    height: min(2.4vw, 5vh);
+    stroke-width: 2.7;
+  }
+
+  .lobby-cinematic .lobby-action-button strong {
+    font-size: min(1.25vw, 2.55vh);
+    text-transform: uppercase;
+  }
+
+  .lobby-cinematic .lobby-action-button small {
+    display: block;
+    color: var(--lobby-muted);
+    font-size: min(0.9vw, 1.82vh);
+  }
+
+  .lobby-cinematic .lobby-action-badge {
+    top: -0.7vh;
+    right: 0.7vw;
+    display: grid;
+    min-width: min(1.7vw, 3.5vh);
+    height: min(1.7vw, 3.5vh);
+    place-items: center;
+    border: 2px solid #ff6666;
+    border-radius: 50%;
+    background: #e82c38;
+    padding: 0;
+    color: white;
+    font-size: min(0.75vw, 1.5vh);
+  }
+
+  .lobby-cinematic .lobby-player-card {
+    top: 24.8vh;
+    left: 38.1vw;
+    width: 24.6vw;
+    height: 44.4vh;
+    min-height: 0;
+    align-content: end;
+    overflow: visible;
+    padding: 0;
+    background: transparent;
+  }
+
+  .lobby-cinematic .lobby-player-glow {
+    width: 78%;
+    height: 88%;
+    background: radial-gradient(circle, rgba(45, 220, 185, 0.2), transparent 68%);
+  }
+
+  .lobby-cinematic .lobby-player-name,
+  .lobby-cinematic .lobby-player-rank,
+  .lobby-cinematic .lobby-stat-chips {
+    display: none;
+  }
+
+  .lobby-cinematic .lobby-stats-card {
+    top: 32.1vh;
+    left: 24.35vw;
+    width: 14.5vw;
+    height: 35.7vh;
+    min-height: 0;
+    gap: 0.75vh;
+    padding: 1.5vh 1.15vw;
+  }
+
+  .lobby-cinematic .lobby-stats-head strong {
+    width: min(3.3vw, 6.7vh);
+    height: min(3.3vw, 6.7vh);
+    border-color: var(--lobby-green);
+    color: var(--lobby-green);
+    font-size: min(1.55vw, 3.1vh);
+    clip-path: polygon(50% 0, 94% 22%, 94% 75%, 50% 100%, 6% 75%, 6% 22%);
+  }
+
+  .lobby-cinematic .lobby-stat-bars {
+    gap: 0.62vh;
+  }
+
+  .lobby-cinematic .lobby-stat-row {
+    grid-template-columns: minmax(0, 0.9fr) minmax(30px, 1.25fr) auto;
+    gap: 0.45vw;
+  }
+
+  .lobby-cinematic .lobby-stat-row span,
+  .lobby-cinematic .lobby-stat-row strong,
+  .lobby-cinematic .lobby-stats-card > small {
+    font-size: min(0.78vw, 1.55vh);
+  }
+
+  .lobby-cinematic .lobby-stat-row i {
+    height: 0.7vh;
+  }
+
+  .lobby-cinematic .lobby-main-mode {
+    top: 69.1vh;
+    left: 34.8vw;
+    width: 30.4vw;
+    gap: 1.25vh;
+  }
+
+  .lobby-cinematic .lobby-mode-info {
+    height: 11.4vh;
+    min-height: 0;
+    padding: 0.65vh 0.65vw 0.8vh;
+  }
+
+  .lobby-cinematic .lobby-mode-info > p {
+    margin-bottom: 0.45vh;
+    color: var(--lobby-green);
+    font-size: min(1vw, 2vh);
+    text-align: center;
+  }
+
+  .lobby-cinematic .lobby-mode-metrics {
+    height: 7.1vh;
+  }
+
+  .lobby-cinematic .lobby-mode-metrics small {
+    font-size: min(0.68vw, 1.36vh);
+  }
+
+  .lobby-cinematic .lobby-mode-metrics strong {
+    font-size: min(1.18vw, 2.35vh);
+  }
+
+  .lobby-cinematic .lobby-play-button {
+    height: 13.2vh;
+    min-height: 0;
+    border: 2px solid rgba(114, 255, 211, 0.82);
+    border-radius: 10px;
+    background:
+      radial-gradient(circle at 82% 30%, rgba(198, 255, 231, 0.42), transparent 30%),
+      linear-gradient(180deg, #5effc8, #29c991);
+    color: #02150f;
+    font-size: min(3.2vw, 6.4vh);
+    letter-spacing: 0.02em;
+    box-shadow:
+      0 0 0 5px rgba(1, 19, 24, 0.72),
+      0 0 0 6px rgba(74, 229, 190, 0.35),
+      0 18px 42px rgba(27, 211, 153, 0.32),
+      inset 0 -7px 0 rgba(2, 100, 72, 0.25);
+  }
+
+  .lobby-cinematic .lobby-season-card,
+  .lobby-cinematic .lobby-bags-card {
+    top: 78.1vh;
+    bottom: auto;
+    height: 17.1vh;
+    min-height: 0;
+  }
+
+  .lobby-cinematic .lobby-season-card {
+    left: max(1.25vw, env(safe-area-inset-left));
+    width: 31.2vw;
+    padding: 1.2vh 1.2vw;
+  }
+
+  .lobby-cinematic .lobby-season-trophy svg {
+    width: min(5vw, 10vh);
+    height: min(5vw, 10vh);
+  }
+
+  .lobby-cinematic .lobby-season-copy strong {
+    font-size: min(1.55vw, 3.1vh);
+    text-transform: uppercase;
+  }
+
+  .lobby-cinematic .lobby-season-copy small {
+    color: var(--lobby-muted);
+    font-size: min(0.87vw, 1.72vh);
+  }
+
+  .lobby-cinematic .lobby-bags-card {
+    right: max(1.25vw, env(safe-area-inset-right));
+    width: 31.3vw;
+    padding: 1vh 0.8vw;
+  }
+
+  .lobby-cinematic .lobby-bag-row {
+    height: 10.6vh;
+  }
+
+  .lobby-cinematic .lobby-mini-bag {
+    border-color: rgba(136, 176, 185, 0.2);
+    background: rgba(1, 10, 20, 0.72);
+  }
+}
+
+@media (orientation: landscape) and (max-height: 430px) and (max-width: 980px) {
+  .lobby-cinematic .lobby-top-actions .lobby-resource-pill small,
+  .lobby-cinematic .lobby-action-button small,
+  .lobby-cinematic .lobby-season-copy small:last-of-type {
+    display: none;
+  }
+
+  .lobby-cinematic .lobby-profile-button {
+    height: 13.3vh;
+  }
+
+  .lobby-cinematic .lobby-side-left,
+  .lobby-cinematic .lobby-side-right {
+    top: 32.2vh;
+    gap: 1.3vh;
+  }
+
+  .lobby-cinematic .lobby-action-button {
+    height: 8.45vh;
+  }
+
+  .lobby-cinematic .lobby-player-card {
+    top: 25.8vh;
+    height: 42vh;
+  }
+
+  .lobby-cinematic .lobby-player-visual.is-portrait-fallback img {
+    width: min(92%, 34vh);
+  }
+
+  .lobby-cinematic .lobby-stats-card {
+    top: 33.2vh;
+    height: 33.5vh;
+    padding: 1vh 0.8vw;
+  }
+
+  .lobby-cinematic .lobby-main-mode {
+    top: 68.8vh;
+  }
+
+  .lobby-cinematic .lobby-season-card,
+  .lobby-cinematic .lobby-bags-card {
+    top: 78.7vh;
+    height: 18.4vh;
+  }
+}
+
+@media (orientation: landscape) and (min-height: 650px) {
+  .lobby-cinematic .lobby-profile-button,
+  .lobby-cinematic .lobby-season-track,
+  .lobby-cinematic .lobby-action-button,
+  .lobby-cinematic .lobby-mode-info,
+  .lobby-cinematic .lobby-season-card,
+  .lobby-cinematic .lobby-stats-card,
+  .lobby-cinematic .lobby-bags-card {
+    border-radius: 12px;
+  }
+
+  .lobby-cinematic .lobby-action-button {
+    border-width: 1.5px;
+  }
+
+  .lobby-cinematic .lobby-player-visual.is-portrait-fallback img {
+    width: min(82%, 31vh);
   }
 }
 

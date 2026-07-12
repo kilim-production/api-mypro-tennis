@@ -64,6 +64,9 @@ import {
 } from "lucide-react";
 import { countries, countryLabel, normalizeCountryCode, type Country } from "@mypro/shared";
 import { API_URL, api, saveToken } from "./api";
+import { LobbyActionButton } from "./components/lobby/LobbyActionButton";
+import { LobbyPlayerHero } from "./components/lobby/LobbyPlayerHero";
+import { LobbySeasonTrack } from "./components/lobby/LobbySeasonTrack";
 import { useGameStore, type GameNotification, type Player } from "./store";
 
 const socketUrl = import.meta.env.VITE_SOCKET_URL ?? "http://localhost:4000";
@@ -113,7 +116,8 @@ function notificationBadgeTarget(notification: GameNotification, compactNav = fa
   if (!compactNav) return target;
   if (target === "/skills") return "/dashboard";
   if (target === "/matches") return "/duel";
-  if (target === "/rankings" || target === "/online" || target === "/community") return "/dashboard";
+  if (target === "/rankings" || target === "/online" || target === "/community")
+    return "/dashboard";
   return target;
 }
 
@@ -275,6 +279,13 @@ function avatarInitials(avatar: string) {
   return parseAvatar(avatar)?.initials ?? legacyAvatarPayload(avatar).initials;
 }
 
+function avatarPictureSource(avatar: string) {
+  const payload = parseAvatar(avatar) ?? legacyAvatarPayload(avatar);
+  if (payload.picture.kind === "upload") return payload.picture.dataUrl;
+  const pictureId = payload.picture.id;
+  return personalPictures.find((item) => item.id === pictureId)?.image ?? personalPictures[0].image;
+}
+
 function ProfilePicture({
   avatar,
   picture,
@@ -313,6 +324,13 @@ function ProfilePicture({
       alt={`Photo de profil ${label}`}
     />
   );
+}
+
+function avatarHeroSource(avatar: string) {
+  const payload = parseAvatar(avatar) ?? legacyAvatarPayload(avatar);
+  if (payload.picture.kind !== "preset") return undefined;
+  if (payload.picture.id === "pp-01") return "/visuals/players/pp-01-hero-v3.png";
+  return undefined;
 }
 
 type Tournament = {
@@ -2786,35 +2804,19 @@ function Dashboard() {
   }
 
   return (
-    <div className="dashboard-lobby">
+    <div className="dashboard-lobby lobby-cinematic">
       <section className="lobby-stage">
         <div className="lobby-topbar">
           <button className="lobby-brand" onClick={() => navigate("/dashboard")} type="button">
             <span>MYPRO</span>
             <strong>TENNIS</strong>
           </button>
-          <button className="lobby-season-track" onClick={() => navigate("/season")} type="button">
-            <div className="lobby-season-title">
-              <strong>Saison {season?.season.key.replace("saison-", "") ?? "..."}</strong>
-              <span>Jour {season?.season.day ?? "..."} / 30</span>
-            </div>
-            <div className="lobby-season-progress">
-              {[0, 1, 2, 3, 4].map((index) => (
-                <span
-                  key={index}
-                  className={
-                    season && index < Math.ceil((season.season.progress / 100) * 5)
-                      ? "is-done"
-                      : ""
-                  }
-                />
-              ))}
-            </div>
-            <div className="lobby-daily-reward">
-              <span>Récompense du jour</span>
-              <strong>{season ? "Disponible dans Saison" : "Chargement"}</strong>
-            </div>
-          </button>
+          <LobbySeasonTrack
+            seasonLabel={`Saison ${season?.season.key.replace("saison-", "") ?? "…"}`}
+            day={season?.season.day}
+            rewardReady={Boolean(season)}
+            onClick={() => navigate("/season")}
+          />
           <div className="lobby-top-actions">
             <div className="lobby-resource-row">
               <button
@@ -2923,35 +2925,36 @@ function Dashboard() {
           </aside>
 
           <main className="lobby-center">
-            <div className="lobby-player-card">
-              <div className="lobby-player-glow" />
-              <ProfilePicture avatar={player.avatar} size="lg" />
-              <div className="lobby-player-rank">
-                <span>{player.fftRanking}</span>
-                <small>Classement</small>
-              </div>
-              <div className="lobby-player-name">
-                <p>Carrière active</p>
-                <h1>{player.name}</h1>
-              </div>
-              <div className="lobby-stat-chips">
-                {topStats.map((item) => (
-                  <span key={item.key}>
-                    <StatIcon statKey={item.key} size="sm" />
-                    <strong>{Math.round(item.value)}</strong>
-                  </span>
-                ))}
-              </div>
-            </div>
+            <LobbyPlayerHero
+              name={player.name}
+              ranking={player.fftRanking}
+              portraitSrc={avatarPictureSource(player.avatar)}
+              heroSrc={avatarHeroSource(player.avatar)}
+              stats={topStats.map((item) => ({
+                key: item.key,
+                value: item.value,
+                icon: <StatIcon statKey={item.key} size="sm" />
+              }))}
+            />
 
             <div className="lobby-main-mode">
               <div className="lobby-mode-info">
                 <p>Duel · saison</p>
-                <h2>Bassin d'adversaires</h2>
-                <span>{player.fftRanking} · coût 1 énergie</span>
+                <div className="lobby-mode-metrics">
+                  <span>
+                    <Users size={20} />
+                    <small>Bassin d’adversaires</small>
+                    <strong>{player.fftRanking} - 300</strong>
+                  </span>
+                  <span>
+                    <Zap size={20} />
+                    <small>Coût du match</small>
+                    <strong>1 énergie</strong>
+                  </span>
+                </div>
               </div>
               <Button className="lobby-play-button" onClick={() => navigate("/duel")}>
-                <Swords size={24} /> Jouer duel
+                Jouer duel
               </Button>
             </div>
           </main>
@@ -2986,18 +2989,25 @@ function Dashboard() {
 
         <div className="lobby-bottom">
           <button className="lobby-season-card" onClick={() => navigate("/season")} type="button">
-            <span className="lobby-card-kicker">Saison en cours</span>
-            <strong>
-              Jour {season?.season.day ?? "..."} · fin le{" "}
-              {season ? new Date(season.season.endsAt).toLocaleDateString("fr-FR") : "..."}
-            </strong>
-            <small>
-              {seasonCompetition?.entry
-                ? "Compétition inscrite"
-                : seasonCompetition?.playableNow
-                  ? "Inscription disponible"
-                  : "Prochaine fenêtre à venir"}
-            </small>
+            <span className="lobby-season-trophy" aria-hidden="true">
+              <Trophy size={52} />
+            </span>
+            <span className="lobby-season-copy">
+              <span className="lobby-card-kicker">Saison en cours</span>
+              <strong>Championnat amateur</strong>
+              <small>
+                Jour {season?.season.day ?? "…"} · fin le{" "}
+                {season ? new Date(season.season.endsAt).toLocaleDateString("fr-FR") : "…"}
+              </small>
+              <small>
+                {seasonCompetition?.entry
+                  ? "Compétition inscrite"
+                  : seasonCompetition?.playableNow
+                    ? "Inscription disponible"
+                    : "Prochaine fenêtre à venir"}
+              </small>
+            </span>
+            <ChevronRight className="lobby-season-chevron" size={28} />
           </button>
 
           <button
@@ -3060,7 +3070,11 @@ function Dashboard() {
                       <>
                         <TennisBagVisual rarity={chest.rarity} />
                         <strong>
-                          {busyChest === chest.id ? "..." : canOpen ? "Prêt" : formatRemaining(remaining)}
+                          {busyChest === chest.id
+                            ? "..."
+                            : canOpen
+                              ? "Prêt"
+                              : formatRemaining(remaining)}
                         </strong>
                         {canOpen ? (
                           <button
@@ -3107,33 +3121,6 @@ function Dashboard() {
         />
       ) : null}
     </div>
-  );
-}
-
-function LobbyActionButton({
-  icon: Icon,
-  label,
-  detail,
-  badge,
-  onClick
-}: {
-  icon: LucideIcon;
-  label: string;
-  detail: string;
-  badge?: string | undefined;
-  onClick: () => void;
-}) {
-  return (
-    <button className="lobby-action-button" onClick={onClick} type="button">
-      <span className="lobby-action-icon">
-        <Icon size={22} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <strong>{label}</strong>
-        <small>{detail}</small>
-      </span>
-      {badge ? <span className="lobby-action-badge">{badge}</span> : null}
-    </button>
   );
 }
 
@@ -3820,7 +3807,10 @@ function SkillsPage() {
           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
             <Metric label="Niveau joueur" value={level} />
             <Metric label="Points disponibles" value={skillPoints} />
-            <Metric label="Points dépensés" value={data?.spentSkillPoints ?? player.spentSkillPoints} />
+            <Metric
+              label="Points dépensés"
+              value={data?.spentSkillPoints ?? player.spentSkillPoints}
+            />
           </div>
         </div>
         <div className="mt-5 rounded-md border border-emerald-300/15 bg-emerald-300/10 p-4">
@@ -4386,8 +4376,8 @@ function CollectionPage() {
               <h2 className="font-bold">Recyclez vos objets pour monter en rareté</h2>
               <p className="mt-1 max-w-2xl text-sm text-slate-300">
                 Le marché consomme de vrais objets de votre inventaire. Les objets non équipés sont
-                utilisés en priorité. 30 % de l'argent investi dans leurs améliorations est rendu
-                au moment de l'échange.
+                utilisés en priorité. 30 % de l'argent investi dans leurs améliorations est rendu au
+                moment de l'échange.
               </p>
             </div>
             <div className="rounded-md bg-white/[0.08] px-3 py-1 text-sm font-black text-slate-200">

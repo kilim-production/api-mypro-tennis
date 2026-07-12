@@ -12,3 +12,5 @@ dev.db
 dev.db-journal
 *.log
 apps/*/dist
+packages/*/src/*.js
+packages/*/src/*.d.ts
