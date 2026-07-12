@@ -1303,17 +1303,26 @@ gameRouter.get("/matches", requireAuth, async (request, response) => {
   if (!player) return response.json([]);
   const matches = await prisma.match.findMany({
     where: { OR: [{ playerAId: player.id }, { playerBId: player.id }] },
-    include: { playerA: true, playerB: true },
+    select: {
+      id: true,
+      winnerId: true,
+      scoreText: true,
+      type: true,
+      surface: true,
+      durationMinutes: true,
+      playedAt: true,
+      playerA: {
+        select: { id: true, firstName: true, lastName: true, fftRanking: true, avatar: true }
+      },
+      playerB: {
+        select: { id: true, firstName: true, lastName: true, fftRanking: true, avatar: true }
+      }
+    },
     orderBy: { playedAt: "desc" },
     take: 30
   });
   return response.json(
-    matches.map((match) => ({
-      ...match,
-      playerA: publicPlayer(match.playerA),
-      playerB: publicPlayer(match.playerB),
-      replay: decodeJson(match.replay)
-    }))
+    matches
   );
 });
 

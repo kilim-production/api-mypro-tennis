@@ -12,7 +12,6 @@ import {
   useParams,
   useSearchParams
 } from "react-router-dom";
-import { io } from "socket.io-client";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
@@ -323,9 +322,12 @@ function ProfilePicture({
   if (selectedPicture?.kind === "upload") {
     return (
       <img
-        className={`profile-picture ${sizeClass}`}
-        src={selectedPicture.dataUrl}
         alt={`Photo de profil ${label}`}
+        className={`profile-picture ${sizeClass}`}
+        decoding="async"
+        draggable={false}
+        loading="lazy"
+        src={selectedPicture.dataUrl}
       />
     );
   }
@@ -333,9 +335,12 @@ function ProfilePicture({
     personalPictures.find((item) => item.id === selectedPicture?.id) ?? personalPictures[0];
   return (
     <img
-      className={`profile-picture profile-picture-preset ${sizeClass}`}
-      src={preset.image}
       alt={`Photo de profil ${label}`}
+      className={`profile-picture profile-picture-preset ${sizeClass}`}
+      decoding="async"
+      draggable={false}
+      loading="lazy"
+      src={preset.image}
     />
   );
 }
@@ -509,6 +514,10 @@ type CareerProfile = {
   };
 };
 type RankedPlayer = Player & { rank: number };
+type MatchSummaryPlayer = Pick<
+  Player,
+  "id" | "firstName" | "lastName" | "fftRanking" | "avatar"
+>;
 type MatchListItem = {
   id: string;
   winnerId: string;
@@ -516,8 +525,8 @@ type MatchListItem = {
   type: string;
   surface: string;
   durationMinutes?: number;
-  playerA: Player;
-  playerB: Player;
+  playerA: MatchSummaryPlayer;
+  playerB: MatchSummaryPlayer;
 };
 type DuelPool = {
   allowedRankings: string[];
@@ -555,7 +564,11 @@ type ReplayEvent = {
   statValues?: [number, number];
   rawStatValues?: [number, number];
 };
-type MatchReplay = MatchListItem & { replay: { events: ReplayEvent[]; momentum: number[] } };
+type MatchReplay = Omit<MatchListItem, "playerA" | "playerB"> & {
+  playerA: Player;
+  playerB: Player;
+  replay: { events: ReplayEvent[]; momentum: number[] };
+};
 type PresenceUser = { userId: string; displayName: string; connectedAt: string };
 type ClubPlayerSummary = {
   id: string;
@@ -888,13 +901,15 @@ function ClubBuildingCard({
 
   return (
     <article
-      className={`overflow-hidden rounded-md border ${theme.border} bg-slate-950/80 shadow-xl shadow-emerald-950/20`}
+      className={`club-building-card overflow-hidden rounded-md border ${theme.border} bg-slate-950/80 shadow-xl shadow-emerald-950/20`}
     >
       <div className="relative min-h-32 sm:min-h-44">
         {heroImage ? (
           <img
             alt={`Illustration ${building.currentLevel.name}`}
             className="absolute inset-0 h-full w-full object-cover"
+            decoding="async"
+            loading="lazy"
             src={heroImage}
           />
         ) : (
@@ -981,6 +996,8 @@ function ClubBuildingCard({
                       className={`h-12 w-20 rounded-md object-cover ${
                         isCurrent || isUnlocked ? "" : "grayscale"
                       }`}
+                      decoding="async"
+                      loading="lazy"
                       src={buildingLevelImage(building.id, level.level)}
                     />
                   ) : (
@@ -1414,7 +1431,9 @@ function CosmeticIcon({
       <img
         alt={item.name}
         className="h-full w-full object-cover"
+        decoding="async"
         draggable={false}
+        loading="lazy"
         src={cosmeticIconPath(item.name)}
       />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/55 via-transparent to-white/5" />
@@ -1447,7 +1466,12 @@ function CosmeticUpgradeMeta({ item }: { item: PlayerCosmeticItem }) {
 function TennisBagVisual({ rarity, opening = false }: { rarity: ChestRarity; opening?: boolean }) {
   return (
     <div className={`tennis-bag ${rarityClass(rarity)} ${opening ? "tennis-bag-opening" : ""}`}>
-      <img alt={`Sac ${rarity}`} draggable={false} src={tennisBagImagePath(rarity)} />
+      <img
+        alt={`Sac ${rarity}`}
+        decoding="async"
+        draggable={false}
+        src={tennisBagImagePath(rarity)}
+      />
     </div>
   );
 }
@@ -7542,12 +7566,18 @@ function MatchesPage() {
 function OnlinePage() {
   const [online, setOnline] = useState<PresenceUser[]>([]);
   useEffect(() => {
-    const socket = io(socketUrl);
-    const token = localStorage.getItem("mypro-token");
-    if (token) socket.emit("presence:join", token);
-    socket.on("presence:list", setOnline);
+    let cancelled = false;
+    let socket: ReturnType<(typeof import("socket.io-client"))["io"]> | null = null;
+    void import("socket.io-client").then(({ io }) => {
+      if (cancelled) return;
+      socket = io(socketUrl);
+      const token = localStorage.getItem("mypro-token");
+      if (token) socket.emit("presence:join", token);
+      socket.on("presence:list", setOnline);
+    });
     return () => {
-      socket.disconnect();
+      cancelled = true;
+      socket?.disconnect();
     };
   }, []);
   return (
@@ -7972,15 +8002,20 @@ function useFitMobileModals() {
       frame = requestAnimationFrame(fit);
     };
 
-    const observer = new MutationObserver(schedule);
+    const modalSelector = ".game-modal-panel, .header-menu-panel";
+    const containsModal = (node: Node) =>
+      node instanceof Element && (node.matches(modalSelector) || Boolean(node.querySelector(modalSelector)));
+    const observer = new MutationObserver((mutations) => {
+      const shouldFit = mutations.some((mutation) => {
+        if (mutation.target instanceof Element && mutation.target.closest(modalSelector)) return true;
+        return [...mutation.addedNodes, ...mutation.removedNodes].some(containsModal);
+      });
+      if (shouldFit) schedule();
+    });
     observer.observe(document.body, { childList: true, subtree: true });
     window.addEventListener("resize", schedule);
     window.addEventListener("orientationchange", schedule);
     window.visualViewport?.addEventListener("resize", schedule);
-    window.visualViewport?.addEventListener("scroll", schedule);
-    document.addEventListener("click", schedule, true);
-    document.addEventListener("input", schedule, true);
-    document.addEventListener("load", schedule, true);
     schedule();
 
     return () => {
@@ -7989,10 +8024,6 @@ function useFitMobileModals() {
       window.removeEventListener("resize", schedule);
       window.removeEventListener("orientationchange", schedule);
       window.visualViewport?.removeEventListener("resize", schedule);
-      window.visualViewport?.removeEventListener("scroll", schedule);
-      document.removeEventListener("click", schedule, true);
-      document.removeEventListener("input", schedule, true);
-      document.removeEventListener("load", schedule, true);
     };
   }, []);
 }
@@ -8008,10 +8039,12 @@ function LoadingScreen() {
   return (
     <main className="loading-screen" aria-busy="true" aria-live="polite">
       <img
-        className="loading-screen-image"
-        src="/visuals/mypro-loading-keyart.png"
         alt=""
         aria-hidden="true"
+        className="loading-screen-image"
+        decoding="async"
+        fetchPriority="high"
+        src="/visuals/mypro-loading-keyart.png"
       />
       <div className="loading-screen-scrim" />
       <section className="loading-screen-card">

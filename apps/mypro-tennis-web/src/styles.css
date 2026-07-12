@@ -6498,3 +6498,40 @@ button.lobby-mini-bag:active:not(:disabled) {
     transition: none;
   }
 }
+
+@supports (content-visibility: auto) {
+  .ranking-row-card,
+  .match-history-card,
+  .online-player-card,
+  .club-building-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 110px;
+  }
+
+  .club-building-card {
+    contain-intrinsic-size: auto 420px;
+  }
+}
+
+@media (max-width: 1024px), (max-height: 560px) {
+  .panel,
+  .app-header,
+  .mobile-bottom-nav,
+  .game-modal-overlay,
+  .game-modal-header,
+  .header-menu-panel {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .resource-pill,
+  .resource-pill::before,
+  .cosmetic-icon::before,
+  .cosmetic-icon::after {
+    animation: none !important;
+  }
+
+  .cosmetic-icon::after {
+    display: none;
+  }
+}

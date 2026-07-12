@@ -97,12 +97,14 @@ function clearSessionCache() {
 }
 
 const cachedSession = readSessionCache();
+const hasSavedToken = Boolean(localStorage.getItem("mypro-token"));
 
 export const useGameStore = create<State>((set) => ({
   user: cachedSession.user,
   player: cachedSession.player,
   notifications: cachedSession.notifications,
-  booted: false,
+  // Render the cached career immediately, then refresh it in the background.
+  booted: !hasSavedToken || Boolean(cachedSession.user),
   async login(email, password) {
     const data = await api<{ token: string; user: User; player: Player | null }>("/auth/login", {
       method: "POST",

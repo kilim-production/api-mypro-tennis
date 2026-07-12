@@ -334,6 +334,9 @@ model Match {
   durationMinutes Int
   replay          String
   playedAt        DateTime @default(now())
+
+  @@index([playerAId, playedAt])
+  @@index([playerBId, playedAt])
 }
 
 model Tournament {
