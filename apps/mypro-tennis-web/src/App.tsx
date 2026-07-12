@@ -2691,6 +2691,7 @@ function Dashboard() {
   } | null>(null);
   const [busyChest, setBusyChest] = useState<string | null>(null);
   const [hubMessage, setHubMessage] = useState("");
+  const [timerNow, setTimerNow] = useState(() => Date.now());
   const topSixStats = useMemo(
     () =>
       profileStatKeys
@@ -2704,8 +2705,16 @@ function Dashboard() {
     season?.competitions.find((competition) => competition.type === "daily") ??
     season?.competitions[0] ??
     null;
-  const readyBags = chests?.slots.filter((slot) => slot.chest?.canOpen).length ?? 0;
+  const readyBags =
+    chests?.slots.filter(
+      (slot) => slot.chest && new Date(slot.chest.unlocksAt).getTime() <= timerNow
+    ).length ?? 0;
   const emptyBags = chests?.slots.filter((slot) => !slot.chest).length ?? 4;
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setTimerNow(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -2734,8 +2743,16 @@ function Dashboard() {
     setSeason(seasonState);
   }
 
+  function currentChestRemaining(chest: TennisBagChest) {
+    return Math.max(0, new Date(chest.unlocksAt).getTime() - timerNow);
+  }
+
+  function currentChestSpeedUpCost(chest: TennisBagChest) {
+    return Math.max(1, Math.ceil(currentChestRemaining(chest) / (10 * 60_000)));
+  }
+
   async function openHubChest(chest: TennisBagChest) {
-    if (!chest.canOpen || busyChest) return;
+    if (currentChestRemaining(chest) > 0 || busyChest) return;
     setBusyChest(chest.id);
     setHubMessage("");
     try {
@@ -2748,6 +2765,21 @@ function Dashboard() {
       setRewardOpening({ rewards: result.rewards, rarity: chest.rarity });
     } catch (error) {
       setHubMessage(error instanceof Error ? error.message : "Ouverture du sac impossible.");
+    } finally {
+      setBusyChest(null);
+    }
+  }
+
+  async function speedUpHubChest(chest: TennisBagChest) {
+    if (currentChestRemaining(chest) <= 0 || busyChest) return;
+    setBusyChest(chest.id);
+    setHubMessage("");
+    try {
+      await api<TennisBagChest>(`/chests/${chest.id}/speedup`, { method: "POST" });
+      await reloadDashboard();
+      await refreshPlayer();
+    } catch (error) {
+      setHubMessage(error instanceof Error ? error.message : "Accélération impossible.");
     } finally {
       setBusyChest(null);
     }
@@ -3013,45 +3045,55 @@ function Dashboard() {
               {(
                 chests?.slots ??
                 Array.from({ length: 4 }, (_, slotIndex) => ({ slotIndex, chest: null }))
-              ).map(({ slotIndex, chest }) => (
-                <button
-                  key={slotIndex}
-                  className={`lobby-mini-bag ${chest ? rarityClass(chest.rarity) : ""} ${
-                    chest?.canOpen ? "is-ready" : ""
-                  }`}
-                  disabled={!chest?.canOpen || busyChest !== null}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    if (chest) void openHubChest(chest);
-                  }}
-                  type="button"
-                >
-                  {chest ? (
-                    <>
-                      <TennisBagVisual rarity={chest.rarity} />
-                      <strong>
-                        {busyChest === chest.id
-                          ? "..."
-                          : chest.canOpen
-                            ? "Ouvrir"
-                            : chest.remainingMs > 0
-                              ? "Déverrouillage"
-                              : "Verrouillé"}
-                      </strong>
-                      {chest.remainingMs > 0 ? (
-                        <small>{formatRemaining(chest.remainingMs)}</small>
-                      ) : null}
-                    </>
-                  ) : (
-                    <>
-                      <span>
-                        <Lock size={15} />
-                      </span>
-                      <strong>Slot vide</strong>
-                    </>
-                  )}
-                </button>
-              ))}
+              ).map(({ slotIndex, chest }) => {
+                const remaining = chest ? currentChestRemaining(chest) : 0;
+                const canOpen = Boolean(chest && remaining <= 0);
+                const speedUpCost = chest ? currentChestSpeedUpCost(chest) : 0;
+                return (
+                  <article
+                    key={slotIndex}
+                    className={`lobby-mini-bag ${chest ? rarityClass(chest.rarity) : ""} ${
+                      canOpen ? "is-ready" : ""
+                    }`}
+                  >
+                    {chest ? (
+                      <>
+                        <TennisBagVisual rarity={chest.rarity} />
+                        <strong>
+                          {busyChest === chest.id ? "..." : canOpen ? "Prêt" : formatRemaining(remaining)}
+                        </strong>
+                        {canOpen ? (
+                          <button
+                            className="lobby-bag-action is-open"
+                            disabled={busyChest !== null}
+                            onClick={() => void openHubChest(chest)}
+                            type="button"
+                          >
+                            Ouvrir
+                          </button>
+                        ) : (
+                          <button
+                            className="lobby-bag-action is-gem"
+                            disabled={busyChest !== null}
+                            onClick={() => void speedUpHubChest(chest)}
+                            type="button"
+                            title={`Accélérer pour ${speedUpCost} gemme(s)`}
+                          >
+                            <Gem size={10} /> {speedUpCost}
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <span>
+                          <Lock size={15} />
+                        </span>
+                        <strong>Slot vide</strong>
+                      </>
+                    )}
+                  </article>
+                );
+              })}
             </div>
           </div>
         </div>

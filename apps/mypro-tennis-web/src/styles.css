@@ -5231,3 +5231,270 @@ button:disabled,
     max-height: 7.6vh;
   }
 }
+
+.lobby-bag-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 22px;
+  border: 0;
+  border-radius: 6px;
+  padding: 3px 5px;
+  font-size: 9px;
+  font-weight: 1000;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.lobby-bag-action.is-open {
+  background: #34d399;
+  color: #020617;
+}
+
+.lobby-bag-action.is-gem {
+  background: linear-gradient(180deg, rgba(147, 51, 234, 0.95), rgba(59, 130, 246, 0.86));
+  color: #f8fafc;
+}
+
+.lobby-bag-action:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+@media (orientation: landscape) and (max-height: 430px) and (max-width: 980px) {
+  .dashboard-lobby,
+  .dashboard-lobby * {
+    min-width: 0;
+  }
+
+  .lobby-brand {
+    top: 2.8vh;
+    left: 1.3vw;
+  }
+
+  .lobby-brand span {
+    font-size: min(4.2vw, 8.5vh);
+    letter-spacing: 0.035em;
+  }
+
+  .lobby-brand strong {
+    font-size: min(2.2vw, 4.1vh);
+  }
+
+  .lobby-top-actions {
+    top: 2.8vh;
+    right: 1.2vw;
+  }
+
+  .lobby-top-actions .lobby-resource-pill {
+    min-width: min(7.4vw, 66px);
+    min-height: min(8.6vh, 38px);
+    border-radius: 8px;
+    padding: 0.65vh 0.55vw;
+  }
+
+  .lobby-top-actions .lobby-resource-pill strong {
+    font-size: min(1.45vw, 3.1vh);
+  }
+
+  .lobby-system-buttons .header-icon-button,
+  .lobby-system-buttons .relative > button[aria-label="Notifications"] {
+    width: min(4.1vw, 8.6vh);
+    height: min(4.1vw, 8.6vh);
+  }
+
+  .lobby-season-track {
+    top: 10.8vh;
+    left: 34.8vw;
+    width: 28vw;
+    height: 12.5vh;
+    border-radius: 8px;
+    gap: 0.35vh;
+    padding: 0.65vh 1vw;
+  }
+
+  .lobby-season-title strong {
+    font-size: min(1.35vw, 2.7vh);
+  }
+
+  .lobby-season-title span {
+    font-size: min(1.1vw, 2.2vh);
+  }
+
+  .lobby-daily-reward {
+    min-height: 0;
+    padding: 0.42vh 0.65vw;
+    font-size: min(0.86vw, 1.8vh);
+  }
+
+  .lobby-profile-button {
+    top: 16.4vh;
+    width: 27.4vw;
+    height: 10.3vh;
+  }
+
+  .lobby-profile-button strong {
+    font-size: min(1.55vw, 3.1vh);
+  }
+
+  .lobby-profile-button small {
+    font-size: min(0.9vw, 1.8vh);
+  }
+
+  .lobby-level-badge strong {
+    font-size: min(2.15vw, 4.8vh);
+  }
+
+  .lobby-side-left,
+  .lobby-side-right {
+    top: 37vh;
+    gap: 1vh;
+  }
+
+  .lobby-action-button {
+    height: 7.05vh;
+    border-radius: 8px;
+    padding: 0.45vh 0.75vw;
+  }
+
+  .lobby-action-icon {
+    width: min(4.3vw, 8vh);
+    height: min(4.3vw, 8vh);
+  }
+
+  .lobby-action-button strong {
+    font-size: min(1.22vw, 2.75vh);
+  }
+
+  .lobby-player-card {
+    top: 28.1vh;
+    height: 29.5vh;
+  }
+
+  .lobby-player-card .profile-picture {
+    width: min(7vw, 15.5vh);
+    height: min(7vw, 15.5vh);
+  }
+
+  .lobby-player-name h1 {
+    font-size: min(2.2vw, 4.7vh);
+  }
+
+  .lobby-player-rank span {
+    font-size: min(2vw, 4.5vh);
+  }
+
+  .lobby-stat-chips span {
+    padding: 0.35vh 0.55vw;
+  }
+
+  .lobby-stat-chips strong {
+    font-size: min(1.2vw, 2.6vh);
+  }
+
+  .lobby-stats-card {
+    top: 38.2vh;
+    width: 14.2vw;
+    height: 27.2vh;
+  }
+
+  .lobby-stat-row span,
+  .lobby-stat-row strong,
+  .lobby-stats-card > small {
+    font-size: min(0.78vw, 1.55vh);
+  }
+
+  .lobby-main-mode {
+    top: 67.4vh;
+    left: 35.1vw;
+    width: 29.8vw;
+    gap: 0.7vh;
+  }
+
+  .lobby-mode-info {
+    height: 8.4vh;
+    border-radius: 8px;
+  }
+
+  .lobby-mode-info p {
+    font-size: min(1vw, 2.1vh);
+  }
+
+  .lobby-mode-info h2 {
+    font-size: min(1.45vw, 3vh);
+  }
+
+  .lobby-play-button {
+    height: 11.4vh;
+    border-radius: 8px;
+    font-size: min(2.55vw, 5.2vh);
+    letter-spacing: 0;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .lobby-play-button svg {
+    width: min(2vw, 4vh);
+    height: min(2vw, 4vh);
+  }
+
+  .lobby-season-card,
+  .lobby-bags-card {
+    bottom: 1.6vh;
+    height: 19.6vh;
+    border-radius: 8px;
+  }
+
+  .lobby-season-card strong,
+  .lobby-bags-card strong {
+    font-size: min(1.38vw, 2.9vh);
+  }
+
+  .lobby-card-kicker,
+  .lobby-season-card small,
+  .lobby-bags-card small {
+    font-size: min(0.9vw, 1.85vh);
+  }
+
+  .lobby-bag-row {
+    height: 11.8vh;
+    gap: 0.42vw;
+  }
+
+  .lobby-mini-bag {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto auto;
+    align-content: center;
+    justify-content: stretch;
+    height: 100%;
+    gap: 0.28vh;
+    padding: 0.42vh 0.32vw;
+  }
+
+  .lobby-mini-bag .tennis-bag {
+    width: min(100%, 6.6vw);
+    max-height: 6.5vh;
+  }
+
+  .lobby-mini-bag strong {
+    display: block;
+    padding: 0;
+    font-size: min(0.82vw, 1.75vh);
+    line-height: 1;
+    text-align: center;
+  }
+
+  .lobby-bag-action {
+    min-height: 2.55vh;
+    border-radius: 5px;
+    padding: 0.28vh 0.35vw;
+    font-size: min(0.82vw, 1.75vh);
+  }
+
+  .lobby-bag-action svg {
+    width: min(1vw, 2.1vh);
+    height: min(1vw, 2.1vh);
+  }
+}
