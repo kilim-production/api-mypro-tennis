@@ -22,6 +22,7 @@ import {
   CalendarDays,
   CheckCircle2,
   ChevronRight,
+  Clock3,
   Crosshair,
   Dumbbell,
   Eye,
@@ -1209,6 +1210,17 @@ function formatRemaining(ms: number) {
   if (hours > 0)
     return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(rest).padStart(2, "0")}s`;
   return `${minutes}m ${String(rest).padStart(2, "0")}s`;
+}
+
+function formatLobbyRemaining(ms: number) {
+  const seconds = Math.max(0, Math.ceil(ms / 1000));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const rest = seconds % 60;
+  if (hours > 0) {
+    return `${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m`;
+  }
+  return `${String(minutes).padStart(2, "0")}m ${String(rest).padStart(2, "0")}s`;
 }
 
 function Countdown({
@@ -2804,6 +2816,13 @@ function Dashboard() {
 
   async function speedUpHubChest(chest: TennisBagChest) {
     if (currentChestRemaining(chest) <= 0 || busyChest) return;
+    const speedUpCost = currentChestSpeedUpCost(chest);
+    if (player.gems < speedUpCost) {
+      setHubMessage(
+        `Il faut ${speedUpCost} gemme(s) pour terminer ce coffre. Vous en avez ${player.gems}.`
+      );
+      return;
+    }
     setBusyChest(chest.id);
     setHubMessage("");
     try {
@@ -3050,12 +3069,13 @@ function Dashboard() {
             <small>Voir toutes les stats</small>
           </button>
 
-          <div className="lobby-bags-card">
-            <div className="flex items-start justify-between gap-3">
-              <span>
-                <span className="lobby-card-kicker">Sacs</span>
-                <strong>{readyBags ? `${readyBags} prêt(s)` : "4 slots"}</strong>
-              </span>
+          <div
+            aria-label={`Sacs, ${readyBags} prêt(s)`}
+            className="lobby-bags-card"
+            role="region"
+          >
+            <div className="lobby-bags-heading">
+              <span className="lobby-card-kicker">Sacs</span>
               <button
                 className="lobby-bags-link"
                 onClick={() => navigate("/collection")}
@@ -3073,53 +3093,61 @@ function Dashboard() {
                 const remaining = chest ? currentChestRemaining(chest) : 0;
                 const canOpen = Boolean(chest && remaining <= 0);
                 const speedUpCost = chest ? currentChestSpeedUpCost(chest) : 0;
+                if (!chest) {
+                  return (
+                    <article
+                      aria-label={`Emplacement ${slotIndex + 1} vide`}
+                      className="lobby-mini-bag is-empty"
+                      key={slotIndex}
+                    >
+                      <span className="lobby-empty-bag-icon">
+                        <Lock size={15} />
+                      </span>
+                      <span className="lobby-bag-action is-empty">Slot vide</span>
+                    </article>
+                  );
+                }
+
+                const isBusy = busyChest === chest.id;
+                const actionLabel = canOpen
+                  ? `Ouvrir le coffre ${chest.rarity}`
+                  : `Terminer le coffre ${chest.rarity} pour ${speedUpCost} gemme(s)`;
+
                 return (
-                  <article
-                    key={slotIndex}
-                    className={`lobby-mini-bag ${chest ? rarityClass(chest.rarity) : ""} ${
-                      canOpen ? "is-ready" : ""
+                  <button
+                    aria-label={`${actionLabel}. ${canOpen ? "Prêt" : formatLobbyRemaining(remaining)}`}
+                    className={`lobby-mini-bag ${rarityClass(chest.rarity)} ${
+                      canOpen ? "is-ready" : "has-timer"
                     }`}
+                    disabled={busyChest !== null}
+                    key={slotIndex}
+                    onClick={() =>
+                      canOpen ? void openHubChest(chest) : void speedUpHubChest(chest)
+                    }
+                    title={actionLabel}
+                    type="button"
                   >
-                    {chest ? (
-                      <>
-                        <TennisBagVisual rarity={chest.rarity} />
-                        <strong>
-                          {busyChest === chest.id
-                            ? "..."
-                            : canOpen
-                              ? "Prêt"
-                              : formatRemaining(remaining)}
-                        </strong>
-                        {canOpen ? (
-                          <button
-                            className="lobby-bag-action is-open"
-                            disabled={busyChest !== null}
-                            onClick={() => void openHubChest(chest)}
-                            type="button"
-                          >
-                            Ouvrir
-                          </button>
-                        ) : (
-                          <button
-                            className="lobby-bag-action is-gem"
-                            disabled={busyChest !== null}
-                            onClick={() => void speedUpHubChest(chest)}
-                            type="button"
-                            title={`Accélérer pour ${speedUpCost} gemme(s)`}
-                          >
-                            <Gem size={10} /> {speedUpCost}
-                          </button>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <span>
-                          <Lock size={15} />
+                    <div className="lobby-bag-visual">
+                      <TennisBagVisual rarity={chest.rarity} opening={isBusy} />
+                      {!canOpen ? (
+                        <span className="lobby-bag-timer" aria-live="polite">
+                          <Clock3 size={10} />
+                          {formatLobbyRemaining(remaining)}
                         </span>
-                        <strong>Slot vide</strong>
-                      </>
-                    )}
-                  </article>
+                      ) : null}
+                    </div>
+                    <span className={`lobby-bag-action ${canOpen ? "is-open" : "is-gem"}`}>
+                      {isBusy ? (
+                        "..."
+                      ) : canOpen ? (
+                        "Ouvrir"
+                      ) : (
+                        <>
+                          <FastForward size={10} /> Finir <Gem size={10} /> {speedUpCost}
+                        </>
+                      )}
+                    </span>
+                  </button>
                 );
               })}
             </div>
