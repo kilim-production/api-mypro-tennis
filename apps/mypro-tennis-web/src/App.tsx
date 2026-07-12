@@ -237,6 +237,19 @@ const personalPictures = [
   { id: "pp-10", label: "Blanc", image: "/profile-pictures/pp-10.jpg" }
 ] as const;
 
+const lobbyHeroPictures: Partial<Record<(typeof personalPictures)[number]["id"], string>> = {
+  "pp-01": "/visuals/players/pp-01-hero-v3.png",
+  "pp-02": "/visuals/players/pp-02-hero-v1.png",
+  "pp-03": "/visuals/players/pp-03-hero-v1.png",
+  "pp-04": "/visuals/players/pp-04-hero-v1.png",
+  "pp-05": "/visuals/players/pp-05-hero-v1.png",
+  "pp-06": "/visuals/players/pp-06-hero-v1.png",
+  "pp-07": "/visuals/players/pp-07-hero-v1.png",
+  "pp-08": "/visuals/players/pp-08-hero-v1.png",
+  "pp-09": "/visuals/players/pp-09-hero-v1.png",
+  "pp-10": "/visuals/players/pp-10-hero-v1.png"
+};
+
 function presetPictureForSeed(seed: string) {
   let hash = 2166136261;
   for (let index = 0; index < seed.length; index += 1) {
@@ -329,8 +342,9 @@ function ProfilePicture({
 function avatarHeroSource(avatar: string) {
   const payload = parseAvatar(avatar) ?? legacyAvatarPayload(avatar);
   if (payload.picture.kind !== "preset") return undefined;
-  if (payload.picture.id === "pp-01") return "/visuals/players/pp-01-hero-v3.png";
-  return undefined;
+  const pictureId = payload.picture.id;
+  const preset = personalPictures.find((item) => item.id === pictureId);
+  return preset ? lobbyHeroPictures[preset.id] : undefined;
 }
 
 type Tournament = {
