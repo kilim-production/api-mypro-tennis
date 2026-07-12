@@ -6188,6 +6188,7 @@ button:disabled,
 /* Mockup-faithful lobby chests ------------------------------------------- */
 
 .lobby-bags-card {
+  contain: layout paint style;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 5px;
 }
@@ -6451,5 +6452,49 @@ button.lobby-mini-bag:active:not(:disabled) {
   .lobby-cinematic .lobby-empty-bag-icon svg {
     width: 3.8vh;
     height: 3.8vh;
+  }
+}
+
+/* Mobile performance mode ------------------------------------------------ */
+
+@media (orientation: landscape) and (max-width: 1024px) {
+  .lobby-cinematic .lobby-profile-button,
+  .lobby-cinematic .lobby-season-track,
+  .lobby-cinematic .lobby-resource-pill,
+  .lobby-cinematic .lobby-action-button,
+  .lobby-cinematic .lobby-mode-info,
+  .lobby-cinematic .lobby-season-card,
+  .lobby-cinematic .lobby-stats-card,
+  .lobby-cinematic .lobby-bags-card {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow:
+      0 7px 18px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+
+  .lobby-cinematic .lobby-resource-pill::before {
+    display: none;
+    animation: none;
+  }
+
+  .lobby-cinematic .lobby-player-glow {
+    animation: none;
+    filter: blur(4px);
+    opacity: 0.68;
+  }
+
+  .lobby-cinematic .lobby-player-visual img {
+    filter: drop-shadow(0 12px 13px rgba(0, 0, 0, 0.46));
+  }
+
+  .lobby-cinematic .lobby-mini-bag .tennis-bag img {
+    filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.38));
+  }
+
+  .lobby-cinematic .lobby-action-button,
+  .lobby-cinematic .lobby-resource-pill,
+  .lobby-cinematic .lobby-mini-bag {
+    transition: none;
   }
 }

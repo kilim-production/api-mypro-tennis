@@ -32,6 +32,22 @@ export default defineConfig({
       workbox: {
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,html,svg,png,ico}"],
+        globIgnores: ["**/visuals/players/*.png"],
+        cleanupOutdatedCaches: true,
+        runtimeCaching: [
+          {
+            urlPattern: /\/visuals\/players\/pp-\d{2}-hero\.webp$/,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "mypro-player-heroes-v1",
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: {
+                maxEntries: 12,
+                maxAgeSeconds: 30 * 24 * 60 * 60
+              }
+            }
+          }
+        ],
         navigateFallback: "/index.html"
       }
     })

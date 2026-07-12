@@ -239,16 +239,16 @@ const personalPictures = [
 ] as const;
 
 const lobbyHeroPictures: Partial<Record<(typeof personalPictures)[number]["id"], string>> = {
-  "pp-01": "/visuals/players/pp-01-hero-v3.png",
-  "pp-02": "/visuals/players/pp-02-hero-v1.png",
-  "pp-03": "/visuals/players/pp-03-hero-v1.png",
-  "pp-04": "/visuals/players/pp-04-hero-v1.png",
-  "pp-05": "/visuals/players/pp-05-hero-v1.png",
-  "pp-06": "/visuals/players/pp-06-hero-v1.png",
-  "pp-07": "/visuals/players/pp-07-hero-v1.png",
-  "pp-08": "/visuals/players/pp-08-hero-v1.png",
-  "pp-09": "/visuals/players/pp-09-hero-v1.png",
-  "pp-10": "/visuals/players/pp-10-hero-v1.png"
+  "pp-01": "/visuals/players/pp-01-hero.webp",
+  "pp-02": "/visuals/players/pp-02-hero.webp",
+  "pp-03": "/visuals/players/pp-03-hero.webp",
+  "pp-04": "/visuals/players/pp-04-hero.webp",
+  "pp-05": "/visuals/players/pp-05-hero.webp",
+  "pp-06": "/visuals/players/pp-06-hero.webp",
+  "pp-07": "/visuals/players/pp-07-hero.webp",
+  "pp-08": "/visuals/players/pp-08-hero.webp",
+  "pp-09": "/visuals/players/pp-09-hero.webp",
+  "pp-10": "/visuals/players/pp-10-hero.webp"
 };
 
 function presetPictureForSeed(seed: string) {
@@ -1221,6 +1221,14 @@ function formatLobbyRemaining(ms: number) {
     return `${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m`;
   }
   return `${String(minutes).padStart(2, "0")}m ${String(rest).padStart(2, "0")}s`;
+}
+
+function chestRemainingAt(chest: TennisBagChest, now = Date.now()) {
+  return Math.max(0, new Date(chest.unlocksAt).getTime() - now);
+}
+
+function chestSpeedUpCostAt(chest: TennisBagChest, now = Date.now()) {
+  return Math.max(1, Math.ceil(chestRemainingAt(chest, now) / (10 * 60_000)));
 }
 
 function Countdown({
@@ -2723,6 +2731,108 @@ function TutorialModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+function LobbyBagsCard({
+  chests,
+  busyChest,
+  onCollection,
+  onOpen,
+  onSpeedUp
+}: {
+  chests: ChestState | null;
+  busyChest: string | null;
+  onCollection: () => void;
+  onOpen: (chest: TennisBagChest) => void;
+  onSpeedUp: (chest: TennisBagChest) => void;
+}) {
+  const timerNow = useNow(1000);
+  const slots =
+    chests?.slots ?? Array.from({ length: 4 }, (_, slotIndex) => ({ slotIndex, chest: null }));
+  const readyBags = slots.filter(
+    (slot) => slot.chest && chestRemainingAt(slot.chest, timerNow) <= 0
+  ).length;
+
+  return (
+    <div
+      aria-label={`Sacs, ${readyBags} prêt(s)`}
+      className="lobby-bags-card"
+      role="region"
+    >
+      <div className="lobby-bags-heading">
+        <span className="lobby-card-kicker">Sacs</span>
+        <button
+          aria-label="Voir la collection"
+          className="lobby-bags-link"
+          onClick={onCollection}
+          type="button"
+        >
+          <PackageOpen size={20} />
+        </button>
+      </div>
+      <div className="lobby-bag-row">
+        {slots.map(({ slotIndex, chest }) => {
+          const remaining = chest ? chestRemainingAt(chest, timerNow) : 0;
+          const canOpen = Boolean(chest && remaining <= 0);
+          const speedUpCost = chest ? chestSpeedUpCostAt(chest, timerNow) : 0;
+          if (!chest) {
+            return (
+              <article
+                aria-label={`Emplacement ${slotIndex + 1} vide`}
+                className="lobby-mini-bag is-empty"
+                key={slotIndex}
+              >
+                <span className="lobby-empty-bag-icon">
+                  <Lock size={15} />
+                </span>
+                <span className="lobby-bag-action is-empty">Slot vide</span>
+              </article>
+            );
+          }
+
+          const isBusy = busyChest === chest.id;
+          const actionLabel = canOpen
+            ? `Ouvrir le coffre ${chest.rarity}`
+            : `Terminer le coffre ${chest.rarity} pour ${speedUpCost} gemme(s)`;
+
+          return (
+            <button
+              aria-label={`${actionLabel}. ${canOpen ? "Prêt" : formatLobbyRemaining(remaining)}`}
+              className={`lobby-mini-bag ${rarityClass(chest.rarity)} ${
+                canOpen ? "is-ready" : "has-timer"
+              }`}
+              disabled={busyChest !== null}
+              key={slotIndex}
+              onClick={() => (canOpen ? onOpen(chest) : onSpeedUp(chest))}
+              title={actionLabel}
+              type="button"
+            >
+              <div className="lobby-bag-visual">
+                <TennisBagVisual rarity={chest.rarity} opening={isBusy} />
+                {!canOpen ? (
+                  <span className="lobby-bag-timer" aria-live="polite">
+                    <Clock3 size={10} />
+                    {formatLobbyRemaining(remaining)}
+                  </span>
+                ) : null}
+              </div>
+              <span className={`lobby-bag-action ${canOpen ? "is-open" : "is-gem"}`}>
+                {isBusy ? (
+                  "..."
+                ) : canOpen ? (
+                  "Ouvrir"
+                ) : (
+                  <>
+                    <FastForward size={10} /> Finir <Gem size={10} /> {speedUpCost}
+                  </>
+                )}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function Dashboard() {
   const player = useGameStore((state) => state.player)!;
   const refreshPlayer = useGameStore((state) => state.refresh);
@@ -2735,7 +2845,6 @@ function Dashboard() {
   } | null>(null);
   const [busyChest, setBusyChest] = useState<string | null>(null);
   const [hubMessage, setHubMessage] = useState("");
-  const [timerNow, setTimerNow] = useState(() => Date.now());
   const topSixStats = useMemo(
     () =>
       profileStatKeys
@@ -2749,16 +2858,7 @@ function Dashboard() {
     season?.competitions.find((competition) => competition.type === "daily") ??
     season?.competitions[0] ??
     null;
-  const readyBags =
-    chests?.slots.filter(
-      (slot) => slot.chest && new Date(slot.chest.unlocksAt).getTime() <= timerNow
-    ).length ?? 0;
   const emptyBags = chests?.slots.filter((slot) => !slot.chest).length ?? 4;
-
-  useEffect(() => {
-    const interval = window.setInterval(() => setTimerNow(Date.now()), 1000);
-    return () => window.clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -2788,11 +2888,11 @@ function Dashboard() {
   }
 
   function currentChestRemaining(chest: TennisBagChest) {
-    return Math.max(0, new Date(chest.unlocksAt).getTime() - timerNow);
+    return chestRemainingAt(chest);
   }
 
   function currentChestSpeedUpCost(chest: TennisBagChest) {
-    return Math.max(1, Math.ceil(currentChestRemaining(chest) / (10 * 60_000)));
+    return chestSpeedUpCostAt(chest);
   }
 
   async function openHubChest(chest: TennisBagChest) {
@@ -3069,89 +3169,13 @@ function Dashboard() {
             <small>Voir toutes les stats</small>
           </button>
 
-          <div
-            aria-label={`Sacs, ${readyBags} prêt(s)`}
-            className="lobby-bags-card"
-            role="region"
-          >
-            <div className="lobby-bags-heading">
-              <span className="lobby-card-kicker">Sacs</span>
-              <button
-                className="lobby-bags-link"
-                onClick={() => navigate("/collection")}
-                type="button"
-                aria-label="Voir la collection"
-              >
-                <PackageOpen size={20} />
-              </button>
-            </div>
-            <div className="lobby-bag-row">
-              {(
-                chests?.slots ??
-                Array.from({ length: 4 }, (_, slotIndex) => ({ slotIndex, chest: null }))
-              ).map(({ slotIndex, chest }) => {
-                const remaining = chest ? currentChestRemaining(chest) : 0;
-                const canOpen = Boolean(chest && remaining <= 0);
-                const speedUpCost = chest ? currentChestSpeedUpCost(chest) : 0;
-                if (!chest) {
-                  return (
-                    <article
-                      aria-label={`Emplacement ${slotIndex + 1} vide`}
-                      className="lobby-mini-bag is-empty"
-                      key={slotIndex}
-                    >
-                      <span className="lobby-empty-bag-icon">
-                        <Lock size={15} />
-                      </span>
-                      <span className="lobby-bag-action is-empty">Slot vide</span>
-                    </article>
-                  );
-                }
-
-                const isBusy = busyChest === chest.id;
-                const actionLabel = canOpen
-                  ? `Ouvrir le coffre ${chest.rarity}`
-                  : `Terminer le coffre ${chest.rarity} pour ${speedUpCost} gemme(s)`;
-
-                return (
-                  <button
-                    aria-label={`${actionLabel}. ${canOpen ? "Prêt" : formatLobbyRemaining(remaining)}`}
-                    className={`lobby-mini-bag ${rarityClass(chest.rarity)} ${
-                      canOpen ? "is-ready" : "has-timer"
-                    }`}
-                    disabled={busyChest !== null}
-                    key={slotIndex}
-                    onClick={() =>
-                      canOpen ? void openHubChest(chest) : void speedUpHubChest(chest)
-                    }
-                    title={actionLabel}
-                    type="button"
-                  >
-                    <div className="lobby-bag-visual">
-                      <TennisBagVisual rarity={chest.rarity} opening={isBusy} />
-                      {!canOpen ? (
-                        <span className="lobby-bag-timer" aria-live="polite">
-                          <Clock3 size={10} />
-                          {formatLobbyRemaining(remaining)}
-                        </span>
-                      ) : null}
-                    </div>
-                    <span className={`lobby-bag-action ${canOpen ? "is-open" : "is-gem"}`}>
-                      {isBusy ? (
-                        "..."
-                      ) : canOpen ? (
-                        "Ouvrir"
-                      ) : (
-                        <>
-                          <FastForward size={10} /> Finir <Gem size={10} /> {speedUpCost}
-                        </>
-                      )}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <LobbyBagsCard
+            busyChest={busyChest}
+            chests={chests}
+            onCollection={() => navigate("/collection")}
+            onOpen={(chest) => void openHubChest(chest)}
+            onSpeedUp={(chest) => void speedUpHubChest(chest)}
+          />
         </div>
         {hubMessage ? <div className="lobby-toast">{hubMessage}</div> : null}
       </section>

@@ -25,7 +25,14 @@ export function LobbyPlayerHero({
     <div className="lobby-player-card">
       <div className="lobby-player-glow" aria-hidden="true" />
       <div className={`lobby-player-visual ${heroSrc ? "has-cutout" : "is-portrait-fallback"}`}>
-        <img src={heroSrc ?? portraitSrc} alt={`Joueur ${name}`} />
+        <img
+          alt={`Joueur ${name}`}
+          decoding="async"
+          draggable={false}
+          fetchPriority="high"
+          loading="eager"
+          src={heroSrc ?? portraitSrc}
+        />
       </div>
       <div className="lobby-player-rank">
         <span>{ranking}</span>
