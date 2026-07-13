@@ -1,4 +1,5 @@
 import type { Player } from "@prisma/client";
+import { calculateOverall } from "@mypro/core";
 import { decodeJson } from "./json";
 import { actionEnergyPayload, actionEnergyPayloadWithClub } from "./actionEnergy";
 
@@ -11,6 +12,7 @@ export async function publicPlayerWithClubBonuses(player: Player) {
 }
 
 function publicPlayerBase(player: Player, actionEnergy: ReturnType<typeof actionEnergyPayload>) {
+  const stats = decodeJson<Record<string, number>>(player.stats);
   return {
     id: player.id,
     name: `${player.firstName} ${player.lastName}`,
@@ -23,7 +25,7 @@ function publicPlayerBase(player: Player, actionEnergy: ReturnType<typeof action
     archetype: player.archetype,
     avatar: player.avatar,
     isAi: player.isAi,
-    stats: decodeJson(player.stats),
+    stats,
     ...actionEnergy,
     energy: player.energy,
     morale: player.morale,
@@ -37,7 +39,7 @@ function publicPlayerBase(player: Player, actionEnergy: ReturnType<typeof action
     playerXp: player.playerXp,
     skillPoints: player.skillPoints,
     spentSkillPoints: player.spentSkillPoints,
-    overall: player.overall,
+    overall: calculateOverall(stats),
     rankingPoints: player.rankingPoints,
     worldRank: player.worldRank,
     fftRanking: player.fftRanking,

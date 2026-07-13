@@ -401,3 +401,43 @@ export async function recalculateExistingPlayerXp() {
 
   return summaries;
 }
+
+export async function recalculateExistingPlayerOveralls() {
+  const players = await prisma.player.findMany({
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      stats: true,
+      overall: true
+    }
+  });
+  const summaries: Array<{
+    playerId: string;
+    name: string;
+    previousOverall: number;
+    overall: number;
+  }> = [];
+
+  for (const player of players) {
+    const overall = calculateOverall(decodeJson<TennisStats>(player.stats));
+    if (overall === player.overall) continue;
+
+    await prisma.player.update({
+      where: { id: player.id },
+      data: { overall }
+    });
+    summaries.push({
+      playerId: player.id,
+      name: `${player.firstName} ${player.lastName}`,
+      previousOverall: player.overall,
+      overall
+    });
+  }
+
+  return {
+    checked: players.length,
+    updated: summaries.length,
+    players: summaries
+  };
+}

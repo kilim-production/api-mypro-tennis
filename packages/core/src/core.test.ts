@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ACTION_ENERGY_MAX,
+  OVERALL_STAT_KEYS,
   PLAYER_MAX_LEVEL,
   calculateOverall,
   getActionEnergySnapshot,
@@ -20,34 +21,23 @@ import {
 } from "./index";
 
 describe("progression carrière", () => {
-  it("calcule un niveau général stable", () => {
-    const stats = Object.fromEntries(
-      [
-        "service",
-        "return",
-        "forehand",
-        "backhand",
-        "volley",
-        "smash",
-        "dropShot",
-        "stamina",
-        "speed",
-        "explosiveness",
-        "strength",
-        "recovery",
-        "focus",
-        "confidence",
-        "composure",
-        "fightingSpirit",
-        "consistency",
-        "aggression",
-        "baseline",
-        "netRush",
-        "footwork",
-        "surfaceAdaptation"
-      ].map((key) => [key, 60])
-    );
-    expect(calculateOverall(stats)).toBe(60);
+  it("calcule la moyenne simple des 12 statistiques principales", () => {
+    const stats = Object.fromEntries(OVERALL_STAT_KEYS.map((key, index) => [key, index + 1]));
+    Object.assign(stats, {
+      focus: 100,
+      confidence: 100,
+      composure: 100,
+      fightingSpirit: 100,
+      consistency: 100,
+      aggression: 100,
+      baseline: 100,
+      netRush: 100,
+      footwork: 100,
+      surfaceAdaptation: 100
+    });
+
+    expect(OVERALL_STAT_KEYS).toHaveLength(12);
+    expect(calculateOverall(stats)).toBe(7);
   });
 
   it("réduit les gains quand la fatigue est trop haute", () => {

@@ -15,35 +15,27 @@ export const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.m
 export const ACTION_ENERGY_MAX = 10;
 export const ACTION_ENERGY_RECHARGE_MINUTES = 30;
 
+export const OVERALL_STAT_KEYS = [
+  "service",
+  "return",
+  "forehand",
+  "backhand",
+  "volley",
+  "smash",
+  "dropShot",
+  "stamina",
+  "speed",
+  "explosiveness",
+  "strength",
+  "recovery"
+] as const;
+
 export function calculateOverall(stats: StatBlock): number {
-  const weights: Record<string, number> = {
-    service: 1.05,
-    return: 1,
-    forehand: 1.1,
-    backhand: 1,
-    volley: 0.75,
-    smash: 0.65,
-    dropShot: 0.6,
-    stamina: 1,
-    speed: 0.95,
-    explosiveness: 0.9,
-    strength: 0.8,
-    recovery: 0.85,
-    focus: 1,
-    confidence: 0.95,
-    composure: 0.95,
-    fightingSpirit: 0.9,
-    consistency: 1.1,
-    aggression: 0.75,
-    baseline: 0.9,
-    netRush: 0.65,
-    footwork: 1,
-    surfaceAdaptation: 0.85
-  };
-  const entries = Object.entries(weights);
-  const weighted = entries.reduce((sum, [key, weight]) => sum + (stats[key] ?? 45) * weight, 0);
-  const totalWeight = entries.reduce((sum, [, weight]) => sum + weight, 0);
-  return Math.round(weighted / totalWeight);
+  const total = OVERALL_STAT_KEYS.reduce((sum, key) => {
+    const value = stats[key];
+    return sum + (typeof value === "number" && Number.isFinite(value) ? clamp(value, 0, 100) : 0);
+  }, 0);
+  return Math.round(total / OVERALL_STAT_KEYS.length);
 }
 
 export function trainingGain(
