@@ -5,6 +5,9 @@ import {
   challengeSchema,
   cosmeticEquipSchema,
   cosmeticMarketSchema,
+  interactiveCoachingDecisionSchema,
+  interactiveMatchAbandonSchema,
+  interactiveMatchFeedbackSchema,
   matchRequestSchema,
   skillUpgradeSchema
 } from "@mypro/shared";
@@ -31,6 +34,15 @@ import {
   upgradeCosmetic
 } from "../services/equipment";
 import { createServerMatch } from "../services/matches";
+import {
+  InteractiveMatchSessionError,
+  abandonInteractiveMatchSession,
+  coachInteractiveMatchSession,
+  createInteractiveMatchSession,
+  getActiveInteractiveMatchSession,
+  getInteractiveMatchSession,
+  saveInteractiveMatchFeedback
+} from "../services/interactiveMatches";
 import { publicPlayer } from "../services/playerMapper";
 import { getPlayerSkillState, spendSkillPoint } from "../services/playerProgression";
 import { decodeJson, encodeJson } from "../services/json";
@@ -1321,9 +1333,7 @@ gameRouter.get("/matches", requireAuth, async (request, response) => {
     orderBy: { playedAt: "desc" },
     take: 30
   });
-  return response.json(
-    matches
-  );
+  return response.json(matches);
 });
 
 gameRouter.get("/matches/duel-pool", requireAuth, async (request, response) => {
@@ -1339,7 +1349,9 @@ gameRouter.get("/matches/duel-pool", requireAuth, async (request, response) => {
 gameRouter.get("/matches/duel-search", requireAuth, async (request, response) => {
   const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
   if (!player) return response.status(404).json({ message: "Joueur introuvable." });
-  const query = String(request.query.q ?? "").trim().toLowerCase();
+  const query = String(request.query.q ?? "")
+    .trim()
+    .toLowerCase();
   if (query.length < 2) {
     return response.status(400).json({ message: "Saisissez au moins 2 caractères." });
   }
@@ -1366,6 +1378,169 @@ gameRouter.get("/matches/duel-search", requireAuth, async (request, response) =>
     results: results.map(publicPlayer)
   });
 });
+
+gameRouter.get("/matches/interactive/active", requireAuth, async (request, response) => {
+  const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
+  if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+  return response.json(await getActiveInteractiveMatchSession(player.id));
+});
+
+gameRouter.post(
+  "/matches/interactive",
+  requireAuth,
+  validateBody(matchRequestSchema),
+  async (request, response) => {
+    const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
+    if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+    const active = await getActiveInteractiveMatchSession(player.id);
+    if (active) return response.json(active);
+
+    const pool = await buildDuelPool(player);
+    let opponent = request.body.opponentId
+      ? pool.find((candidate) => candidate.id === request.body.opponentId)
+      : pool[0];
+    if (!opponent && request.body.opponentId) {
+      opponent =
+        (await prisma.player.findFirst({
+          where: {
+            id: request.body.opponentId,
+            isAi: false,
+            NOT: { id: player.id }
+          }
+        })) ?? undefined;
+    }
+    if (!opponent) return response.status(404).json({ message: "Adversaire introuvable." });
+    if (!duelRankingPool(player.fftRanking).includes(opponent.fftRanking as FftRanking)) {
+      return response
+        .status(403)
+        .json({ message: "Cet adversaire doit être dans votre zone de classement de duel." });
+    }
+    if (!opponent.isAi) {
+      const matchCount = await realOpponentMatchCountToday(player.id, opponent.id);
+      if (matchCount >= 2) {
+        return response.status(409).json({
+          message: "Vous avez déjà affronté ce joueur réel 2 fois aujourd'hui."
+        });
+      }
+    }
+
+    try {
+      await spendCareerAction(player);
+    } catch (error) {
+      return response
+        .status(429)
+        .json({ message: error instanceof Error ? error.message : "Énergie insuffisante." });
+    }
+    try {
+      const result = await createInteractiveMatchSession({
+        playerA: player,
+        playerB: opponent,
+        surface: request.body.surface ?? "Dur",
+        tactic: request.body.tactic ?? "Équilibré",
+        risk: request.body.risk ?? "Normale",
+        format: request.body.format ?? "Deux sets gagnants",
+        type: player.proUnlocked ? "Duel professionnel interactif" : "Duel amateur interactif"
+      });
+      return response.status(result.created ? 201 : 200).json(result.session);
+    } catch (error) {
+      if (error instanceof InteractiveMatchSessionError) {
+        return response.status(error.statusCode).json({ message: error.message });
+      }
+      return response.status(500).json({ message: "Création du match interactif impossible." });
+    }
+  }
+);
+
+gameRouter.get("/matches/interactive/:id", requireAuth, async (request, response) => {
+  const sessionId = request.params.id;
+  if (!sessionId) return response.status(400).json({ message: "Identifiant de session requis." });
+  try {
+    return response.json(await getInteractiveMatchSession(sessionId, request.session!.userId));
+  } catch (error) {
+    if (error instanceof InteractiveMatchSessionError) {
+      return response.status(error.statusCode).json({ message: error.message });
+    }
+    return response.status(500).json({ message: "Impossible de charger le match interactif." });
+  }
+});
+
+gameRouter.post(
+  "/matches/interactive/:id/coach",
+  requireAuth,
+  validateBody(interactiveCoachingDecisionSchema),
+  async (request, response) => {
+    const sessionId = request.params.id;
+    if (!sessionId) return response.status(400).json({ message: "Identifiant de session requis." });
+    try {
+      return response.json(
+        await coachInteractiveMatchSession({
+          sessionId,
+          userId: request.session!.userId,
+          revision: request.body.revision,
+          instructionId: request.body.instructionId
+        })
+      );
+    } catch (error) {
+      if (error instanceof InteractiveMatchSessionError) {
+        return response.status(error.statusCode).json({ message: error.message });
+      }
+      return response.status(409).json({
+        message: error instanceof Error ? error.message : "Décision de coaching impossible."
+      });
+    }
+  }
+);
+
+gameRouter.post(
+  "/matches/interactive/:id/abandon",
+  requireAuth,
+  validateBody(interactiveMatchAbandonSchema),
+  async (request, response) => {
+    const sessionId = request.params.id;
+    if (!sessionId) return response.status(400).json({ message: "Identifiant de session requis." });
+    try {
+      return response.json(
+        await abandonInteractiveMatchSession({
+          sessionId,
+          userId: request.session!.userId,
+          revision: request.body.revision
+        })
+      );
+    } catch (error) {
+      if (error instanceof InteractiveMatchSessionError) {
+        return response.status(error.statusCode).json({ message: error.message });
+      }
+      return response.status(409).json({ message: "Abandon du match impossible." });
+    }
+  }
+);
+
+gameRouter.post(
+  "/matches/interactive/:id/feedback",
+  requireAuth,
+  validateBody(interactiveMatchFeedbackSchema),
+  async (request, response) => {
+    const sessionId = request.params.id;
+    if (!sessionId) return response.status(400).json({ message: "Identifiant de session requis." });
+    try {
+      return response.json(
+        await saveInteractiveMatchFeedback({
+          sessionId,
+          userId: request.session!.userId,
+          balance: request.body.balance,
+          enjoyment: request.body.enjoyment,
+          viewport: request.body.viewport,
+          comment: request.body.comment
+        })
+      );
+    } catch (error) {
+      if (error instanceof InteractiveMatchSessionError) {
+        return response.status(error.statusCode).json({ message: error.message });
+      }
+      return response.status(500).json({ message: "Retour bêta impossible." });
+    }
+  }
+);
 
 gameRouter.get("/matches/:id", requireAuth, async (request, response) => {
   const matchId = request.params.id;

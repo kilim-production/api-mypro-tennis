@@ -153,7 +153,7 @@ export const clubLeaveSchema = z.object({
 });
 
 export const countryCodeSchema = z.preprocess(
-  (value) => (typeof value === "string" ? normalizeCountryCode(value) ?? value : value),
+  (value) => (typeof value === "string" ? (normalizeCountryCode(value) ?? value) : value),
   z.enum(countryCodes)
 );
 
@@ -204,6 +204,22 @@ export const matchRequestSchema = z.object({
     .optional(),
   risk: z.enum(["Prudente", "Normale", "Forte"]).optional(),
   format: z.enum(["Un set", "Deux sets gagnants", "Trois sets gagnants"]).default("Un set")
+});
+
+export const interactiveCoachingDecisionSchema = z.object({
+  revision: z.number().int().min(0),
+  instructionId: z.string().min(1).nullable()
+});
+
+export const interactiveMatchAbandonSchema = z.object({
+  revision: z.number().int().min(0)
+});
+
+export const interactiveMatchFeedbackSchema = z.object({
+  balance: z.enum(["TOO_EASY", "BALANCED", "TOO_HARD"]),
+  enjoyment: z.number().int().min(1).max(5).optional(),
+  viewport: z.enum(["MOBILE_LANDSCAPE", "DESKTOP", "OTHER"]).default("OTHER"),
+  comment: z.string().trim().max(500).default("")
 });
 
 export const challengeSchema = z.object({

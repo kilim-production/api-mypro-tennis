@@ -58,6 +58,8 @@ import {
   Upload,
   UserPlus,
   Users,
+  Volume2,
+  VolumeX,
   Wifi,
   Wind,
   X,
@@ -68,6 +70,10 @@ import { API_URL, api, saveToken } from "./api";
 import { LobbyActionButton } from "./components/lobby/LobbyActionButton";
 import { LobbyPlayerHero } from "./components/lobby/LobbyPlayerHero";
 import { LobbySeasonTrack } from "./components/lobby/LobbySeasonTrack";
+import {
+  InteractiveMatchPage,
+  playMatchSound
+} from "./components/match/InteractiveMatchPage";
 import { useGameStore, type GameNotification, type Player } from "./store";
 
 const socketUrl = import.meta.env.VITE_SOCKET_URL ?? "http://localhost:4000";
@@ -6868,6 +6874,9 @@ function ClubPage() {
 
 function MatchStartPage() {
   const [pool, setPool] = useState<DuelPool | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [matchMode, setMatchMode] = useState<"coach" | "auto" | "quick">("coach");
+  const [pendingOpponent, setPendingOpponent] = useState<Player | null>(null);
   const [duelTab, setDuelTab] = useState<"pool" | "friends">("pool");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Player[]>([]);
@@ -6877,19 +6886,29 @@ function MatchStartPage() {
   const navigate = useNavigate();
   const refresh = useGameStore((state) => state.refresh);
   async function loadPool() {
-    setPool(await api<DuelPool>("/matches/duel-pool"));
+    const [nextPool, activeSession] = await Promise.all([
+      api<DuelPool>("/matches/duel-pool"),
+      api<{ id: string } | null>("/matches/interactive/active")
+    ]);
+    setPool(nextPool);
+    setActiveSessionId(activeSession?.id ?? null);
   }
   useEffect(() => void loadPool(), []);
-  async function start(opponentId: string) {
+  async function start(opponentId: string, selectedMode: "coach" | "auto" | "quick") {
     setMessage("");
     setLoadingId(opponentId);
     try {
-      const match = await api<MatchListItem>("/matches/quick", {
+      const endpoint = selectedMode === "coach" ? "/matches/interactive" : "/matches/quick";
+      const match = await api<{ id: string }>(endpoint, {
         method: "POST",
         body: JSON.stringify({ opponentId, format: "Deux sets gagnants" })
       });
       await refresh();
-      navigate(`/match/${match.id}`);
+      if (selectedMode === "coach") {
+        navigate(`/match-live/${match.id}`);
+      } else {
+        navigate(`/match/${match.id}${selectedMode === "quick" ? "?result=1" : ""}`);
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Duel impossible.");
       setLoadingId(null);
@@ -6963,11 +6982,15 @@ function MatchStartPage() {
           ))}
         </div>
         <Button
-          disabled={loadingId !== null}
-          onClick={() => start(opponent.id)}
+          disabled={loadingId !== null || activeSessionId !== null}
+          onClick={() => {
+            setMatchMode("coach");
+            setPendingOpponent(opponent);
+          }}
           className="mt-5 w-full"
         >
-          <Play size={17} /> {loadingId === opponent.id ? "Duel en cours..." : "Affronter"}
+          <Play size={17} />
+          {loadingId === opponent.id ? "Duel en cours..." : "Affronter"}
         </Button>
       </article>
     );
@@ -7009,6 +7032,22 @@ function MatchStartPage() {
           ))}
         </div>
       </section>
+      {activeSessionId ? (
+        <section className="panel flex flex-wrap items-center justify-between gap-4 border-emerald-300/35 p-4">
+          <div>
+            <p className="text-sm font-black uppercase tracking-[0.16em] text-emerald-300">
+              Match en cours
+            </p>
+            <p className="mt-1 text-sm text-slate-300">
+              Votre progression est sauvegardée. Terminez ce match avant de choisir un nouvel
+              adversaire.
+            </p>
+          </div>
+          <Button onClick={() => navigate(`/match-live/${activeSessionId}`)}>
+            <Play size={17} /> Reprendre le match
+          </Button>
+        </section>
+      ) : null}
       {message ? <div className="panel p-4 text-sm text-amber-100">{message}</div> : null}
       {duelTab === "friends" ? (
         <>
@@ -7063,6 +7102,96 @@ function MatchStartPage() {
           ) : null}
         </>
       )}
+      {pendingOpponent ? (
+        <div className="duel-launch-overlay" onClick={() => setPendingOpponent(null)}>
+          <section className="duel-launch-panel" onClick={(event) => event.stopPropagation()}>
+            <header>
+              <div className="duel-launch-opponent">
+                <ProfilePicture avatar={pendingOpponent.avatar} size="sm" />
+                <span>
+                  <small>Adversaire sélectionné</small>
+                  <strong>
+                    {pendingOpponent.firstName} {pendingOpponent.lastName}
+                  </strong>
+                  <em>
+                    {pendingOpponent.fftRanking} · Niveau {pendingOpponent.overall}
+                  </em>
+                </span>
+              </div>
+              <button aria-label="Fermer" onClick={() => setPendingOpponent(null)} type="button">
+                <X size={18} />
+              </button>
+            </header>
+            <div className="duel-launch-title">
+              <p>Choisissez votre expérience</p>
+              <h2>Comment voulez-vous jouer ce match ?</h2>
+            </div>
+            <div className="duel-launch-modes">
+              {[
+                {
+                  id: "coach",
+                  label: "Mode Coach",
+                  duration: "5 à 8 min",
+                  meta: "Analyse de l’adversaire, plan initial gratuit et interventions aux moments clés.",
+                  badge: "Recommandé",
+                  Icon: Target
+                },
+                {
+                  id: "auto",
+                  label: "Automatique",
+                  duration: "1 à 2 min",
+                  meta: "Le match est calculé et vous regardez le replay point par point.",
+                  badge: "Spectateur",
+                  Icon: Play
+                },
+                {
+                  id: "quick",
+                  label: "Résultat rapide",
+                  duration: "Immédiat",
+                  meta: "Le calcul est instantané et vous arrivez directement au score final.",
+                  badge: "Express",
+                  Icon: FastForward
+                }
+              ].map(({ id, label, duration, meta, badge, Icon }) => (
+                <button
+                  className={matchMode === id ? "is-active" : ""}
+                  key={id}
+                  onClick={() => setMatchMode(id as "coach" | "auto" | "quick")}
+                  type="button"
+                >
+                  <span className="duel-launch-mode-icon">
+                    <Icon size={23} />
+                  </span>
+                  <span className="duel-launch-mode-copy">
+                    <small>{badge}</small>
+                    <strong>{label}</strong>
+                    <em>{duration}</em>
+                    <span>{meta}</span>
+                  </span>
+                  <span className="duel-launch-radio" />
+                </button>
+              ))}
+            </div>
+            <footer>
+              <button
+                className="duel-launch-cancel"
+                onClick={() => setPendingOpponent(null)}
+                type="button"
+              >
+                Annuler
+              </button>
+              <Button
+                className="duel-launch-confirm"
+                disabled={loadingId !== null}
+                onClick={() => void start(pendingOpponent.id, matchMode)}
+              >
+                <Play size={18} />
+                {loadingId ? "Préparation..." : "Lancer ce match"}
+              </Button>
+            </footer>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -7070,6 +7199,8 @@ function MatchStartPage() {
 function MatchReplayPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const instantResult = searchParams.get("result") === "1";
   const player = useGameStore((state) => state.player);
   const [match, setMatch] = useState<MatchReplay | null>(null);
   const [replayTab, setReplayTab] = useState<"live" | "calc" | "feed">("live");
@@ -7077,16 +7208,26 @@ function MatchReplayPage() {
   const [speed, setSpeed] = useState(1);
   const [playing, setPlaying] = useState(true);
   const [resultDismissed, setResultDismissed] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(
+    () => localStorage.getItem("mypro-match-sound") === "1"
+  );
   const pageVisible = usePageVisible();
   useEffect(() => {
     setIndex(0);
     setReplayTab("live");
-    setPlaying(true);
+    setPlaying(!instantResult);
     setResultDismissed(false);
-    void api<MatchReplay>(`/matches/${id}`).then(setMatch);
-  }, [id]);
+    void api<MatchReplay>(`/matches/${id}`).then((payload) => {
+      setMatch(payload);
+      if (instantResult) setIndex(Math.max(0, payload.replay.events.length - 1));
+    });
+  }, [id, instantResult]);
   const events = match?.replay?.events ?? [];
   const event = events[Math.min(index, events.length - 1)];
+  useEffect(() => {
+    if (!soundEnabled || !event || instantResult) return;
+    playMatchSound(event.winnerId === player?.id ? "positive" : "negative");
+  }, [event, instantResult, player?.id, soundEnabled]);
   useEffect(() => {
     if (!playing || !events.length || !pageVisible) return;
     const timer = window.setInterval(
@@ -7134,6 +7275,19 @@ function MatchReplayPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button
+              aria-label={soundEnabled ? "Couper le son" : "Activer le son"}
+              className="bg-white/10 text-slate-100 hover:bg-white/15"
+              onClick={() => {
+                const enabled = !soundEnabled;
+                setSoundEnabled(enabled);
+                localStorage.setItem("mypro-match-sound", enabled ? "1" : "0");
+                if (enabled) playMatchSound("confirm");
+              }}
+            >
+              {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+              {soundEnabled ? "Son" : "Muet"}
+            </Button>
             <Button onClick={() => setPlaying(!playing)}>
               {playing ? <Pause size={16} /> : <Play size={16} />} {playing ? "Pause" : "Lecture"}
             </Button>
@@ -8263,6 +8417,19 @@ export function App() {
             }
           />
           <Route path="/match" element={<Navigate to="/duel" replace />} />
+          <Route
+            path="/match-live/:id"
+            element={
+              <NeedAuth>
+                <NeedPlayer>
+                  <InteractiveMatchPage
+                    resolveHeroSource={avatarHeroSource}
+                    resolvePictureSource={avatarPictureSource}
+                  />
+                </NeedPlayer>
+              </NeedAuth>
+            }
+          />
           <Route
             path="/match/:id"
             element={

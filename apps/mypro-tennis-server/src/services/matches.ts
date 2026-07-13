@@ -15,7 +15,7 @@ import {
   type TennisSurface,
   type TennisTactic
 } from "@mypro/sports-tennis";
-import type { Player } from "@prisma/client";
+import type { Player, Prisma } from "@prisma/client";
 import { awardChestForWin } from "./chests";
 import { encodeJson } from "./json";
 import {
@@ -55,6 +55,140 @@ export function toEnginePlayer(
   };
 }
 
+export type ServerMatchOutcome = {
+  winnerId: string;
+  loserId: string;
+  surface: TennisSurface;
+  format: MatchFormat;
+  scoreText: string;
+  durationMinutes: number;
+};
+
+export async function persistServerMatchOutcome(
+  tx: Prisma.TransactionClient,
+  input: {
+    playerA: Player;
+    playerB: Player;
+    type: string;
+    replay: ServerMatchOutcome;
+    replayPayload: unknown;
+    awardChests?: boolean;
+  }
+) {
+  const { playerA, playerB, replay } = input;
+  const winner = replay.winnerId === playerA.id ? playerA : playerB;
+  const loser = replay.winnerId === playerA.id ? playerB : playerA;
+  const delta = rankingDelta(winner.worldRank, loser.worldRank, input.type === "Tournoi" ? 1.8 : 1);
+  const officialAmateur = input.type.includes("officiel amateur") || input.type === "Tournoi";
+  const individualChampionshipWinPrize =
+    input.type.includes("Championnat individuel") && !winner.isAi ? 100 : 0;
+
+  const created = await tx.match.create({
+    data: {
+      playerAId: playerA.id,
+      playerBId: playerB.id,
+      winnerId: replay.winnerId,
+      type: input.type,
+      surface: replay.surface,
+      format: replay.format,
+      scoreText: replay.scoreText,
+      durationMinutes: replay.durationMinutes,
+      replay: encodeJson(input.replayPayload)
+    }
+  });
+  if (officialAmateur) {
+    await tx.fftResult.createMany({
+      data: [
+        {
+          playerId: playerA.id,
+          matchId: created.id,
+          competitionType: input.type,
+          won: replay.winnerId === playerA.id,
+          ownRanking: playerA.fftRanking,
+          opponentRanking: playerB.fftRanking,
+          coefficient: 1
+        },
+        {
+          playerId: playerB.id,
+          matchId: created.id,
+          competitionType: input.type,
+          won: replay.winnerId === playerB.id,
+          ownRanking: playerB.fftRanking,
+          opponentRanking: playerA.fftRanking,
+          coefficient: 1
+        }
+      ]
+    });
+  }
+
+  const refreshFft = async (player: Player) => {
+    if (!officialAmateur || player.proUnlocked) return {};
+    const results = await tx.fftResult.findMany({ where: { playerId: player.id } });
+    const calculation = calculateFftRanking({
+      currentRanking: player.fftRanking as FftFullRanking,
+      gender: player.gender as "Femme" | "Homme",
+      results: results.map((result) => ({
+        won: result.won,
+        opponentRanking: result.opponentRanking as FftFullRanking,
+        playedAt: result.playedAt,
+        coefficient: result.coefficient
+      }))
+    });
+    return {
+      amateurPoints: calculation.points,
+      fftRanking: calculation.ranking,
+      fftRankingValidated: calculation.fftRankingValidated,
+      proUnlocked: calculation.proUnlocked,
+      careerStage: getCareerStage(calculation.ranking as FftRanking, calculation.proUnlocked)
+    };
+  };
+
+  const winnerXp = careerXpForMatch({
+    won: true,
+    official: officialAmateur,
+    opponentRanking: loser.fftRanking,
+    playerRanking: winner.fftRanking,
+    type: input.type
+  });
+  const loserXp = careerXpForMatch({
+    won: false,
+    official: officialAmateur,
+    opponentRanking: winner.fftRanking,
+    playerRanking: loser.fftRanking,
+    type: input.type
+  });
+
+  await tx.player.update({
+    where: { id: winner.id },
+    data: {
+      wins: { increment: 1 },
+      rankingPoints: { increment: delta },
+      fatigue: { increment: 8 },
+      energy: { decrement: 10 },
+      reputation: { increment: 1 },
+      budget: { increment: individualChampionshipWinPrize },
+      ...(await refreshFft(winner))
+    }
+  });
+  await grantCareerXp(tx, winner, winnerXp);
+  await tx.player.update({
+    where: { id: loser.id },
+    data: {
+      losses: { increment: 1 },
+      rankingPoints: { increment: Math.max(3, Math.round(delta * 0.22)) },
+      fatigue: { increment: 9 },
+      energy: { decrement: 11 },
+      ...(await refreshFft(loser))
+    }
+  });
+  await grantCareerXp(tx, loser, loserXp);
+  if (input.awardChests ?? true) {
+    await awardChestForWin(winner, tx, input.type);
+    await awardChestForWin(loser, tx, `Défaite - ${input.type}`, "Bronze");
+  }
+  return created;
+}
+
 export async function createServerMatch(input: {
   playerAId: string;
   playerBId: string;
@@ -91,119 +225,14 @@ export async function createServerMatch(input: {
     format: input.format,
     seed
   });
-  const winner = replay.winnerId === playerA.id ? playerA : playerB;
-  const loser = replay.winnerId === playerA.id ? playerB : playerA;
-  const delta = rankingDelta(winner.worldRank, loser.worldRank, input.type === "Tournoi" ? 1.8 : 1);
-  const officialAmateur = input.type.includes("officiel amateur") || input.type === "Tournoi";
-  const individualChampionshipWinPrize =
-    input.type.includes("Championnat individuel") && !winner.isAi ? 100 : 0;
-
-  const match = await prisma.$transaction(async (tx) => {
-    const created = await tx.match.create({
-      data: {
-        playerAId: playerA.id,
-        playerBId: playerB.id,
-        winnerId: replay.winnerId,
-        type: input.type,
-        surface: replay.surface,
-        format: replay.format,
-        scoreText: replay.scoreText,
-        durationMinutes: replay.durationMinutes,
-        replay: encodeJson(replay)
-      }
-    });
-    if (officialAmateur) {
-      await tx.fftResult.createMany({
-        data: [
-          {
-            playerId: playerA.id,
-            matchId: created.id,
-            competitionType: input.type,
-            won: replay.winnerId === playerA.id,
-            ownRanking: playerA.fftRanking,
-            opponentRanking: playerB.fftRanking,
-            coefficient: 1
-          },
-          {
-            playerId: playerB.id,
-            matchId: created.id,
-            competitionType: input.type,
-            won: replay.winnerId === playerB.id,
-            ownRanking: playerB.fftRanking,
-            opponentRanking: playerA.fftRanking,
-            coefficient: 1
-          }
-        ]
-      });
-    }
-
-    const refreshFft = async (player: Player) => {
-      if (!officialAmateur || player.proUnlocked) return {};
-      const results = await tx.fftResult.findMany({ where: { playerId: player.id } });
-      const calculation = calculateFftRanking({
-        currentRanking: player.fftRanking as FftFullRanking,
-        gender: player.gender as "Femme" | "Homme",
-        results: results.map((result) => ({
-          won: result.won,
-          opponentRanking: result.opponentRanking as FftFullRanking,
-          playedAt: result.playedAt,
-          coefficient: result.coefficient
-        }))
-      });
-      return {
-        amateurPoints: calculation.points,
-        fftRanking: calculation.ranking,
-        fftRankingValidated: calculation.fftRankingValidated,
-        proUnlocked: calculation.proUnlocked,
-        careerStage: getCareerStage(calculation.ranking as FftRanking, calculation.proUnlocked)
-      };
-    };
-
-    const winnerXp = careerXpForMatch({
-      won: true,
-      official: officialAmateur,
-      opponentRanking: loser.fftRanking,
-      playerRanking: winner.fftRanking,
-      type: input.type
-    });
-    const loserXp = careerXpForMatch({
-      won: false,
-      official: officialAmateur,
-      opponentRanking: winner.fftRanking,
-      playerRanking: loser.fftRanking,
-      type: input.type
-    });
-
-    await tx.player.update({
-      where: { id: winner.id },
-      data: {
-        wins: { increment: 1 },
-        rankingPoints: { increment: delta },
-        fatigue: { increment: 8 },
-        energy: { decrement: 10 },
-        reputation: { increment: 1 },
-        budget: { increment: individualChampionshipWinPrize },
-        ...(await refreshFft(winner))
-      }
-    });
-    await grantCareerXp(tx, winner, winnerXp);
-    await tx.player.update({
-      where: { id: loser.id },
-      data: {
-        losses: { increment: 1 },
-        rankingPoints: { increment: Math.max(3, Math.round(delta * 0.22)) },
-        fatigue: { increment: 9 },
-        energy: { decrement: 11 },
-        ...(await refreshFft(loser))
-      }
-    });
-    await grantCareerXp(tx, loser, loserXp);
-    if (input.awardChests ?? true) {
-      await awardChestForWin(winner, tx, input.type);
-      await awardChestForWin(loser, tx, `Défaite - ${input.type}`, "Bronze");
-    }
-    return created;
-  });
-
-  return match;
+  return prisma.$transaction((tx) =>
+    persistServerMatchOutcome(tx, {
+      playerA,
+      playerB,
+      type: input.type,
+      replay,
+      replayPayload: replay,
+      ...(input.awardChests === undefined ? {} : { awardChests: input.awardChests })
+    })
+  );
 }

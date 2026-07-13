@@ -39,9 +39,9 @@ model OAuthAccount {
 }
 
 model Player {
-  id                       String                   @id @default(cuid())
-  userId                   String?                  @unique
-  user                     User?                    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id                       String                     @id @default(cuid())
+  userId                   String?                    @unique
+  user                     User?                      @relation(fields: [userId], references: [id], onDelete: SetNull)
   firstName                String
   lastName                 String
   nationality              String
@@ -50,40 +50,43 @@ model Player {
   backhand                 String
   archetype                String
   avatar                   String
-  isAi                     Boolean                  @default(false)
+  isAi                     Boolean                    @default(false)
   stats                    String
-  energy                   Float                    @default(82)
-  actionEnergy             Int                      @default(10)
-  actionEnergyUpdatedAt    DateTime                 @default(now())
-  morale                   Float                    @default(70)
-  fatigue                  Float                    @default(12)
-  health                   Float                    @default(95)
-  reputation               Float                    @default(15)
-  budget                   Int                      @default(5000)
-  gems                     Int                      @default(0)
-  careerCashPrizeWon       Int                      @default(0)
-  playerLevel              Int                      @default(0)
-  playerXp                 Int                      @default(0)
-  skillPoints              Int                      @default(0)
-  spentSkillPoints         Int                      @default(0)
-  skillAllocations         String                   @default("{}")
+  energy                   Float                      @default(82)
+  actionEnergy             Int                        @default(10)
+  actionEnergyUpdatedAt    DateTime                   @default(now())
+  morale                   Float                      @default(70)
+  fatigue                  Float                      @default(12)
+  health                   Float                      @default(95)
+  reputation               Float                      @default(15)
+  budget                   Int                        @default(5000)
+  gems                     Int                        @default(0)
+  careerCashPrizeWon       Int                        @default(0)
+  playerLevel              Int                        @default(0)
+  playerXp                 Int                        @default(0)
+  skillPoints              Int                        @default(0)
+  spentSkillPoints         Int                        @default(0)
+  skillAllocations         String                     @default("{}")
   overall                  Int
-  rankingPoints            Int                      @default(0)
-  worldRank                Int                      @default(999)
-  fftRanking               String                   @default("NC")
-  fftRankingValidated      Boolean                  @default(false)
-  amateurPoints            Int                      @default(0)
-  careerStage              String                   @default("Amateur")
-  proUnlocked              Boolean                  @default(false)
-  recentForm               Int                      @default(55)
-  wins                     Int                      @default(0)
-  losses                   Int                      @default(0)
-  createdAt                DateTime                 @default(now())
-  updatedAt                DateTime                 @updatedAt
+  rankingPoints            Int                        @default(0)
+  worldRank                Int                        @default(999)
+  fftRanking               String                     @default("NC")
+  fftRankingValidated      Boolean                    @default(false)
+  amateurPoints            Int                        @default(0)
+  careerStage              String                     @default("Amateur")
+  proUnlocked              Boolean                    @default(false)
+  recentForm               Int                        @default(55)
+  wins                     Int                        @default(0)
+  losses                   Int                        @default(0)
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
   trainingSessions         TrainingSession[]
-  matchesAsA               Match[]                  @relation("MatchA")
-  matchesAsB               Match[]                  @relation("MatchB")
-  matchesWon               Match[]                  @relation("MatchWinner")
+  matchesAsA               Match[]                    @relation("MatchA")
+  matchesAsB               Match[]                    @relation("MatchB")
+  matchesWon               Match[]                    @relation("MatchWinner")
+  interactiveMatchesAsA    InteractiveMatchSession[]  @relation("InteractiveMatchPlayerA")
+  interactiveMatchesAsB    InteractiveMatchSession[]  @relation("InteractiveMatchPlayerB")
+  interactiveMatchFeedback InteractiveMatchFeedback[]
   fftResults               FftResult[]
   tournamentEntries        TournamentEntry[]
   seasonCompetitionEntries SeasonCompetitionEntry[]
@@ -91,7 +94,7 @@ model Player {
   tennisBagChests          TennisBagChest[]
   statCards                PlayerStatCard[]
   cosmetics                PlayerCosmetic[]
-  clubPresidencies         Club[]                   @relation("ClubPresident")
+  clubPresidencies         Club[]                     @relation("ClubPresident")
   clubMembership           ClubMembership?
   clubJoinRequests         ClubJoinRequest[]
   clubDuePayments          ClubDuePayment[]
@@ -337,6 +340,45 @@ model Match {
 
   @@index([playerAId, playedAt])
   @@index([playerBId, playedAt])
+}
+
+model InteractiveMatchSession {
+  id               String                    @id @default(cuid())
+  playerAId        String
+  playerA          Player                    @relation("InteractiveMatchPlayerA", fields: [playerAId], references: [id], onDelete: Cascade)
+  playerBId        String
+  playerB          Player                    @relation("InteractiveMatchPlayerB", fields: [playerBId], references: [id], onDelete: Cascade)
+  type             String
+  surface          String
+  format           String
+  state            String
+  status           String                    @default("ACTIVE")
+  revision         Int                       @default(0)
+  completedMatchId String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  completedAt      DateTime?
+  feedback         InteractiveMatchFeedback?
+
+  @@index([playerAId, status, updatedAt])
+  @@index([playerBId, status, updatedAt])
+}
+
+model InteractiveMatchFeedback {
+  id        String                  @id @default(cuid())
+  sessionId String                  @unique
+  session   InteractiveMatchSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  playerId  String
+  player    Player                  @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  balance   String
+  enjoyment Int?
+  viewport  String                  @default("OTHER")
+  comment   String                  @default("")
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+
+  @@index([balance, createdAt])
+  @@index([playerId, createdAt])
 }
 
 model Tournament {

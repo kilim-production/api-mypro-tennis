@@ -3,6 +3,9 @@ import {
   avatarUpdateSchema,
   challengeSchema,
   cosmeticEquipSchema,
+  interactiveCoachingDecisionSchema,
+  interactiveMatchAbandonSchema,
+  interactiveMatchFeedbackSchema,
   loginSchema,
   playerCreationSchema,
   playerProfileUpdateSchema,
@@ -16,15 +19,15 @@ describe("validations partagees", () => {
 
   it("valide une creation de joueur realiste", () => {
     const result = playerCreationSchema.safeParse({
-        firstName: "Alex",
-        lastName: "Moreau",
-        nationality: "France",
-        gender: "Femme",
-        dominantHand: "Droite",
-        backhand: "Deux mains",
-        archetype: "Joueur complet",
-        avatarPicture: { kind: "preset", id: "pp-01" }
-      });
+      firstName: "Alex",
+      lastName: "Moreau",
+      nationality: "France",
+      gender: "Femme",
+      dominantHand: "Droite",
+      backhand: "Deux mains",
+      archetype: "Joueur complet",
+      avatarPicture: { kind: "preset", id: "pp-01" }
+    });
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.nationality).toBe("FR");
   });
@@ -141,5 +144,31 @@ describe("validations partagees", () => {
         risk: "Forte"
       }).success
     ).toBe(true);
+  });
+
+  it("valide les actions de session de match interactif", () => {
+    expect(
+      interactiveCoachingDecisionSchema.safeParse({
+        revision: 2,
+        instructionId: "attack-backhand"
+      }).success
+    ).toBe(true);
+    expect(
+      interactiveCoachingDecisionSchema.safeParse({ revision: 2, instructionId: null }).success
+    ).toBe(true);
+    expect(
+      interactiveCoachingDecisionSchema.safeParse({ revision: -1, instructionId: null }).success
+    ).toBe(false);
+    expect(interactiveMatchAbandonSchema.safeParse({ revision: 0 }).success).toBe(true);
+    expect(
+      interactiveMatchFeedbackSchema.safeParse({
+        balance: "BALANCED",
+        enjoyment: 5,
+        viewport: "MOBILE_LANDSCAPE"
+      }).success
+    ).toBe(true);
+    expect(
+      interactiveMatchFeedbackSchema.safeParse({ balance: "TOO_HARD", enjoyment: 6 }).success
+    ).toBe(false);
   });
 });

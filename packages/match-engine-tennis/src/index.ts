@@ -24,7 +24,14 @@ export type PointEvent = {
   action: string;
   rallyLength: number;
   comment: string;
-  position: { ballX: number; ballY: number; playerAX: number; playerAY: number; playerBX: number; playerBY: number };
+  position: {
+    ballX: number;
+    ballY: number;
+    playerAX: number;
+    playerAY: number;
+    playerBX: number;
+    playerBY: number;
+  };
   ace: boolean;
   doubleFault: boolean;
   unforcedError: boolean;
@@ -122,9 +129,12 @@ function weightedAverage(player: EnginePlayer, keys: Array<keyof TennisStats>) {
 
 function surfaceModifier(player: EnginePlayer, surface: TennisSurface) {
   const adaptation = (player.stats.surfaceAdaptation - 50) / 350;
-  if (surface === "Terre battue") return adaptation + (player.stats.stamina + player.stats.consistency - 100) / 500;
-  if (surface === "Gazon") return adaptation + (player.stats.service + player.stats.volley - 100) / 520;
-  if (surface === "Indoor") return adaptation + (player.stats.service + player.stats.aggression - 100) / 560;
+  if (surface === "Terre battue")
+    return adaptation + (player.stats.stamina + player.stats.consistency - 100) / 500;
+  if (surface === "Gazon")
+    return adaptation + (player.stats.service + player.stats.volley - 100) / 520;
+  if (surface === "Indoor")
+    return adaptation + (player.stats.service + player.stats.aggression - 100) / 560;
   return adaptation + (player.stats.footwork + player.stats.baseline - 100) / 620;
 }
 
@@ -149,11 +159,13 @@ function tacticModifier(player: EnginePlayer, opponent: EnginePlayer) {
     ["D\u00e9fensif" as TennisTactic]: (stats.consistency + stats.stamina - 100) / 650,
     ["\u00c9quilibr\u00e9" as TennisTactic]: (stats.surfaceAdaptation + stats.footwork - 100) / 900,
     Agressif: (stats.aggression + stats.forehand - 100) / 620,
-    ["Service-vol\u00e9e" as TennisTactic]: (stats.service + stats.volley + stats.netRush - 150) / 760,
+    ["Service-vol\u00e9e" as TennisTactic]:
+      (stats.service + stats.volley + stats.netRush - 150) / 760,
     Contreur: (stats.return + stats.composure - 100) / 650,
     "Fond de court": (stats.baseline + stats.backhand + stats.forehand - 150) / 760,
     "Attaque du revers adverse": (stats.aggression + stats.forehand - opp.backhand - 35) / 700,
-    ["Jeu vari\u00e9" as TennisTactic]: (stats.dropShot + stats.surfaceAdaptation + stats.focus - 150) / 760
+    ["Jeu vari\u00e9" as TennisTactic]:
+      (stats.dropShot + stats.surfaceAdaptation + stats.focus - 150) / 760
   };
   return map[normalizeTactic(player.tactic)] ?? 0;
 }
@@ -194,6 +206,8 @@ const mirroredPointStatLabels: Record<string, string> = {
   recovery: "Récupération"
 };
 
+export * from "./interactive";
+
 function resolveMirroredPoint(players: readonly [EnginePlayer, EnginePlayer], rng: SeededRandom) {
   const statKey = mirroredPointStats[rng.int(0, mirroredPointStats.length - 1)] ?? "service";
   const rawA = players[0].stats[statKey] ?? 0;
@@ -215,11 +229,21 @@ function resolveMirroredPoint(players: readonly [EnginePlayer, EnginePlayer], rn
   };
 }
 
-export function pointWinProbability(server: EnginePlayer, receiver: EnginePlayer, surface: TennisSurface, momentum: number) {
+export function pointWinProbability(
+  server: EnginePlayer,
+  receiver: EnginePlayer,
+  surface: TennisSurface,
+  momentum: number
+) {
   const serveQuality = weightedAverage(server, ["service", "confidence", "focus", "strength"]);
   const returnQuality = weightedAverage(receiver, ["return", "footwork", "focus", "composure"]);
   const rallyQuality = weightedAverage(server, ["forehand", "backhand", "baseline", "consistency"]);
-  const defensiveQuality = weightedAverage(receiver, ["speed", "stamina", "consistency", "fightingSpirit"]);
+  const defensiveQuality = weightedAverage(receiver, [
+    "speed",
+    "stamina",
+    "consistency",
+    "fightingSpirit"
+  ]);
   const vitals =
     (server.energy - receiver.energy) / 1200 -
     (server.fatigue - receiver.fatigue) / 1150 +
@@ -227,7 +251,8 @@ export function pointWinProbability(server: EnginePlayer, receiver: EnginePlayer
     (server.morale - receiver.morale) / 1500;
   const serviceEdge = 0.062 + (serveQuality - returnQuality) / 560;
   const rallyEdge = (rallyQuality - defensiveQuality) / 860;
-  const form = (server.recentForm - receiver.recentForm + server.confidence - receiver.confidence) / 1250;
+  const form =
+    (server.recentForm - receiver.recentForm + server.confidence - receiver.confidence) / 1250;
   return Math.max(
     0.28,
     Math.min(
@@ -248,8 +273,14 @@ export function pointWinProbability(server: EnginePlayer, receiver: EnginePlayer
   );
 }
 
-function isPressurePoint(points: [number, number], games: [number, number], sets: [number, number]) {
-  return points[0] >= 3 || points[1] >= 3 || games[0] >= 5 || games[1] >= 5 || sets[0] > 0 || sets[1] > 0;
+function isPressurePoint(
+  points: [number, number],
+  games: [number, number],
+  sets: [number, number]
+) {
+  return (
+    points[0] >= 3 || points[1] >= 3 || games[0] >= 5 || games[1] >= 5 || sets[0] > 0 || sets[1] > 0
+  );
 }
 
 function pressureFlags(
@@ -275,17 +306,42 @@ function actionForPoint(
 ) {
   const serverRisk = riskModifier(server);
   const receiverRisk = riskModifier(receiver);
-  const aceChance = Math.max(0.02, (server.stats.service - receiver.stats.return) / 650 + (surface === "Gazon" ? 0.025 : 0.01));
-  const doubleFaultChance = Math.max(0.008, (55 - server.stats.composure) / 900 + serverRisk.error / 3);
+  const aceChance = Math.max(
+    0.02,
+    (server.stats.service - receiver.stats.return) / 650 + (surface === "Gazon" ? 0.025 : 0.01)
+  );
+  const doubleFaultChance = Math.max(
+    0.008,
+    (55 - server.stats.composure) / 900 + serverRisk.error / 3
+  );
   const errorChance = Math.max(0.06, 0.16 + serverRisk.error + receiverRisk.error / 2);
   const roll = rng.next();
-  const rallyLength = surface === "Terre battue" ? rng.int(5, 18) : surface === "Gazon" ? rng.int(1, 9) : rng.int(3, 14);
+  const rallyLength =
+    surface === "Terre battue"
+      ? rng.int(5, 18)
+      : surface === "Gazon"
+        ? rng.int(1, 9)
+        : rng.int(3, 14);
 
   if (serverWon && roll < aceChance) {
-    return { action: "ace", rallyLength: 1, ace: true, doubleFault: false, unforcedError: false, winner: true };
+    return {
+      action: "ace",
+      rallyLength: 1,
+      ace: true,
+      doubleFault: false,
+      unforcedError: false,
+      winner: true
+    };
   }
   if (!serverWon && roll < doubleFaultChance) {
-    return { action: "double faute", rallyLength: 1, ace: false, doubleFault: true, unforcedError: true, winner: false };
+    return {
+      action: "double faute",
+      rallyLength: 1,
+      ace: false,
+      doubleFault: true,
+      unforcedError: true,
+      winner: false
+    };
   }
   if (roll < errorChance) {
     return {
@@ -297,7 +353,13 @@ function actionForPoint(
       winner: false
     };
   }
-  const winners = ["coup droit croisé", "passing long de ligne", "volée gagnante", "revers décroisé", "amortie masquée"];
+  const winners = [
+    "coup droit croisé",
+    "passing long de ligne",
+    "volée gagnante",
+    "revers décroisé",
+    "amortie masquée"
+  ];
   return {
     action: winners[rng.int(0, winners.length - 1)] ?? "coup gagnant",
     rallyLength,
@@ -308,8 +370,10 @@ function actionForPoint(
   };
 }
 
-
-function mirroredPointComment(point: ReturnType<typeof resolveMirroredPoint>, pointWinner: EnginePlayer) {
+function mirroredPointComment(
+  point: ReturnType<typeof resolveMirroredPoint>,
+  pointWinner: EnginePlayer
+) {
   return `${point.statLabel} : ${Math.round(point.statValues[0])} contre ${Math.round(point.statValues[1])}. ${pointWinner.name} gagne le point.`;
 }
 
@@ -339,7 +403,11 @@ export function simulateMatch(input: {
   let inTieBreak = false;
   let tieBreakPointCount = 0;
 
-  while (sets[0] < setsNeeded(input.format) && sets[1] < setsNeeded(input.format) && events.length < 520) {
+  while (
+    sets[0] < setsNeeded(input.format) &&
+    sets[1] < setsNeeded(input.format) &&
+    events.length < 520
+  ) {
     const server = players[serverIndex];
     const receiverIndex = serverIndex === 0 ? 1 : 0;
     const receiver = players[receiverIndex];
@@ -379,7 +447,10 @@ export function simulateMatch(input: {
     }
 
     const pressure = isPressurePoint(points, games, sets) ? 1.15 : 1;
-    momentum = Math.max(-0.035, Math.min(0.035, momentum + (winnerIndex === 0 ? 0.0055 : -0.0055) * pressure));
+    momentum = Math.max(
+      -0.035,
+      Math.min(0.035, momentum + (winnerIndex === 0 ? 0.0055 : -0.0055) * pressure)
+    );
     momentumTrace.push(Number(momentum.toFixed(3)));
 
     events.push({
