@@ -12,7 +12,7 @@ export default defineConfig({
         "icon-192.png",
         "icon-512.png",
         "apple-touch-icon.png",
-        "visuals/mypro-loading-keyart.png"
+        "visuals/mypro-loading-keyart.webp"
       ],
       manifest: {
         name: "MYPRO - TENNIS",
@@ -31,8 +31,16 @@ export default defineConfig({
       },
       workbox: {
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        globPatterns: ["**/*.{js,css,html,svg,png,ico}"],
-        globIgnores: ["**/visuals/players/*.png"],
+        globPatterns: ["**/*.{js,css,html,svg,png,webp,ico}"],
+        globIgnores: [
+          "**/visuals/players/*",
+          "**/visuals/mypro-loading-keyart.png",
+          "**/visuals/lobby-stadium.png",
+          "**/visuals/app-arena.png",
+          "**/visuals/chests/*.png",
+          "**/brand/mypro-tennis-logo-aaa.png",
+          "**/icon-1024.png"
+        ],
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
@@ -52,6 +60,16 @@ export default defineConfig({
       }
     })
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          icons: ["lucide-react"],
+          "react-vendor": ["react", "react-dom", "react-router-dom", "zustand"]
+        }
+      }
+    }
+  },
   server: {
     port: 5173
   }

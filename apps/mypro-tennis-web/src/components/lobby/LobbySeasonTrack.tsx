@@ -5,6 +5,7 @@ type LobbySeasonTrackProps = {
   day?: number | undefined;
   rewardReady: boolean;
   onClick: () => void;
+  onPrefetch?: (() => void) | undefined;
 };
 
 function visibleDays(day: number) {
@@ -16,12 +17,19 @@ export function LobbySeasonTrack({
   seasonLabel,
   day,
   rewardReady,
-  onClick
+  onClick,
+  onPrefetch
 }: LobbySeasonTrackProps) {
   const currentDay = day ?? 1;
 
   return (
-    <button className="lobby-season-track" onClick={onClick} type="button">
+    <button
+      className="lobby-season-track"
+      onClick={onClick}
+      onFocus={onPrefetch}
+      onPointerEnter={onPrefetch}
+      type="button"
+    >
       <div className="lobby-season-title">
         <strong>{seasonLabel}</strong>
         <span>Jour {day ?? "…"}/30</span>

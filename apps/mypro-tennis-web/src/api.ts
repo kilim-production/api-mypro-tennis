@@ -15,25 +15,75 @@ export type ApiState = {
   setToken: (token: string | null) => void;
 };
 
+type CachedApiResponse = {
+  expiresAt: number;
+  value: unknown;
+};
+
+const responseCache = new Map<string, CachedApiResponse>();
+const pendingRequests = new Map<string, Promise<unknown>>();
+
+function cacheDuration(path: string) {
+  if (path === "/rankings" || path === "/tournaments") return 30_000;
+  if (path === "/matches" || path === "/clubs") return 15_000;
+  if (path === "/clubs/me" || path === "/skills" || path === "/players/me/career") return 8_000;
+  if (path === "/season" || path === "/chests" || path === "/matches/duel-pool") return 5_000;
+  return 0;
+}
+
+export function clearApiCache() {
+  responseCache.clear();
+}
+
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem("mypro-token");
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers
+  const method = (options.method ?? "GET").toUpperCase();
+  const requestKey = `${token ?? "guest"}:${path}`;
+  const duration = method === "GET" ? cacheDuration(path) : 0;
+  const cached = duration ? responseCache.get(requestKey) : undefined;
+  if (cached && cached.expiresAt > Date.now()) return cached.value as T;
+
+  if (method === "GET") {
+    const pending = pendingRequests.get(requestKey);
+    if (pending) return pending as Promise<T>;
+  }
+
+  const request = (async () => {
+    const response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers
+      }
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new ApiError(payload.message ?? "Action impossible.", response.status);
+
+    if (method === "GET" && duration) {
+      responseCache.set(requestKey, { expiresAt: Date.now() + duration, value: payload });
+    } else if (method !== "GET") {
+      clearApiCache();
     }
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new ApiError(payload.message ?? "Action impossible.", response.status);
-  return payload as T;
+    return payload as T;
+  })();
+
+  if (method === "GET") pendingRequests.set(requestKey, request);
+  try {
+    return await request;
+  } finally {
+    if (method === "GET" && pendingRequests.get(requestKey) === request) {
+      pendingRequests.delete(requestKey);
+    }
+  }
 }
 
 export function saveToken(token: string) {
+  clearApiCache();
   localStorage.setItem("mypro-token", token);
 }
 
 export function clearToken() {
+  clearApiCache();
   localStorage.removeItem("mypro-token");
 }

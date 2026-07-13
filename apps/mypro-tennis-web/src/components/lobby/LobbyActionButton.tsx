@@ -6,6 +6,7 @@ type LobbyActionButtonProps = {
   detail: string;
   badge?: string | undefined;
   onClick: () => void;
+  onPrefetch?: (() => void) | undefined;
 };
 
 export function LobbyActionButton({
@@ -13,10 +14,17 @@ export function LobbyActionButton({
   label,
   detail,
   badge,
-  onClick
+  onClick,
+  onPrefetch
 }: LobbyActionButtonProps) {
   return (
-    <button className="lobby-action-button" onClick={onClick} type="button">
+    <button
+      className="lobby-action-button"
+      onClick={onClick}
+      onFocus={onPrefetch}
+      onPointerEnter={onPrefetch}
+      type="button"
+    >
       <span className="lobby-action-icon" aria-hidden="true">
         <Icon size={22} />
       </span>

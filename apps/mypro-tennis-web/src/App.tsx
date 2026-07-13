@@ -94,6 +94,24 @@ const mobileNav = [
   ["Club", "/club", Users]
 ] as const;
 
+const routeDataPaths: Record<string, readonly string[]> = {
+  "/player": ["/players/me/career"],
+  "/skills": ["/skills"],
+  "/collection": ["/chests"],
+  "/club": ["/clubs/me", "/clubs"],
+  "/season": ["/season"],
+  "/tournaments": ["/tournaments"],
+  "/duel": ["/matches/duel-pool"],
+  "/matches": ["/matches"],
+  "/rankings": ["/rankings"]
+};
+
+function prefetchRouteData(path: string) {
+  for (const dataPath of routeDataPaths[path] ?? []) {
+    void api<unknown>(dataPath).catch(() => undefined);
+  }
+}
+
 function notificationTarget(notification: GameNotification) {
   const type = notification.type.toUpperCase();
   const text = `${notification.title} ${notification.body}`.toLowerCase();
@@ -1210,12 +1228,25 @@ type SkillState = {
   };
 };
 
+function usePageVisible() {
+  const [visible, setVisible] = useState(() => !document.hidden);
+  useEffect(() => {
+    const update = () => setVisible(!document.hidden);
+    document.addEventListener("visibilitychange", update);
+    return () => document.removeEventListener("visibilitychange", update);
+  }, []);
+  return visible;
+}
+
 function useNow(intervalMs = 1000) {
   const [now, setNow] = useState(() => Date.now());
+  const pageVisible = usePageVisible();
   useEffect(() => {
+    setNow(Date.now());
+    if (!pageVisible) return;
     const timer = window.setInterval(() => setNow(Date.now()), intervalMs);
     return () => window.clearInterval(timer);
-  }, [intervalMs]);
+  }, [intervalMs, pageVisible]);
   return now;
 }
 
@@ -1384,7 +1415,7 @@ function rarityClass(rarity: ChestRarity) {
 }
 
 function tennisBagImagePath(rarity: ChestRarity) {
-  return `/visuals/chests/tennis-bag-${rarityClass(rarity).replace("rarity-", "")}.png`;
+  return `/visuals/chests/tennis-bag-${rarityClass(rarity).replace("rarity-", "")}.webp`;
 }
 
 function sortCosmeticsByRarity(items: PlayerCosmeticItem[]) {
@@ -1711,7 +1742,10 @@ function NotificationCenter({ compact = false }: { compact?: boolean }) {
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
-  const { user, player, notifications, logout } = useGameStore();
+  const user = useGameStore((state) => state.user);
+  const player = useGameStore((state) => state.player);
+  const notifications = useGameStore((state) => state.notifications);
+  const logout = useGameStore((state) => state.logout);
   const refresh = useGameStore((state) => state.refresh);
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1910,6 +1944,8 @@ function Shell({ children }: { children: React.ReactNode }) {
                     <NavLink
                       key={path}
                       to={path}
+                      onFocus={() => prefetchRouteData(path)}
+                      onPointerEnter={() => prefetchRouteData(path)}
                       className={({ isActive }) =>
                         `header-menu-link ${isActive ? "is-active" : ""}`
                       }
@@ -2108,7 +2144,8 @@ function AuthPage({ mode }: { mode: "login" | "signup" }) {
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState(searchParams.get("oauthError") ?? "");
   const navigate = useNavigate();
-  const store = useGameStore();
+  const login = useGameStore((state) => state.login);
+  const signup = useGameStore((state) => state.signup);
   function startGoogle() {
     window.location.href = `${API_URL}/auth/google/start?mode=${mode}`;
   }
@@ -2116,8 +2153,8 @@ function AuthPage({ mode }: { mode: "login" | "signup" }) {
     event.preventDefault();
     setError("");
     try {
-      if (mode === "login") await store.login(email, password);
-      else await store.signup(displayName, email, password);
+      if (mode === "login") await login(email, password);
+      else await signup(displayName, email, password);
       navigate(mode === "login" ? "/dashboard" : "/create-player");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Connexion impossible.");
@@ -2973,6 +3010,7 @@ function Dashboard() {
             day={season?.season.day}
             rewardReady={Boolean(season)}
             onClick={() => navigate("/season")}
+            onPrefetch={() => prefetchRouteData("/season")}
           />
           <div className="lobby-top-actions">
             <div className="lobby-resource-row">
@@ -3034,7 +3072,13 @@ function Dashboard() {
           </div>
         </div>
 
-        <button className="lobby-profile-button" onClick={() => navigate("/player")} type="button">
+        <button
+          className="lobby-profile-button"
+          onClick={() => navigate("/player")}
+          onFocus={() => prefetchRouteData("/player")}
+          onPointerEnter={() => prefetchRouteData("/player")}
+          type="button"
+        >
           <ProfilePicture avatar={player.avatar} size="sm" />
           <span>
             <strong>{player.name}</strong>
@@ -3059,12 +3103,14 @@ function Dashboard() {
               detail="Joueurs & équipements"
               badge={emptyBags ? `${emptyBags} slot(s)` : undefined}
               onClick={() => navigate("/collection")}
+              onPrefetch={() => prefetchRouteData("/collection")}
             />
             <LobbyActionButton
               icon={Repeat2}
               label="Marché"
               detail="Occasion & offres"
               onClick={() => navigate("/collection")}
+              onPrefetch={() => prefetchRouteData("/collection")}
             />
             <LobbyActionButton
               icon={Target}
@@ -3072,12 +3118,14 @@ function Dashboard() {
               detail={`${player.skillPoints} point(s) à placer`}
               badge={player.skillPoints ? "!" : undefined}
               onClick={() => navigate("/skills")}
+              onPrefetch={() => prefetchRouteData("/skills")}
             />
             <LobbyActionButton
               icon={Trophy}
               label="Palmarès"
               detail="Titres & records"
               onClick={() => navigate("/player")}
+              onPrefetch={() => prefetchRouteData("/player")}
             />
           </aside>
 
@@ -3110,7 +3158,12 @@ function Dashboard() {
                   </span>
                 </div>
               </div>
-              <Button className="lobby-play-button" onClick={() => navigate("/duel")}>
+              <Button
+                className="lobby-play-button"
+                onClick={() => navigate("/duel")}
+                onFocus={() => prefetchRouteData("/duel")}
+                onPointerEnter={() => prefetchRouteData("/duel")}
+              >
                 Jouer duel
               </Button>
             </div>
@@ -3122,12 +3175,14 @@ function Dashboard() {
               label="Mon club"
               detail="Membres & gestion"
               onClick={() => navigate("/club")}
+              onPrefetch={() => prefetchRouteData("/club")}
             />
             <LobbyActionButton
               icon={BarChart3}
               label="Classement"
               detail={`Global · rang ${player.worldRank}`}
               onClick={() => navigate("/rankings")}
+              onPrefetch={() => prefetchRouteData("/rankings")}
             />
             <LobbyActionButton
               icon={MessageCircle}
@@ -3145,7 +3200,13 @@ function Dashboard() {
         </div>
 
         <div className="lobby-bottom">
-          <button className="lobby-season-card" onClick={() => navigate("/season")} type="button">
+          <button
+            className="lobby-season-card"
+            onClick={() => navigate("/season")}
+            onFocus={() => prefetchRouteData("/season")}
+            onPointerEnter={() => prefetchRouteData("/season")}
+            type="button"
+          >
             <span className="lobby-season-trophy" aria-hidden="true">
               <Trophy size={52} />
             </span>
@@ -5156,14 +5217,16 @@ function SeasonPage() {
   const [claimingReward, setClaimingReward] = useState(false);
   const refresh = useGameStore((state) => state.refresh);
   const navigate = useNavigate();
+  const pageVisible = usePageVisible();
   async function load() {
     setData(await api<SeasonData>("/season"));
   }
   useEffect(() => {
     void load();
+    if (!pageVisible) return;
     const timer = window.setInterval(() => void load(), 60_000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [pageVisible]);
   async function register(type: SeasonCompetition["type"]) {
     setMessage("");
     try {
@@ -7009,6 +7072,7 @@ function MatchReplayPage() {
   const [speed, setSpeed] = useState(1);
   const [playing, setPlaying] = useState(true);
   const [resultDismissed, setResultDismissed] = useState(false);
+  const pageVisible = usePageVisible();
   useEffect(() => {
     setIndex(0);
     setReplayTab("live");
@@ -7019,13 +7083,13 @@ function MatchReplayPage() {
   const events = match?.replay?.events ?? [];
   const event = events[Math.min(index, events.length - 1)];
   useEffect(() => {
-    if (!playing || !events.length) return;
+    if (!playing || !events.length || !pageVisible) return;
     const timer = window.setInterval(
       () => setIndex((current) => Math.min(events.length - 1, current + 1)),
       1000 / speed
     );
     return () => window.clearInterval(timer);
-  }, [playing, speed, events.length]);
+  }, [playing, speed, events.length, pageVisible]);
   const finalReached = events.length > 0 && index >= events.length - 1;
   useEffect(() => {
     if (finalReached) setPlaying(false);
@@ -7967,10 +8031,12 @@ function OrientationGuard() {
 function useFitMobileModals() {
   useEffect(() => {
     let frame = 0;
+    let observing = false;
+    const compactMedia = window.matchMedia("(max-width: 900px), (max-height: 560px)");
 
     const fit = () => {
       frame = 0;
-      const compactViewport = window.matchMedia("(max-width: 900px), (max-height: 560px)").matches;
+      const compactViewport = compactMedia.matches;
       const panels = document.querySelectorAll<HTMLElement>(
         ".game-modal-panel, .header-menu-panel"
       );
@@ -8012,11 +8078,21 @@ function useFitMobileModals() {
       });
       if (shouldFit) schedule();
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    const updateObservation = () => {
+      if (compactMedia.matches && !observing) {
+        observer.observe(document.body, { childList: true, subtree: true });
+        observing = true;
+      } else if (!compactMedia.matches && observing) {
+        observer.disconnect();
+        observing = false;
+      }
+      schedule();
+    };
     window.addEventListener("resize", schedule);
     window.addEventListener("orientationchange", schedule);
     window.visualViewport?.addEventListener("resize", schedule);
-    schedule();
+    compactMedia.addEventListener("change", updateObservation);
+    updateObservation();
 
     return () => {
       if (frame) cancelAnimationFrame(frame);
@@ -8024,6 +8100,7 @@ function useFitMobileModals() {
       window.removeEventListener("resize", schedule);
       window.removeEventListener("orientationchange", schedule);
       window.visualViewport?.removeEventListener("resize", schedule);
+      compactMedia.removeEventListener("change", updateObservation);
     };
   }, []);
 }
@@ -8044,7 +8121,7 @@ function LoadingScreen() {
         className="loading-screen-image"
         decoding="async"
         fetchPriority="high"
-        src="/visuals/mypro-loading-keyart.png"
+        src="/visuals/mypro-loading-keyart.webp"
       />
       <div className="loading-screen-scrim" />
       <section className="loading-screen-card">
@@ -8072,7 +8149,8 @@ function LoadingScreen() {
 }
 
 export function App() {
-  const { booted, refresh } = useGameStore();
+  const booted = useGameStore((state) => state.booted);
+  const refresh = useGameStore((state) => state.refresh);
   useFitMobileModals();
   useEffect(() => void refresh(), [refresh]);
   if (!booted)
