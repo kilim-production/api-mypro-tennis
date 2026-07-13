@@ -34,7 +34,8 @@ trainingRouter.post("/start", requireAuth, validateBody(trainingStartSchema), as
   const powerLevel = trainingPowerLevel(player.overall);
   const scaledCost = scaleDevelopmentCost(training.cost, powerLevel, 1.16);
   const scaledDurationMinutes = scaleDevelopmentMinutes(training.durationMinutes, powerLevel, 1.18);
-  if (player.budget < scaledCost) return response.status(400).json({ message: "Budget insuffisant." });
+  if (player.budget < scaledCost)
+    return response.status(400).json({ message: "Crédits insuffisants." });
   const active = await prisma.trainingSession.findFirst({ where: { playerId: player.id, status: "ACTIVE" } });
   if (active) return response.status(409).json({ message: "Un entraînement est déjà en cours." });
   const endsAt = new Date(Date.now() + scaledDurationMinutes * 60_000);

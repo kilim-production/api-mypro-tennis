@@ -1237,7 +1237,7 @@ clubsRouter.post("/dues/pay", requireAuth, async (request, response) => {
   });
   if (existing) return response.status(409).json({ message: "Cotisation déjà payée." });
   if (player.budget < membership.club.duesAmount)
-    return response.status(400).json({ message: "Budget insuffisant pour payer la cotisation." });
+    return response.status(400).json({ message: "Crédits insuffisants pour payer la cotisation." });
   const payment = await prisma.$transaction(async (tx) => {
     await tx.player.update({
       where: { id: player.id },
@@ -1336,7 +1336,7 @@ clubsRouter.post("/", requireAuth, validateBody(clubCreateSchema), async (reques
     return response.status(409).json({ message: "Vous êtes déjà membre d'un club." });
   if (player.budget < clubCreationCost)
     return response.status(400).json({
-      message: `Budget insuffisant. Créer un club coûte ${clubCreationCost.toLocaleString("fr-FR")} €.`
+      message: `Crédits insuffisants. Créer un club coûte ${clubCreationCost.toLocaleString("fr-FR")} CR.`
     });
   try {
     const club = await prisma.$transaction(async (tx) => {
@@ -1428,7 +1428,7 @@ clubsRouter.post("/me/buildings/complex/upgrade", requireAuth, async (request, r
   }
   if (membership.club.budget < nextLevel.cost) {
     return response.status(400).json({
-      message: `Budget du club insuffisant. Amélioration requise : ${nextLevel.cost.toLocaleString("fr-FR")} €.`
+      message: `Crédits du club insuffisants. Amélioration requise : ${nextLevel.cost.toLocaleString("fr-FR")} CR.`
     });
   }
 
@@ -1474,7 +1474,7 @@ async function upgradeSpecializedBuilding(
   }
   if (membership.club.budget < nextLevel.cost) {
     return response.status(400).json({
-      message: `Budget du club insuffisant. Amelioration requise : ${nextLevel.cost.toLocaleString("fr-FR")} euros.`
+      message: `Crédits du club insuffisants. Amélioration requise : ${nextLevel.cost.toLocaleString("fr-FR")} CR.`
     });
   }
 
@@ -1547,7 +1547,7 @@ clubsRouter.post(
         club: null,
         pendingRequest: null,
         refunded: clubResaleRefund,
-        message: `Club revendu. ${clubResaleRefund.toLocaleString("fr-FR")} € récupérés.`
+        message: `Club revendu. ${clubResaleRefund.toLocaleString("fr-FR")} CR récupérés.`
       });
     }
 

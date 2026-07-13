@@ -464,7 +464,7 @@ export async function unlockStatCardBonus(playerId: string, statKey: string) {
     if (earnedLevel < nextLevel) throw new Error("Palier de doublons non atteint.");
 
     const cost = trainingCardUnlockCost(nextLevel);
-    if (player.budget < cost) throw new Error(`Budget insuffisant. Coût : ${cost} €.`);
+    if (player.budget < cost) throw new Error(`Crédits insuffisants. Coût : ${cost} CR.`);
 
     const stats = { ...decodeJson<TennisStats>(player.stats) };
     stats[statKey as keyof TennisStats] = clamp((stats[statKey as keyof TennisStats] ?? 0) + 1);

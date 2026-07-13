@@ -1129,7 +1129,7 @@ gameRouter.post("/season/:type/register", requireAuth, async (request, response)
         await tx.seasonCompetitionEntry.delete({ where: { id: already.id } });
       }
       if (player.budget < economy.entryFee) {
-        throw new Error(`Budget insuffisant. Inscription requise : ${economy.entryFee} €.`);
+        throw new Error(`Crédits insuffisants. Inscription requise : ${economy.entryFee} CR.`);
       }
       await spendCareerAction(player, tx, definition.energyCost);
       await tx.player.update({

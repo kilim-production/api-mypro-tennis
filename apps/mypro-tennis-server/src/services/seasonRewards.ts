@@ -53,7 +53,7 @@ export const seasonDailyRewards: SeasonRewardDefinition[] = [
 ];
 
 function rewardLabel(reward: SeasonRewardDefinition) {
-  if (reward.type === "money") return `${reward.money.toLocaleString("fr-FR")} €`;
+  if (reward.type === "money") return `${reward.money.toLocaleString("fr-FR")} CR`;
   if (reward.type === "gems") return `${reward.gems} gemme${reward.gems > 1 ? "s" : ""}`;
   return `Sac ${reward.rarity}`;
 }

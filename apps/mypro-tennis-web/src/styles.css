@@ -6575,3 +6575,42 @@ button.lobby-mini-bag:active:not(:disabled) {
     opacity: 0.72;
   }
 }
+
+/* Compact landscape fit ------------------------------------------------- */
+
+@media (orientation: landscape) and (max-height: 430px) and (max-width: 980px) {
+  .lobby-cinematic .lobby-top-actions .lobby-resource-pill > span {
+    min-width: 0;
+  }
+
+  .lobby-cinematic .lobby-top-actions .lobby-resource-pill strong {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    font-variant-numeric: tabular-nums;
+    text-overflow: clip;
+  }
+
+  .lobby-cinematic .lobby-top-actions .lobby-money {
+    width: 11.8vw;
+    min-width: 100px;
+  }
+
+  .lobby-cinematic .lobby-top-actions .lobby-money strong {
+    font-size: min(1.3vw, 2.75vh);
+    letter-spacing: -0.025em;
+  }
+
+  .lobby-cinematic .lobby-top-actions .lobby-resource-pill svg {
+    width: min(1.75vw, 3.6vh);
+    height: min(1.75vw, 3.6vh);
+  }
+
+  .lobby-cinematic .lobby-bags-card {
+    top: auto;
+    right: max(1.25vw, env(safe-area-inset-right));
+    bottom: max(1.2vh, env(safe-area-inset-bottom));
+    height: 23vh;
+    max-height: calc(100dvh - max(1.2vh, env(safe-area-inset-bottom)));
+  }
+}

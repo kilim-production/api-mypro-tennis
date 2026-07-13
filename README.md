@@ -11,7 +11,7 @@ L'univers sportif est entièrement fictif : joueurs, tournois, lieux, classement
 - Création de joueur avec archétypes.
 - Parcours amateur FFT : départ à 12 ans, classement `15/1`, progression jusqu'à validation de `-15`.
 - Énergie de carrière : 10 points maximum, recharge de 1 point toutes les 30 minutes, 1 point consommé par action.
-- Tableau de bord de carrière, statistiques, jauges et budget.
+- Tableau de bord de carrière, statistiques, jauges et crédits de jeu.
 - Entraînements à durée réelle, calculés côté serveur.
 - Infrastructures améliorables.
 - Staff recrutable.

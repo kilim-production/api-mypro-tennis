@@ -22,6 +22,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock3,
+  Coins,
   Crosshair,
   Dumbbell,
   Eye,
@@ -209,6 +210,10 @@ function statVisual(key: string) {
 }
 
 const stat = (player: Player, key: string) => player.stats[key] ?? 0;
+
+function formatCredits(value: number) {
+  return `${value.toLocaleString("fr-FR")} CR`;
+}
 
 function nationalityLabel(value: string) {
   return countryLabel(value);
@@ -1032,7 +1037,7 @@ function ClubBuildingCard({
                     </small>
                   </span>
                   <span className="whitespace-nowrap text-xs font-bold text-slate-200">
-                    {level.cost === 0 ? "Base" : `${level.cost.toLocaleString("fr-FR")} €`}
+                    {level.cost === 0 ? "Base" : formatCredits(level.cost)}
                   </span>
                 </div>
               );
@@ -1058,7 +1063,7 @@ function ClubBuildingCard({
             disabled={upgradeBusy || !canUpgrade}
             onClick={() => onUpgrade(building)}
           >
-            Améliorer pour {nextLevel.cost.toLocaleString("fr-FR")} €
+            Améliorer pour {formatCredits(nextLevel.cost)}
           </Button>
         ) : (
           <Button className="w-full bg-white/10 text-slate-100 hover:bg-white/15" disabled>
@@ -1067,7 +1072,7 @@ function ClubBuildingCard({
         )}
         {club.isPresident && nextLevel && !canUpgrade ? (
           <p className="mt-2 text-xs text-amber-200">
-            Budget du club insuffisant pour cette amélioration.
+            Crédits du club insuffisants pour cette amélioration.
           </p>
         ) : null}
       </div>
@@ -1487,7 +1492,7 @@ function CosmeticUpgradeMeta({ item }: { item: PlayerCosmeticItem }) {
       </div>
       <div className="mt-2">
         {item.nextUpgradeCost
-          ? `Prochain niveau : ${item.nextUpgradeCost.toLocaleString("fr-FR")} €`
+          ? `Prochain niveau : ${formatCredits(item.nextUpgradeCost)}`
           : "Niveau maximum atteint"}
       </div>
     </div>
@@ -1538,7 +1543,7 @@ function RewardModal({
         </p>
         <h2 className="mt-1 text-3xl font-black">Récompenses obtenues</h2>
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <Metric label="Argent" value={`${rewards.money} €`} />
+          <Metric label="Crédits" value={formatCredits(rewards.money)} />
           <Metric label="Gemmes" value={rewards.gems} />
           <Metric
             label="Paliers prêts"
@@ -3043,10 +3048,10 @@ function Dashboard() {
                 onClick={() => navigate("/player")}
                 type="button"
               >
-                <span className="text-xl font-black">€</span>
+                <Coins aria-hidden="true" size={18} />
                 <span>
-                  <small>Budget</small>
-                  <strong>{player.budget.toLocaleString("fr-FR")} €</strong>
+                  <small>Crédits</small>
+                  <strong>{formatCredits(player.budget)}</strong>
                 </span>
               </button>
             </div>
@@ -4201,11 +4206,11 @@ function CollectionPage() {
       await refreshPlayer();
       const refundLabel =
         result.refund > 0
-          ? ` Remboursement amélioration : ${result.refund.toLocaleString("fr-FR")} €.`
+          ? ` Remboursement amélioration : ${formatCredits(result.refund)}.`
           : "";
       setCollectionMessage(
         result.money > 0
-          ? `Marché validé : ${result.recipe}. Vous récupérez ${result.totalMoney.toLocaleString("fr-FR")} €.${refundLabel}`
+          ? `Marché validé : ${result.recipe}. Vous récupérez ${formatCredits(result.totalMoney)}.${refundLabel}`
           : `Marché validé : ${result.recipe}. Nouvel objet ${result.resultRarity} obtenu.${refundLabel}`
       );
     } catch (error) {
@@ -4350,7 +4355,7 @@ function CollectionPage() {
                         <span className="hidden sm:inline">
                           {busyUpgrade === item.id
                             ? "Amélioration..."
-                            : `Améliorer · ${item.nextUpgradeCost.toLocaleString("fr-FR")} €`}
+                            : `Améliorer · ${formatCredits(item.nextUpgradeCost)}`}
                         </span>
                       </button>
                     ) : null}
@@ -4432,7 +4437,7 @@ function CollectionPage() {
                     >
                       {busyCard === card.statKey
                         ? "Déblocage..."
-                        : `Débloquer +1 · ${card.unlockCost} €`}
+                        : `Débloquer +1 · ${formatCredits(card.unlockCost)}`}
                     </Button>
                   ) : null}
                 </div>
@@ -4483,7 +4488,7 @@ function CollectionPage() {
                     >
                       {busyUpgrade === item.id
                         ? "Amélioration..."
-                        : `Améliorer · ${item.nextUpgradeCost.toLocaleString("fr-FR")} €`}
+                        : `Améliorer · ${formatCredits(item.nextUpgradeCost)}`}
                     </Button>
                   ) : null}
                   <div className="mt-4 grid grid-cols-4 gap-2">
@@ -4566,7 +4571,7 @@ function CollectionPage() {
                       <div className="mt-1 font-black text-emerald-200">
                         {recipe.resultRarity
                           ? `1 objet ${recipe.resultRarity}`
-                          : `${recipe.money.toLocaleString("fr-FR")} €`}
+                          : formatCredits(recipe.money)}
                       </div>
                     </div>
                   </div>
@@ -4722,8 +4727,8 @@ function SeasonEntryDetails({
             </p>
             <h2 className="text-2xl font-black">{title}</h2>
             <p className="mt-2 text-sm text-slate-300">
-              Inscription payée : {entry.entryFee.toLocaleString("fr-FR")} € · Cash prize :{" "}
-              {entry.cashPrize.toLocaleString("fr-FR")} €
+              Inscription payée : {formatCredits(entry.entryFee)} · Dotation :{" "}
+              {formatCredits(entry.cashPrize)}
             </p>
           </div>
           <Button onClick={onClose} className="justify-center">
@@ -5120,7 +5125,7 @@ function BracketColumnTitle({ label }: { label: string }) {
 }
 
 function DailyRewardIcon({ reward }: { reward: SeasonDailyReward }) {
-  if (reward.type === "money") return <span className="text-lg font-black">€</span>;
+  if (reward.type === "money") return <Coins aria-label="Crédits" size={20} />;
   if (reward.type === "gems") return <Gem size={19} />;
   return <PackageOpen size={19} />;
 }
@@ -5363,7 +5368,7 @@ function SeasonPage() {
                       <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400">
                         Prix
                       </div>
-                      <div className="text-lg font-black">{entryFee.toLocaleString("fr-FR")} €</div>
+                      <div className="text-lg font-black">{formatCredits(entryFee)}</div>
                     </div>
                   </div>
                   <p className="mt-3 line-clamp-2 text-sm text-slate-300">{competition.subtitle}</p>
@@ -5375,8 +5380,8 @@ function SeasonPage() {
                     <GameMiniMetric label="Statut" value={statusLabel} />
                     <GameMiniMetric label="Zone haute" value={competition.rankingRange.best} />
                     <GameMiniMetric
-                      label="Cash prize"
-                      value={`${cashPrize.toLocaleString("fr-FR")} €`}
+                      label="Dotation"
+                      value={formatCredits(cashPrize)}
                     />
                   </div>
                   <div className="mt-4 rounded-md border border-cyan-300/15 bg-cyan-300/10 p-3">
@@ -5492,7 +5497,7 @@ function TournamentsPage() {
             <div className="mt-4 grid grid-cols-2 gap-3">
               <Metric label="Catégorie" value={tournament.category} />
               <Metric label="Points" value={tournament.points} />
-              <Metric label="Dotation" value={`${tournament.prize} ?`} />
+              <Metric label="Dotation" value={formatCredits(tournament.prize)} />
               <Metric label="Niveau" value={tournament.recommendedLevel} />
             </div>
             <div className="mt-4 rounded-md bg-white/5 p-3 text-sm text-slate-300">
@@ -5696,7 +5701,7 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
             Une équipe compte 5 joueurs. Le championnat réunit 13 équipes, avec une rencontre par
             jour à 18h30 et une éventuelle journée exempt. Chaque rencontre se joue en 5 simples, du
             Simple 1 au Simple 5, selon la hiérarchie des titulaires : classement FFT, niveau du
-            joueur, puis budget.
+            joueur, puis crédits disponibles.
           </p>
         </div>
         {!data.team ? (
@@ -5727,7 +5732,7 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
             <p className="mt-2 text-xs text-slate-400">{duesValidityLabel}</p>
           </div>
           <div className="grid gap-2 text-right">
-            <strong className="text-2xl">{dues.amount.toLocaleString("fr-FR")} €</strong>
+            <strong className="text-2xl">{formatCredits(dues.amount)}</strong>
             <span className="text-sm text-slate-300">
               {dues.amount === 0
                 ? "Aucune cotisation"
@@ -5742,8 +5747,8 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <Metric label="Joueurs à jour" value={`${dues.eligibleCount}/${club.memberCount}`} />
           <Metric
-            label="Budget club"
-            value={`${(data.club?.budget ?? club.budget).toLocaleString("fr-FR")} €`}
+            label="Crédits du club"
+            value={formatCredits(data.club?.budget ?? club.budget)}
           />
           <Metric
             label="Statut"
@@ -5754,7 +5759,7 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
         </div>
         {dues.currentPlayerCanPay ? (
           <Button className="mt-4" disabled={busy} onClick={() => void payDues()}>
-            Payer ma cotisation · {dues.amount.toLocaleString("fr-FR")} €
+            Payer ma cotisation · {formatCredits(dues.amount)}
           </Button>
         ) : null}
       </article>
@@ -5887,7 +5892,7 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
                             <td>{entry.setsFor - entry.setsAgainst}</td>
                             <td>{entry.gamesFor - entry.gamesAgainst}</td>
                             <td className="font-black text-amber-100">
-                              {displayedCashPrize.toLocaleString("fr-FR")} €
+                              {formatCredits(displayedCashPrize)}
                             </td>
                             <td>
                               {movement ? (
@@ -6357,10 +6362,10 @@ function ClubPage() {
             <Metric label="Classement requis" value={club.minimumRanking} />
             <Metric
               label="Cotisation"
-              value={`${clubDuesAmount(club).toLocaleString("fr-FR")} €`}
+              value={formatCredits(clubDuesAmount(club))}
             />
             <Metric label="Niveau compétitif" value={club.competitiveLevel} />
-            <Metric label="Budget du club" value={`${club.budget.toLocaleString("fr-FR")} €`} />
+            <Metric label="Crédits du club" value={formatCredits(club.budget)} />
           </div>
           <div className="segmented-tabs mt-5">
             {[
@@ -6399,10 +6404,10 @@ function ClubPage() {
               </div>
               <div className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-3 py-2 text-right text-xs text-emerald-100 sm:text-sm">
                 <span className="block text-[10px] uppercase tracking-[0.14em] text-emerald-200">
-                  Budget
+                  Crédits
                 </span>
                 <span className="font-black text-white">
-                  {club.budget.toLocaleString("fr-FR")} €
+                  {formatCredits(club.budget)}
                 </span>
               </div>
             </div>
@@ -6563,7 +6568,7 @@ function ClubPage() {
                   ) : club.isPresident ? (
                     <div className="mt-5 rounded-md border border-emerald-300/30 bg-emerald-300/10 p-3 text-sm text-emerald-100">
                       Vous êtes le seul joueur du club. Quitter le club revend automatiquement la
-                      structure, supprime le club et vous récupérez 4 000 €.
+                      structure, supprime le club et vous récupérez 4 000 CR.
                     </div>
                   ) : (
                     <div className="mt-5 rounded-md border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-300">
@@ -6674,7 +6679,7 @@ function ClubPage() {
         <h1 className="mt-1 text-3xl font-black">Créer ou rejoindre un club</h1>
         <p className="mt-2 max-w-2xl text-sm text-slate-300">
           Un nouveau club commence avec 5 places. Le créateur devient président et valide les
-          demandes d'adhésion. La création coûte {clubCreationCost.toLocaleString("fr-FR")} €.
+          demandes d'adhésion. La création coûte {formatCredits(clubCreationCost)}.
         </p>
         {data.pendingRequest ? (
           <div className="mt-4 rounded-md border border-emerald-300/30 bg-emerald-300/10 p-3 text-sm text-emerald-100">
@@ -6690,7 +6695,7 @@ function ClubPage() {
         <div className="segmented-tabs mt-5">
           {[
             ["join", "Rejoindre", `${clubs.length} clubs`],
-            ["create", "Créer", `${clubCreationCost.toLocaleString("fr-FR")} €`]
+            ["create", "Créer", formatCredits(clubCreationCost)]
           ].map(([value, label, meta]) => (
             <button
               className={clubDiscoveryTab === value ? "is-active" : ""}
@@ -6711,8 +6716,8 @@ function ClubPage() {
             <div>
               <h2 className="text-xl font-black">Créer un club</h2>
               <p className="mt-1 text-sm text-slate-300">
-                Coût : {clubCreationCost.toLocaleString("fr-FR")} € · Budget :{" "}
-                {player.budget.toLocaleString("fr-FR")} €
+                Coût : {formatCredits(clubCreationCost)} · Crédits disponibles :{" "}
+                {formatCredits(player.budget)}
               </p>
             </div>
             <label className="grid gap-1 text-sm">
@@ -6785,11 +6790,11 @@ function ClubPage() {
             </label>
             {!canCreateClub ? (
               <p className="rounded-md border border-amber-300/30 bg-amber-300/10 p-3 text-sm text-amber-100">
-                Budget insuffisant pour fonder un club.
+                Crédits insuffisants pour fonder un club.
               </p>
             ) : null}
             <Button disabled={busy === "create" || Boolean(data.pendingRequest) || !canCreateClub}>
-              Créer le club · {clubCreationCost.toLocaleString("fr-FR")} €
+              Créer le club · {formatCredits(clubCreationCost)}
             </Button>
           </form>
         ) : null}
@@ -6829,7 +6834,7 @@ function ClubPage() {
                             Classement requis : {club.minimumRanking} minimum
                           </p>
                           <p className="mt-1 text-sm text-slate-300">
-                            Cotisation : {clubDuesAmount(club).toLocaleString("fr-FR")} €
+                            Cotisation : {formatCredits(clubDuesAmount(club))}
                           </p>
                           {club.description ? (
                             <p className="mt-2 text-sm text-slate-400">{club.description}</p>

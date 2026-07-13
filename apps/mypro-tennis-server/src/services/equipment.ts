@@ -36,7 +36,7 @@ const marketRecipes: Record<
   Argent: { required: 6, resultRarity: "Or", label: "6 Argent = 1 Or" },
   Or: { required: 9, resultRarity: "Légendaire", label: "9 Or = 1 Légendaire" },
   Légendaire: { required: 12, resultRarity: "Mythique", label: "12 Légendaires = 1 Mythique" },
-  Mythique: { required: 1, money: 10_000, label: "1 Mythique = 10 000 €" }
+  Mythique: { required: 1, money: 10_000, label: "1 Mythique = 10 000 CR" }
 };
 
 type CosmeticBonusSource = Pick<PlayerCosmetic, "bonuses" | "cosmeticId" | "rarity"> & {
@@ -253,7 +253,7 @@ export async function upgradeCosmetic(playerId: string, cosmeticId: string) {
 
     const cost = cosmeticUpgradeCost(owned.rarity, upgradeLevel + 1);
     const player = await tx.player.findUniqueOrThrow({ where: { id: playerId } });
-    if (player.budget < cost) throw new Error(`Budget insuffisant. Il faut ${cost} €.`);
+    if (player.budget < cost) throw new Error(`Crédits insuffisants. Il faut ${cost} CR.`);
 
     const before = sumBonuses(
       await tx.playerCosmetic.findMany({ where: { playerId, equippedSlot: { not: null } } })
