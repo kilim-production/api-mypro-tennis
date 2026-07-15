@@ -591,6 +591,12 @@ const pointPatterns = [
     b: ["return", "speed", "composure"]
   },
   {
+    key: "smash",
+    label: "Smash",
+    a: ["smash", "strength", "explosiveness"],
+    b: ["return", "speed", "composure"]
+  },
+  {
     key: "stamina",
     label: "Échange long",
     a: ["stamina", "recovery", "consistency"],
@@ -651,10 +657,9 @@ function pointProbability(
   // A tennis match amplifies every small point advantage over many rallies. Keeping the
   // per-point statistical edge moderate preserves credible upsets without flattening progression.
   const skillEdge = (qualityA - qualityB) / 650;
-  const physicalEdge =
-    (state.energy[0] - state.energy[1]) / 780 +
-    (playerA.health - playerB.health) / 1800 -
-    (playerA.fatigue - playerB.fatigue) / 1500;
+  // Health and fatigue already determine the match's starting energy. Only the remaining
+  // match-local energy is compared here, otherwise physical condition is counted twice.
+  const physicalEdge = (state.energy[0] - state.energy[1]) / 780;
   const confidenceEdge = (state.confidence[0] - state.confidence[1]) / 1050;
   const momentumEdge = state.momentum / 1900;
   const activeA = state.activeInstructions[0]?.id ?? null;
@@ -976,8 +981,14 @@ function resolvePoint(state: InteractiveMatchState) {
 export function createInteractiveMatch(input: CreateInteractiveMatchInput): InteractiveMatchState {
   const seed = String(input.seed);
   const serverIndex: 0 | 1 = hashRandom(seed, 0, "server") < 0.5 ? 0 : 1;
+  // A match starts from a playable baseline, then reflects the player's persistent condition.
+  // This keeps preparation meaningful without forcing depleted careers to begin every match at 20%.
   const startingEnergy = (player: EnginePlayer) =>
-    clamp(player.energy - player.fatigue * 0.3 + player.health * 0.12, 20, 100);
+    clamp(
+      80 + (player.energy - 50) * 0.18 + (player.health - 75) * 0.12 - player.fatigue * 0.22,
+      40,
+      95
+    );
   const startingConfidence = (player: EnginePlayer) =>
     clamp(
       ((player.confidence > 0 ? player.confidence : (player.morale + player.recentForm) / 2) * 2 +

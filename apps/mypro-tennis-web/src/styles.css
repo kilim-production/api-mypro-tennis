@@ -6023,6 +6023,33 @@ button:disabled,
   background: linear-gradient(90deg, #2dd4bf, #67e8f9);
 }
 
+.interactive-energy-source {
+  margin-top: 4px;
+  border-left: 2px solid rgba(251, 191, 36, 0.5);
+  padding-left: 7px;
+}
+
+.interactive-energy-source strong,
+.interactive-energy-source small {
+  display: block;
+}
+
+.interactive-energy-source strong {
+  color: #fde68a;
+  font-size: clamp(6px, 0.65vw, 10px);
+  font-weight: 950;
+}
+
+.interactive-energy-source small {
+  margin-top: 1px;
+  overflow: hidden;
+  color: #94a3b8;
+  font-size: clamp(5px, 0.56vw, 8px);
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .interactive-momentum-card {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   padding-top: clamp(5px, 0.65vw, 10px);
@@ -6260,6 +6287,22 @@ button:disabled,
   text-align: center;
 }
 
+.interactive-open-matchup {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: clamp(5px, 0.6vw, 8px) auto 0;
+  border: 1px solid rgba(94, 234, 212, 0.4);
+  border-radius: 7px;
+  padding: 5px 10px;
+  color: #ccfbf1;
+  background: rgba(45, 212, 191, 0.1);
+  font-size: clamp(7px, 0.68vw, 10px);
+  font-weight: 950;
+}
+
 .interactive-point-callout span {
   color: #fbbf24;
   font-size: clamp(6px, 0.6vw, 9px);
@@ -6364,6 +6407,20 @@ button:disabled,
 
 .interactive-coaching-heading button.is-selected {
   color: #fef3c7;
+}
+
+.interactive-coaching-tools {
+  display: flex;
+  max-width: 100%;
+  gap: clamp(6px, 0.65vw, 10px);
+  overflow: hidden;
+}
+
+.interactive-coaching-tools button {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .interactive-coaching-options {
@@ -6833,6 +6890,142 @@ button:disabled,
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: clamp(9px, 1.15vw, 17px);
+}
+
+.interactive-matchup-panel {
+  width: min(1040px, 94vw);
+}
+
+.interactive-matchup-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: clamp(8px, 1vw, 15px);
+}
+
+.interactive-matchup-players {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 1.35fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(7px, 1vw, 15px);
+}
+
+.interactive-matchup-players article {
+  min-width: 0;
+  border: 1px solid rgba(94, 234, 212, 0.25);
+  border-radius: 8px;
+  padding: clamp(7px, 0.8vw, 12px);
+  background: rgba(45, 212, 191, 0.07);
+}
+
+.interactive-matchup-players article:last-child {
+  border-color: rgba(251, 191, 36, 0.28);
+  background: rgba(251, 191, 36, 0.06);
+  text-align: right;
+}
+
+.interactive-matchup-players small,
+.interactive-matchup-players strong,
+.interactive-matchup-players span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.interactive-matchup-players small {
+  color: #94a3b8;
+  font-size: clamp(6px, 0.62vw, 9px);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.interactive-matchup-players strong {
+  margin-top: 2px;
+  font-size: clamp(10px, 1vw, 15px);
+  font-weight: 1000;
+}
+
+.interactive-matchup-players span {
+  margin-top: 2px;
+  color: #99f6e4;
+  font-size: clamp(7px, 0.72vw, 10px);
+  font-weight: 850;
+}
+
+.interactive-matchup-players > p {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: clamp(7px, 0.72vw, 11px);
+  font-weight: 750;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.interactive-matchup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(5px, 0.65vw, 9px);
+  margin-top: clamp(8px, 1vw, 14px);
+}
+
+.interactive-matchup-grid > article {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 60px minmax(0, 1fr) 70px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 7px;
+  padding: clamp(5px, 0.6vw, 8px);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.interactive-matchup-value,
+.interactive-matchup-stat {
+  min-width: 0;
+  text-align: center;
+}
+
+.interactive-matchup-value small,
+.interactive-matchup-value strong,
+.interactive-matchup-stat small,
+.interactive-matchup-stat strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.interactive-matchup-value small,
+.interactive-matchup-stat small {
+  color: #94a3b8;
+  font-size: clamp(5px, 0.55vw, 8px);
+  font-weight: 850;
+}
+
+.interactive-matchup-value strong {
+  color: #e2e8f0;
+  font-size: clamp(11px, 1.2vw, 18px);
+  font-weight: 1000;
+}
+
+.interactive-matchup-value.is-leading strong {
+  color: #5eead4;
+}
+
+.interactive-matchup-value.is-leading.is-opponent strong {
+  color: #fbbf24;
+}
+
+.interactive-matchup-stat strong {
+  font-size: clamp(8px, 0.82vw, 12px);
+  font-weight: 950;
+}
+
+.interactive-matchup-stat small {
+  margin-top: 2px;
+  color: #cbd5e1;
 }
 
 .interactive-instruction-card.is-compact {

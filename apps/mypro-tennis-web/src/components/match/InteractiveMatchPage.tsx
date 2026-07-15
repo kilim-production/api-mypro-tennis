@@ -135,12 +135,29 @@ const tacticalStatLabels: Record<string, string> = {
   forehand: "Coup droit",
   backhand: "Revers",
   volley: "Volée",
+  smash: "Smash",
+  dropShot: "Amortie",
   stamina: "Endurance",
   speed: "Vitesse",
-  focus: "Concentration",
-  consistency: "Régularité"
+  explosiveness: "Explosivité",
+  strength: "Force",
+  recovery: "Récupération"
 };
-const tacticalStatKeys = Object.keys(tacticalStatLabels);
+const profileStatKeys = [
+  "service",
+  "return",
+  "forehand",
+  "backhand",
+  "volley",
+  "smash",
+  "dropShot",
+  "stamina",
+  "speed",
+  "explosiveness",
+  "strength",
+  "recovery"
+] as const;
+const tacticalStatKeys = [...profileStatKeys];
 let sharedAudioContext: AudioContext | null = null;
 
 export function playMatchSound(kind: "confirm" | "positive" | "negative" | "finish") {
@@ -200,6 +217,18 @@ function playerName(player: Player) {
 
 function clampPercent(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function startingMatchEnergy(player: Player) {
+  return clampPercent(
+    Math.max(
+      40,
+      Math.min(
+        95,
+        80 + (player.energy - 50) * 0.18 + (player.health - 75) * 0.12 - player.fatigue * 0.22
+      )
+    )
+  );
 }
 
 function momentumLabel(momentum: number) {
@@ -401,6 +430,7 @@ export function InteractiveMatchPage({
   const [busy, setBusy] = useState(false);
   const [selectedInstructionId, setSelectedInstructionId] = useState<string | null>(null);
   const [catalogOpen, setCatalogOpen] = useState(false);
+  const [matchupOpen, setMatchupOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(
@@ -623,6 +653,7 @@ export function InteractiveMatchPage({
   const activeInstruction = session.coachingInstructions.find(
     (instruction) => instruction.id === session.matchState.activeInstructions[0]?.id
   );
+  const initialEnergy = startingMatchEnergy(playerA);
   const playerAPoints = session.matchState.events.filter(
     (event) => event.winnerId === playerA.id
   ).length;
@@ -772,6 +803,13 @@ export function InteractiveMatchPage({
               Les trois propositions ci-dessous sont calculées à partir de ces écarts. Vous pouvez
               aussi commencer sans plan et garder vos trois interventions pour plus tard.
             </p>
+            <button
+              className="interactive-open-matchup"
+              onClick={() => setMatchupOpen(true)}
+              type="button"
+            >
+              <BarChart3 size={14} /> Comparer les 12 statistiques
+            </button>
           </section>
         ) : latestEvent ? (
           <div className="interactive-point-callout" key={latestEvent.index}>
@@ -803,6 +841,13 @@ export function InteractiveMatchPage({
             tone="energy"
             value={session.matchState.energy[0]}
           />
+          <div className="interactive-energy-source">
+            <strong>Départ calculé : {initialEnergy}%</strong>
+            <small>
+              Forme {Math.round(playerA.energy)} · Santé {Math.round(playerA.health)} · Fatigue{" "}
+              {Math.round(playerA.fatigue)}
+            </small>
+          </div>
           <StatusMeter
             icon={Sparkles}
             label="Confiance"
@@ -838,9 +883,14 @@ export function InteractiveMatchPage({
                 : `${session.matchState.coachingPoints[0]} INTERVENTION(S) DISPONIBLE(S)`}
             </small>
           </span>
-          <button onClick={() => setCatalogOpen(true)} type="button">
-            <ListFilter size={15} /> Toutes les consignes
-          </button>
+          <div className="interactive-coaching-tools">
+            <button onClick={() => setCatalogOpen(true)} type="button">
+              <ListFilter size={15} /> Consignes
+            </button>
+            <button onClick={() => setMatchupOpen(true)} type="button">
+              <BarChart3 size={15} /> Statistiques
+            </button>
+          </div>
           <button
             className={selectedInstructionId === null ? "is-selected" : ""}
             onClick={() => setSelectedInstructionId(null)}
@@ -932,6 +982,77 @@ export function InteractiveMatchPage({
         </div>
       ) : null}
 
+      {matchupOpen ? (
+        <div className="interactive-catalog-overlay" onClick={() => setMatchupOpen(false)}>
+          <section
+            aria-labelledby="interactive-matchup-title"
+            className="interactive-catalog-panel interactive-matchup-panel"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header>
+              <div>
+                <p>Analyse de l’adversaire</p>
+                <h2 id="interactive-matchup-title">Les 12 statistiques utilisées</h2>
+              </div>
+              <button aria-label="Fermer" onClick={() => setMatchupOpen(false)} type="button">
+                <X size={18} />
+              </button>
+            </header>
+            <div className="interactive-matchup-body">
+              <div className="interactive-matchup-players">
+                <article>
+                  <small>Votre joueur</small>
+                  <strong>{playerName(playerA)}</strong>
+                  <span>Niveau {playerA.overall}</span>
+                </article>
+                <p>
+                  Chaque point utilise plusieurs statistiques selon la situation. Le niveau global
+                  est une moyenne, pas le résultat direct du match.
+                </p>
+                <article>
+                  <small>Adversaire</small>
+                  <strong>{playerName(playerB)}</strong>
+                  <span>Niveau {playerB.overall}</span>
+                </article>
+              </div>
+              <div className="interactive-matchup-grid">
+                {profileStatKeys.map((key) => {
+                  const playerValue = Math.round(playerA.stats[key] ?? 0);
+                  const opponentValue = Math.round(playerB.stats[key] ?? 0);
+                  const difference = playerValue - opponentValue;
+                  return (
+                    <article key={key}>
+                      <span
+                        className={`interactive-matchup-value ${difference > 0 ? "is-leading" : ""}`}
+                      >
+                        <small>Vous</small>
+                        <strong>{playerValue}</strong>
+                      </span>
+                      <span className="interactive-matchup-stat">
+                        <strong>{tacticalStatLabels[key]}</strong>
+                        <small>
+                          {difference === 0
+                            ? "Équilibre"
+                            : difference > 0
+                              ? `Avantage +${difference}`
+                              : `Retard ${difference}`}
+                        </small>
+                      </span>
+                      <span
+                        className={`interactive-matchup-value ${difference < 0 ? "is-leading is-opponent" : ""}`}
+                      >
+                        <small>Adversaire</small>
+                        <strong>{opponentValue}</strong>
+                      </span>
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       {pauseOpen ? (
         <div className="interactive-dialog-overlay">
           <section className="interactive-dialog-panel" aria-labelledby="pause-match-title">
@@ -974,8 +1095,8 @@ export function InteractiveMatchPage({
                 deux sets remporte ce format de match.
               </li>
               <li>
-                Avant chaque point, le moteur compare les statistiques utiles à la situation :
-                service, retour, coup droit, revers, volée ou endurance.
+                Avant chaque point, le moteur compare les statistiques utiles à la situation : les
+                12 statistiques visibles du profil participent directement au match.
               </li>
               <li>
                 Le serveur, la surface, l’énergie, la confiance, le momentum et votre consigne
@@ -984,6 +1105,14 @@ export function InteractiveMatchPage({
               <li>
                 Une part d’incertitude reste toujours présente : une bonne consigne améliore vos
                 chances, mais ne garantit jamais le point.
+              </li>
+              <li>
+                L’énergie commence sur une base de 80 %, ajustée par la forme, la santé et la
+                fatigue. Elle reste comprise entre 40 % et 95 % au coup d’envoi.
+              </li>
+              <li>
+                L’endurance et la récupération ralentissent ensuite la perte d’énergie pendant les
+                échanges, surtout lors des longs rallyes.
               </li>
               <li>
                 Le plan d’avant-match est gratuit. Une carte marquée « Votre choix » sera appliquée

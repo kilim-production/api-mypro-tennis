@@ -18,11 +18,8 @@ import {
 import type { Player, Prisma } from "@prisma/client";
 import { awardChestForWin } from "./chests";
 import { encodeJson } from "./json";
-import {
-  applyArchetypeMatchBonuses,
-  careerXpForMatch,
-  grantCareerXp
-} from "./playerProgression";
+import { applyArchetypeMatchBonuses, careerXpForMatch, grantCareerXp } from "./playerProgression";
+import { clampVital, normalizedPlayerVitals, playerVitalsAfterMatch } from "./playerVitals";
 
 function matchEnergyForPlayer(player: Player, seed: string, aiRange: [number, number]) {
   if (!player.isAi) {
@@ -39,17 +36,18 @@ export function toEnginePlayer(
   matchEnergy: number
 ): EnginePlayer {
   const stats = applyArchetypeMatchBonuses(player);
+  const vitals = normalizedPlayerVitals(player);
   return {
     id: player.id,
     name: `${player.firstName} ${player.lastName}`,
     stats,
     matchEnergy,
-    energy: player.energy,
-    morale: player.morale,
-    fatigue: player.fatigue,
-    health: player.health,
+    energy: vitals.energy,
+    morale: vitals.morale,
+    fatigue: vitals.fatigue,
+    health: vitals.health,
     confidence: stats.confidence,
-    recentForm: player.recentForm,
+    recentForm: clampVital(player.recentForm),
     tactic,
     risk
   };
@@ -157,14 +155,16 @@ export async function persistServerMatchOutcome(
     playerRanking: loser.fftRanking,
     type: input.type
   });
+  const winnerVitals = playerVitalsAfterMatch(winner, true);
+  const loserVitals = playerVitalsAfterMatch(loser, false);
 
   await tx.player.update({
     where: { id: winner.id },
     data: {
       wins: { increment: 1 },
       rankingPoints: { increment: delta },
-      fatigue: { increment: 8 },
-      energy: { decrement: 10 },
+      fatigue: winnerVitals.fatigue,
+      energy: winnerVitals.energy,
       reputation: { increment: 1 },
       budget: { increment: individualChampionshipWinPrize },
       ...(await refreshFft(winner))
@@ -176,8 +176,8 @@ export async function persistServerMatchOutcome(
     data: {
       losses: { increment: 1 },
       rankingPoints: { increment: Math.max(3, Math.round(delta * 0.22)) },
-      fatigue: { increment: 9 },
-      energy: { decrement: 11 },
+      fatigue: loserVitals.fatigue,
+      energy: loserVitals.energy,
       ...(await refreshFft(loser))
     }
   });

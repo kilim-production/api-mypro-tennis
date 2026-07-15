@@ -151,6 +151,78 @@ describe("moteur de match interactif", () => {
     expect(aggressivePoint!.energy[0]).toBeLessThan(conservativePoint!.energy[0]);
   });
 
+  it("utilise directement la statistique de smash dans les points aériens", () => {
+    let smashSeed = "";
+    for (let index = 0; index < 100; index += 1) {
+      const seed = `smash-pattern-${index}`;
+      const state = advanceInteractiveMatch(
+        applyCoachingDecision(createInteractiveMatch(matchInput(seed)), null),
+        1
+      );
+      if (state.events[0]?.statKey === "smash") {
+        smashSeed = seed;
+        break;
+      }
+    }
+
+    expect(smashSeed).not.toBe("");
+    const baseInput = matchInput(smashSeed);
+    const boostedStats = { ...baseInput.playerA.stats, smash: 99 };
+    const regular = advanceInteractiveMatch(
+      applyCoachingDecision(createInteractiveMatch(baseInput), null),
+      1
+    );
+    const boosted = advanceInteractiveMatch(
+      applyCoachingDecision(
+        createInteractiveMatch({
+          ...baseInput,
+          playerA: { ...baseInput.playerA, stats: boostedStats }
+        }),
+        null
+      ),
+      1
+    );
+
+    expect(boosted.events[0]?.probabilityForPlayerA).toBeGreaterThan(
+      regular.events[0]?.probabilityForPlayerA ?? 0
+    );
+  });
+
+  it("garantit une énergie de départ jouable tout en récompensant une bonne condition", () => {
+    const exhausted = createInteractiveMatch({
+      ...matchInput("starting-energy-exhausted"),
+      playerA: player("a", "Alex Moreau", "Joueur complet", {
+        energy: 0,
+        fatigue: 100,
+        health: 0
+      })
+    });
+    const fresh = createInteractiveMatch({
+      ...matchInput("starting-energy-fresh"),
+      playerA: player("a", "Alex Moreau", "Joueur complet", {
+        energy: 100,
+        fatigue: 0,
+        health: 100
+      })
+    });
+
+    expect(exhausted.energy[0]).toBe(40);
+    expect(fresh.energy[0]).toBe(92);
+    expect(fresh.energy[0]).toBeGreaterThan(exhausted.energy[0]);
+  });
+
+  it("ne recompte pas la fatigue après son intégration dans l’énergie de départ", () => {
+    const state = createInteractiveMatch({
+      ...matchInput("fatigue-counted-once"),
+      playerA: player("a", "Alex Moreau", "Joueur complet", { fatigue: 100 }),
+      playerB: player("b", "Luca Moretti", "Joueur complet", { fatigue: 0 })
+    });
+    state.energy = [70, 70];
+    const advanced = advanceInteractiveMatch(applyCoachingDecision(state, null), 1);
+
+    expect(advanced.events[0]?.probabilityBreakdown.physical).toBe(0);
+  });
+
   it("garde les matchs équilibrés ouverts et permet de vrais exploits", () => {
     const sampleSize = 120;
     let equalWins = 0;
