@@ -71,6 +71,7 @@ import { LobbyActionButton } from "./components/lobby/LobbyActionButton";
 import { LobbyPlayerHero } from "./components/lobby/LobbyPlayerHero";
 import { LobbySeasonTrack } from "./components/lobby/LobbySeasonTrack";
 import { CoachDeckBuilderPage } from "./components/coach-deck/CoachDeckBuilderPage";
+import { CoachDeckTutorialPage } from "./components/coach-deck/CoachDeckTutorialPage";
 import { InteractiveMatchPage, playMatchSound } from "./components/match/InteractiveMatchPage";
 import { useGameStore, type GameNotification, type Player } from "./store";
 
@@ -6882,6 +6883,14 @@ function MatchStartPage() {
   useEffect(() => void loadPool(), []);
   async function start(opponentId: string, selectedMode: "coach" | "auto" | "quick") {
     setMessage("");
+    if (
+      selectedMode === "coach" &&
+      localStorage.getItem("mypro-coach-deck-tutorial-done") !== "1"
+    ) {
+      setPendingOpponent(null);
+      navigate("/coach-deck/tutorial");
+      return;
+    }
     setLoadingId(opponentId);
     try {
       const endpoint = selectedMode === "coach" ? "/matches/interactive" : "/matches/quick";
@@ -7166,6 +7175,27 @@ function MatchStartPage() {
                 </button>
               ))}
             </div>
+            {matchMode === "coach" ? (
+              <section className="duel-coach-tutorial-notice">
+                <HelpCircle size={19} />
+                <span>
+                  <strong>
+                    {localStorage.getItem("mypro-coach-deck-tutorial-done") === "1"
+                      ? "Tutoriel Coach Deck terminé"
+                      : "Tutoriel requis avant votre premier match Coach Deck"}
+                  </strong>
+                  <small>
+                    Trois décisions guidées pour lire une intention, relier les statistiques et
+                    gérer le Focus.
+                  </small>
+                </span>
+                <button onClick={() => navigate("/coach-deck/tutorial")} type="button">
+                  {localStorage.getItem("mypro-coach-deck-tutorial-done") === "1"
+                    ? "Rejouer"
+                    : "Commencer"}
+                </button>
+              </section>
+            ) : null}
             <footer>
               <button
                 className="duel-launch-cancel"
@@ -8380,6 +8410,15 @@ export function App() {
                   <CoachDeckBuilderPage />
                 </NeedPlayer>
               </NeedAuth>
+            }
+          />
+          <Route
+            path="/coach-deck/tutorial"
+            element={
+              <CoachDeckTutorialPage
+                resolveHeroSource={avatarHeroSource}
+                resolvePictureSource={avatarPictureSource}
+              />
             }
           />
           <Route

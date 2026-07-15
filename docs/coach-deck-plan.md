@@ -273,11 +273,31 @@ résultat mobile et aucune sortie horizontale.
 
 ### Étape 6 — Tutoriel et transparence
 
-- [ ] Créer un match tutoriel scénarisé en trois décisions.
-- [ ] Expliquer la relation entre carte, statistique et intention.
-- [ ] Montrer le calcul avant/après sans formule complexe.
-- [ ] Ajouter l’historique détaillé du match.
-- [ ] Ajouter une aide accessible à tout moment.
+- [x] Créer un match tutoriel scénarisé en trois décisions.
+- [x] Expliquer la relation entre carte, statistique et intention.
+- [x] Montrer le calcul avant/après sans formule complexe.
+- [x] Ajouter l’historique détaillé du match.
+- [x] Ajouter une aide accessible à tout moment.
+
+Le tutoriel utilise maintenant l’interface complète d’un vrai match Coach Deck : même tableau de
+score avec sets, jeux et points, mêmes joueurs sur le court, même comparaison des 12 statistiques,
+même scouting adverse, même bannière d’intention, même main de quatre cartes et même réserve de
+Focus. Le score et l’état physique progressent entre trois fenêtres de décision scénarisées : contrer
+une zone ciblée, protéger l’énergie face aux longs échanges, puis conserver le Focus lorsque la
+menace est faible. Une petite surcouche guide le joueur sans déplacer ni remplacer les commandes du
+match. Une mauvaise réponse est expliquée et la décision correcte doit être confirmée avant de
+continuer. Il est accessible depuis le constructeur, le choix de mode et l’aide du match, et il est
+demandé avant le premier vrai match Coach Deck.
+
+Pendant une partie, la sélection relie désormais l’intention adverse, les statistiques ciblées et
+les statistiques exploitées par la carte. L’historique tactique conserve chaque décision, son coût,
+son statut de contre direct, l’évolution estimée de la probabilité et le résultat du point suivant.
+Le détail de chaque point décompose la base de 50 %, le service, les statistiques, le physique, la
+confiance, le momentum, la surface, la tactique et les cartes, puis explique le tirage d’incertitude.
+
+Validation visuelle effectuée à 844 × 390 et 1920 × 1080 sans débordement du tutoriel. Les actions
+principales restent simultanément visibles en paysage et le parcours tutoriel conserve exactement
+les repères visuels du match réel.
 
 **Terminé lorsque :** les testeurs savent expliquer pourquoi leur carte était utile ou non et comment augmenter leurs chances de gagner.
 

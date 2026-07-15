@@ -15,6 +15,1323 @@
   background: #07111f;
 }
 
+/* Coach Deck - tutoriel, transparence et historique tactique */
+.duel-coach-tutorial-notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin: 0 clamp(10px, 1.25vw, 18px) clamp(10px, 1.25vw, 16px);
+  border: 1px solid rgba(94, 234, 212, 0.28);
+  border-radius: 9px;
+  padding: 9px 11px;
+  color: #ccfbf1;
+  background: rgba(13, 148, 136, 0.09);
+}
+
+.duel-coach-tutorial-notice > svg {
+  color: #5eead4;
+}
+
+.duel-coach-tutorial-notice strong,
+.duel-coach-tutorial-notice small {
+  display: block;
+}
+
+.duel-coach-tutorial-notice strong {
+  font-size: clamp(9px, 0.85vw, 13px);
+  font-weight: 950;
+}
+
+.duel-coach-tutorial-notice small {
+  margin-top: 2px;
+  color: #94a3b8;
+  font-size: clamp(7px, 0.68vw, 10px);
+}
+
+.duel-coach-tutorial-notice > button {
+  min-height: 36px;
+  border: 1px solid rgba(94, 234, 212, 0.42);
+  border-radius: 7px;
+  padding: 0 12px;
+  color: #07141d;
+  background: #5eead4;
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.coach-deck-header-tools {
+  display: flex;
+  align-items: stretch;
+  gap: 0.55rem;
+}
+
+.coach-deck-header-tools > button {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid rgba(94, 234, 212, 0.3);
+  border-radius: 0.7rem;
+  padding: 0.45rem 0.7rem;
+  color: #ccfbf1;
+  background: rgba(8, 33, 49, 0.82);
+  font-size: 0.65rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+}
+
+.coach-deck-header-tools > button svg {
+  width: 1rem;
+  height: 1rem;
+  color: #5eead4;
+}
+
+.coach-deck-choice-explanation {
+  border: 1px solid rgba(94, 234, 212, 0.22);
+  border-radius: 7px;
+  padding: 6px 7px;
+  background: rgba(45, 212, 191, 0.06);
+}
+
+.coach-deck-choice-explanation strong,
+.coach-deck-choice-explanation span,
+.coach-deck-choice-explanation small {
+  display: block;
+}
+
+.coach-deck-choice-explanation strong {
+  color: #5eead4;
+  font-size: clamp(6px, 0.62vw, 9px);
+  font-weight: 1000;
+}
+
+.coach-deck-choice-explanation span,
+.coach-deck-choice-explanation small {
+  margin-top: 2px;
+  color: #b9c9d4;
+  font-size: clamp(5px, 0.53vw, 8px);
+  line-height: 1.25;
+}
+
+.is-coach-deck .coach-deck-choice-explanation {
+  display: none;
+}
+
+.interactive-help-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.interactive-help-actions > button {
+  min-height: 40px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 8px;
+  padding: 0 14px;
+  color: #e2e8f0;
+  background: rgba(15, 34, 51, 0.8);
+  font-weight: 900;
+}
+
+.interactive-help-actions > button.is-primary {
+  color: #03211e;
+  background: #5eead4;
+}
+
+.interactive-catalog-overlay.coach-deck-history-overlay {
+  z-index: 180;
+}
+
+.interactive-catalog-panel.coach-deck-history-panel {
+  display: block;
+  width: min(1180px, 96vw);
+  overflow-y: auto;
+  color: #e2e8f0;
+}
+
+.coach-deck-history-panel > header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgba(4, 20, 33, 0.97);
+}
+
+.coach-deck-history-panel > header > button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  color: #e2e8f0;
+  background: rgba(15, 34, 51, 0.8);
+}
+
+.coach-deck-history-explainer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 9px;
+  margin: 12px;
+  border: 1px solid rgba(94, 234, 212, 0.22);
+  border-radius: 9px;
+  padding: 10px;
+  color: #c8fdf5;
+  background: rgba(45, 212, 191, 0.07);
+}
+
+.coach-deck-history-explainer svg {
+  color: #5eead4;
+}
+
+.coach-deck-history-explainer p {
+  margin: 0;
+  font-size: clamp(9px, 0.78vw, 12px);
+  line-height: 1.45;
+}
+
+.coach-deck-history-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.coach-deck-history-summary > span {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: rgba(15, 34, 51, 0.68);
+  text-align: center;
+}
+
+.coach-deck-history-summary small,
+.coach-deck-history-summary strong {
+  display: block;
+}
+
+.coach-deck-history-summary small {
+  color: #94a3b8;
+  font-size: 8px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.coach-deck-history-summary strong {
+  margin-top: 2px;
+  color: #5eead4;
+  font-size: 18px;
+  font-weight: 1000;
+}
+
+.coach-deck-decision-history,
+.coach-deck-point-history {
+  padding: 0 12px 12px;
+}
+
+.coach-deck-decision-history h3,
+.coach-deck-point-history h3 {
+  margin: 0 0 7px;
+  color: #ffffff;
+  font-size: clamp(12px, 1.1vw, 17px);
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.coach-deck-decision-history > div,
+.coach-deck-point-history > div {
+  display: grid;
+  gap: 7px;
+}
+
+.coach-deck-decision-history article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(150px, 0.32fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 9px;
+  padding: 9px;
+  background: rgba(7, 25, 40, 0.82);
+}
+
+.coach-deck-decision-history article > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 999px;
+  color: #cbd5e1;
+  font-weight: 1000;
+}
+
+.coach-deck-decision-history article > span.is-success {
+  border-color: #5eead4;
+  color: #03211e;
+  background: #5eead4;
+}
+
+.coach-deck-decision-history article small,
+.coach-deck-decision-history article strong,
+.coach-deck-decision-history article p,
+.coach-deck-decision-history article em {
+  display: block;
+  margin: 0;
+}
+
+.coach-deck-decision-history article > div > small {
+  color: #fbbf24;
+  font-size: 8px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+}
+
+.coach-deck-decision-history article > div > strong {
+  margin-top: 2px;
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.coach-deck-decision-history article p,
+.coach-deck-decision-history article em {
+  margin-top: 2px;
+  color: #9fb1bf;
+  font-size: 9px;
+  font-style: normal;
+  line-height: 1.35;
+}
+
+.coach-deck-decision-history article > aside {
+  border-left: 1px solid rgba(148, 163, 184, 0.16);
+  padding-left: 10px;
+  text-align: right;
+}
+
+.coach-deck-decision-history article > aside small,
+.coach-deck-decision-history article > aside strong,
+.coach-deck-decision-history article > aside span {
+  display: block;
+}
+
+.coach-deck-decision-history article > aside small,
+.coach-deck-decision-history article > aside span {
+  color: #94a3b8;
+  font-size: 8px;
+}
+
+.coach-deck-decision-history article > aside strong {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  margin: 2px 0;
+  color: #5eead4;
+  font-size: 13px;
+}
+
+.coach-deck-decision-history .is-forward {
+  width: 13px;
+  transform: rotate(180deg);
+}
+
+.coach-deck-empty-history {
+  margin: 0;
+  border: 1px dashed rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  padding: 12px;
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.coach-deck-point-history details {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background: rgba(5, 19, 32, 0.8);
+}
+
+.coach-deck-point-history summary {
+  display: grid;
+  cursor: pointer;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  padding: 7px 10px;
+  list-style: none;
+}
+
+.coach-deck-point-history summary::-webkit-details-marker {
+  display: none;
+}
+
+.coach-deck-point-history summary > span {
+  color: #5eead4;
+  font-size: 8px;
+  font-weight: 1000;
+}
+
+.coach-deck-point-history summary > strong {
+  font-size: 11px;
+}
+
+.coach-deck-point-history summary > em {
+  color: #cbd5e1;
+  font-size: 9px;
+  font-style: normal;
+}
+
+.coach-deck-point-history summary > b {
+  min-width: 54px;
+  border-radius: 5px;
+  padding: 4px 6px;
+  font-size: 8px;
+  text-align: center;
+}
+
+.coach-deck-point-history summary > b.is-won {
+  color: #052e2b;
+  background: #5eead4;
+}
+
+.coach-deck-point-history summary > b.is-lost {
+  color: #fecaca;
+  background: rgba(185, 28, 28, 0.35);
+}
+
+.coach-deck-point-detail {
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  padding: 9px 10px 10px;
+}
+
+.coach-deck-point-detail > p {
+  margin: 0 0 7px;
+  color: #e2e8f0;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.coach-deck-point-detail > small {
+  display: block;
+  margin-top: 7px;
+  color: #94a3b8;
+  font-size: 8px;
+  line-height: 1.4;
+}
+
+.coach-deck-probability-formula {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.coach-deck-probability-formula > span {
+  min-width: 105px;
+  flex: 1 1 105px;
+  border: 1px solid rgba(148, 163, 184, 0.17);
+  border-radius: 6px;
+  padding: 5px 7px;
+  background: rgba(15, 34, 51, 0.65);
+}
+
+.coach-deck-probability-formula small,
+.coach-deck-probability-formula strong {
+  display: block;
+}
+
+.coach-deck-probability-formula small {
+  color: #94a3b8;
+  font-size: 7px;
+}
+
+.coach-deck-probability-formula strong {
+  margin-top: 1px;
+  color: #e2e8f0;
+  font-size: 10px;
+}
+
+.coach-deck-probability-formula .is-positive strong,
+.coach-deck-probability-formula .is-total strong {
+  color: #5eead4;
+}
+
+.coach-deck-probability-formula .is-negative strong {
+  color: #fca5a5;
+}
+
+.coach-deck-probability-formula .is-total {
+  border-color: rgba(94, 234, 212, 0.34);
+  background: rgba(13, 148, 136, 0.12);
+}
+
+.coach-deck-tutorial-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  height: 100dvh;
+  grid-template-rows: clamp(52px, 7.2dvh, 76px) minmax(0, 1fr) minmax(190px, 38dvh);
+  overflow: hidden;
+  color: #ecfeff;
+  background: #020817 url("/visuals/coach-deck-stadium-v1.webp") center/cover no-repeat;
+  isolation: isolate;
+}
+
+.coach-deck-tutorial-arena {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(12, 148, 136, 0.13), transparent 30%),
+    linear-gradient(180deg, rgba(1, 8, 22, 0.2), rgba(1, 7, 18, 0.72));
+}
+
+.coach-deck-tutorial-header {
+  z-index: 5;
+  display: grid;
+  grid-template-columns: auto auto minmax(280px, 0.75fr) auto;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 1.1vw, 18px);
+  padding: max(5px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 5px
+    max(10px, env(safe-area-inset-left));
+  border-bottom: 1px solid rgba(94, 234, 212, 0.24);
+  background: rgba(1, 10, 24, 0.94);
+}
+
+.coach-deck-tutorial-header > button {
+  display: grid;
+  width: clamp(36px, 3.2vw, 48px);
+  height: clamp(36px, 3.2vw, 48px);
+  place-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.27);
+  border-radius: 8px;
+  color: #e2e8f0;
+  background: rgba(15, 34, 51, 0.75);
+}
+
+.coach-deck-tutorial-brand strong,
+.coach-deck-tutorial-brand span {
+  display: block;
+  font-weight: 1000;
+  font-style: italic;
+  line-height: 0.85;
+}
+
+.coach-deck-tutorial-brand strong {
+  font-size: clamp(18px, 2.3vw, 34px);
+}
+
+.coach-deck-tutorial-brand span {
+  color: #5eead4;
+  font-size: clamp(9px, 1.1vw, 16px);
+  letter-spacing: 0.12em;
+}
+
+.coach-deck-tutorial-score {
+  display: grid;
+  width: min(620px, 100%);
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid rgba(94, 234, 212, 0.34);
+  border-radius: 9px;
+  background: rgba(4, 27, 40, 0.9);
+}
+
+.coach-deck-tutorial-score > span {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  text-align: center;
+}
+
+.coach-deck-tutorial-score > span + span {
+  border-left: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.coach-deck-tutorial-score strong {
+  color: #ffffff;
+  font-size: clamp(11px, 1.3vw, 20px);
+}
+
+.coach-deck-tutorial-score small {
+  color: #94a3b8;
+  font-size: clamp(6px, 0.55vw, 8px);
+  font-weight: 950;
+  letter-spacing: 0.1em;
+}
+
+.coach-deck-tutorial-progress {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.coach-deck-tutorial-progress i {
+  width: clamp(8px, 0.8vw, 12px);
+  height: clamp(8px, 0.8vw, 12px);
+  border: 1px solid rgba(94, 234, 212, 0.4);
+  border-radius: 999px;
+}
+
+.coach-deck-tutorial-progress i.is-active {
+  background: #5eead4;
+  box-shadow: 0 0 9px rgba(94, 234, 212, 0.7);
+}
+
+.coach-deck-tutorial-progress b {
+  margin-left: 3px;
+  color: #5eead4;
+  font-size: 10px;
+}
+
+.coach-deck-tutorial-stage {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.coach-deck-tutorial-stage > img {
+  position: absolute;
+  bottom: -8%;
+  width: clamp(180px, 28vw, 520px);
+  height: 120%;
+  object-fit: contain;
+  object-position: bottom;
+  filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.7));
+}
+
+.coach-deck-tutorial-stage > img.is-player {
+  left: 12%;
+}
+
+.coach-deck-tutorial-stage > img.is-opponent {
+  right: 12%;
+  transform: scaleX(-1);
+}
+
+.coach-deck-tutorial-player-name {
+  position: absolute;
+  bottom: 8%;
+  z-index: 2;
+  border-left: 3px solid #5eead4;
+  padding: 4px 7px;
+  background: rgba(2, 12, 25, 0.78);
+}
+
+.coach-deck-tutorial-player-name.is-player {
+  left: 4%;
+}
+
+.coach-deck-tutorial-player-name.is-opponent {
+  right: 4%;
+  border-right: 3px solid #fbbf24;
+  border-left: 0;
+  text-align: right;
+}
+
+.coach-deck-tutorial-player-name small,
+.coach-deck-tutorial-player-name strong {
+  display: block;
+}
+
+.coach-deck-tutorial-player-name small {
+  color: #5eead4;
+  font-size: 7px;
+  font-weight: 1000;
+}
+
+.coach-deck-tutorial-player-name strong {
+  margin-top: 1px;
+  font-size: clamp(9px, 1vw, 14px);
+}
+
+.coach-deck-tutorial-intent {
+  position: absolute;
+  top: 8%;
+  left: 50%;
+  z-index: 3;
+  display: grid;
+  width: min(390px, 34vw);
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1px 8px;
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  border-radius: 10px;
+  padding: 9px 11px;
+  background: rgba(24, 16, 4, 0.9);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.4);
+  transform: translateX(-50%);
+}
+
+.coach-deck-tutorial-intent > svg {
+  grid-row: 1 / 5;
+  align-self: center;
+  color: #fbbf24;
+}
+
+.coach-deck-tutorial-intent span {
+  color: #fbbf24;
+  font-size: clamp(6px, 0.55vw, 8px);
+  font-weight: 1000;
+  letter-spacing: 0.12em;
+}
+
+.coach-deck-tutorial-intent strong {
+  color: #ffffff;
+  font-size: clamp(11px, 1.1vw, 17px);
+}
+
+.coach-deck-tutorial-intent small {
+  color: #cbd5e1;
+  font-size: clamp(7px, 0.65vw, 10px);
+}
+
+.coach-deck-tutorial-intent em {
+  color: #fde68a;
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.coach-deck-tutorial-dock {
+  z-index: 5;
+  display: grid;
+  min-height: 0;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(360px, 1.65fr) minmax(210px, 0.9fr);
+  gap: clamp(6px, 0.8vw, 12px);
+  padding: clamp(7px, 1vw, 14px) max(8px, env(safe-area-inset-right))
+    max(7px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  border-top: 1px solid rgba(94, 234, 212, 0.34);
+  background: linear-gradient(180deg, rgba(3, 17, 30, 0.98), rgba(1, 7, 17, 1));
+}
+
+.coach-deck-tutorial-lesson,
+.coach-deck-tutorial-decision {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(94, 234, 212, 0.2);
+  border-radius: 10px;
+  padding: clamp(7px, 0.9vw, 13px);
+  background: rgba(7, 27, 42, 0.86);
+}
+
+.coach-deck-tutorial-lesson > span {
+  color: #5eead4;
+  font-size: clamp(7px, 0.66vw, 10px);
+  font-weight: 1000;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.coach-deck-tutorial-lesson h1 {
+  margin: 4px 0;
+  color: #ffffff;
+  font-size: clamp(15px, 1.55vw, 24px);
+  font-weight: 1000;
+  line-height: 1.04;
+}
+
+.coach-deck-tutorial-lesson p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: #b8c8d4;
+  font-size: clamp(8px, 0.75vw, 11px);
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.coach-deck-tutorial-stat-link {
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr;
+  align-items: center;
+  gap: 6px;
+  margin-top: clamp(6px, 0.8vw, 11px);
+  border: 1px solid rgba(94, 234, 212, 0.18);
+  border-radius: 7px;
+  padding: 6px;
+  background: rgba(45, 212, 191, 0.05);
+}
+
+.coach-deck-tutorial-stat-link > svg {
+  color: #5eead4;
+}
+
+.coach-deck-tutorial-stat-link small,
+.coach-deck-tutorial-stat-link strong {
+  display: block;
+}
+
+.coach-deck-tutorial-stat-link small {
+  color: #94a3b8;
+  font-size: 6px;
+}
+
+.coach-deck-tutorial-stat-link strong {
+  font-size: clamp(10px, 1vw, 15px);
+}
+
+.coach-deck-tutorial-stat-link em {
+  color: #64748b;
+  font-size: 7px;
+  font-style: normal;
+}
+
+.coach-deck-tutorial-hand {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(5px, 0.65vw, 10px);
+}
+
+.coach-deck-tutorial-card {
+  --tutorial-card: #5eead4;
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--tutorial-card), transparent 48%);
+  border-radius: 10px;
+  padding: clamp(7px, 0.8vw, 12px);
+  color: #e5f8fa;
+  background:
+    radial-gradient(
+      circle at 50% 20%,
+      color-mix(in srgb, var(--tutorial-card), transparent 82%),
+      transparent 38%
+    ),
+    linear-gradient(160deg, rgba(9, 31, 47, 0.98), rgba(3, 12, 24, 1));
+  text-align: left;
+  transition: 150ms ease;
+}
+
+.coach-deck-tutorial-card.is-counter {
+  --tutorial-card: #5eead4;
+}
+
+.coach-deck-tutorial-card.is-state {
+  --tutorial-card: #c084fc;
+}
+
+.coach-deck-tutorial-card.is-deck {
+  --tutorial-card: #38bdf8;
+}
+
+.coach-deck-tutorial-card.is-boost {
+  --tutorial-card: #fbbf24;
+}
+
+.coach-deck-tutorial-card.is-selected {
+  border-width: 2px;
+  box-shadow: 0 0 22px color-mix(in srgb, var(--tutorial-card), transparent 55%);
+  transform: translateY(-4px);
+}
+
+.coach-deck-tutorial-card > span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--tutorial-card);
+  font-size: clamp(6px, 0.6vw, 9px);
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.coach-deck-tutorial-card > span svg {
+  width: 13px;
+  height: 13px;
+}
+
+.coach-deck-tutorial-card > b {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 5px;
+  padding: 3px 4px;
+  color: #03211e;
+  background: #5eead4;
+  font-size: 6px;
+}
+
+.coach-deck-tutorial-card > b svg {
+  width: 9px;
+  height: 9px;
+}
+
+.coach-deck-tutorial-card > strong {
+  margin-top: clamp(5px, 0.7vw, 10px);
+  font-size: clamp(11px, 1.15vw, 18px);
+  font-weight: 1000;
+  line-height: 1.02;
+}
+
+.coach-deck-tutorial-card > small {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 4px;
+  color: #aabcc8;
+  font-size: clamp(7px, 0.63vw, 9px);
+  line-height: 1.3;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.coach-deck-tutorial-card > em {
+  margin-top: auto;
+  padding-top: 5px;
+  color: var(--tutorial-card);
+  font-size: clamp(6px, 0.58vw, 8px);
+  font-style: normal;
+  font-weight: 850;
+}
+
+.coach-deck-tutorial-card > i {
+  display: flex;
+  align-items: center;
+  align-self: flex-end;
+  gap: 3px;
+  margin-top: 5px;
+  color: #e9d5ff;
+  font-size: clamp(8px, 0.8vw, 12px);
+  font-style: normal;
+  font-weight: 1000;
+}
+
+.coach-deck-tutorial-card > i svg {
+  width: 12px;
+  height: 12px;
+}
+
+.coach-deck-tutorial-decision {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  gap: clamp(4px, 0.55vw, 8px);
+}
+
+.coach-deck-tutorial-focus {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.coach-deck-tutorial-focus > span,
+.coach-deck-tutorial-focus > strong {
+  color: #d8b4fe;
+  font-size: clamp(7px, 0.68vw, 10px);
+  font-weight: 1000;
+}
+
+.coach-deck-tutorial-focus > div {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.coach-deck-tutorial-focus i {
+  width: clamp(7px, 0.7vw, 11px);
+  height: clamp(7px, 0.7vw, 11px);
+  border: 1px solid #c084fc;
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+.coach-deck-tutorial-focus i.is-filled {
+  background: #a855f7;
+  box-shadow: 0 0 8px rgba(192, 132, 252, 0.65);
+}
+
+.coach-deck-tutorial-decision > button:not(.is-confirm) {
+  min-height: 34px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 7px;
+  color: #e2e8f0;
+  background: rgba(15, 34, 51, 0.75);
+  font-size: clamp(8px, 0.76vw, 11px);
+  font-weight: 950;
+}
+
+.coach-deck-tutorial-decision > button:not(.is-confirm) small {
+  margin-left: 5px;
+  color: #94a3b8;
+}
+
+.coach-deck-tutorial-decision > button.is-selected {
+  border-color: #5eead4;
+  color: #5eead4;
+  background: rgba(13, 148, 136, 0.15);
+}
+
+.coach-deck-tutorial-chance {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  border: 1px solid rgba(94, 234, 212, 0.17);
+  border-radius: 7px;
+  padding: 5px;
+  background: rgba(45, 212, 191, 0.05);
+  text-align: center;
+}
+
+.coach-deck-tutorial-chance small,
+.coach-deck-tutorial-chance strong {
+  display: block;
+}
+
+.coach-deck-tutorial-chance small {
+  color: #94a3b8;
+  font-size: 6px;
+}
+
+.coach-deck-tutorial-chance strong {
+  font-size: clamp(11px, 1.1vw, 17px);
+}
+
+.coach-deck-tutorial-chance svg,
+.coach-deck-tutorial-chance .is-better strong {
+  color: #5eead4;
+}
+
+.coach-deck-tutorial-decision > p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  font-size: clamp(7px, 0.64vw, 9px);
+  line-height: 1.3;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.coach-deck-tutorial-decision > p.is-success {
+  color: #a7f3d0;
+}
+
+.coach-deck-tutorial-decision > p.is-warning {
+  color: #fde68a;
+}
+
+.coach-deck-tutorial-decision > button.is-confirm {
+  display: flex;
+  min-height: 44px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #5eead4;
+  border-radius: 8px;
+  color: #03211e;
+  background: linear-gradient(135deg, #5eead4, #34d399);
+  font-size: clamp(10px, 1vw, 15px);
+  font-weight: 1000;
+}
+
+.coach-deck-tutorial-decision > button.is-confirm:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.coach-deck-tutorial-decision > button.is-confirm small {
+  margin-top: 1px;
+  font-size: 6px;
+}
+
+.coach-deck-tutorial-complete {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: rgba(1, 7, 18, 0.88);
+}
+
+.coach-deck-tutorial-complete > section {
+  width: min(520px, 90vw);
+  border: 1px solid rgba(94, 234, 212, 0.58);
+  border-radius: 13px;
+  padding: clamp(16px, 2.5vw, 30px);
+  background: linear-gradient(155deg, #082436, #020914);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.7);
+  text-align: center;
+}
+
+.coach-deck-tutorial-complete > section > svg {
+  color: #fbbf24;
+}
+
+.coach-deck-tutorial-complete span {
+  display: block;
+  margin-top: 5px;
+  color: #5eead4;
+  font-size: 9px;
+  font-weight: 1000;
+  letter-spacing: 0.13em;
+}
+
+.coach-deck-tutorial-complete h2 {
+  margin: 4px 0 12px;
+  color: #ffffff;
+  font-size: clamp(22px, 3vw, 38px);
+  font-weight: 1000;
+}
+
+.coach-deck-tutorial-complete ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.coach-deck-tutorial-complete li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #cbd5e1;
+  font-size: 11px;
+}
+
+.coach-deck-tutorial-complete li svg {
+  width: 15px;
+  color: #5eead4;
+}
+
+.coach-deck-tutorial-complete > section > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.coach-deck-tutorial-complete button {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 8px;
+  color: #e2e8f0;
+  background: rgba(15, 34, 51, 0.8);
+  font-weight: 950;
+}
+
+.coach-deck-tutorial-complete button.is-primary {
+  border-color: #5eead4;
+  color: #03211e;
+  background: #5eead4;
+}
+
+.coach-deck-tutorial-help {
+  position: absolute;
+  top: calc(clamp(52px, 7.2dvh, 76px) + 8px);
+  right: max(9px, env(safe-area-inset-right));
+  z-index: 8;
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid rgba(94, 234, 212, 0.35);
+  border-radius: 8px;
+  padding: 0 9px;
+  color: #ccfbf1;
+  background: rgba(4, 27, 40, 0.9);
+  font-size: 8px;
+  font-weight: 900;
+}
+
+@media (orientation: landscape) and (max-height: 450px) {
+  .duel-coach-tutorial-notice {
+    margin-bottom: 7px;
+    padding: 6px 9px;
+  }
+
+  .duel-coach-tutorial-notice small {
+    display: none;
+  }
+
+  .coach-deck-tutorial-screen {
+    grid-template-rows: 48px minmax(0, 1fr) minmax(176px, 48dvh);
+  }
+
+  .coach-deck-tutorial-header {
+    grid-template-columns: auto auto minmax(230px, 0.85fr) auto;
+    gap: 7px;
+    padding-block: 3px;
+  }
+
+  .coach-deck-tutorial-header > button {
+    width: 34px;
+    height: 34px;
+  }
+
+  .coach-deck-tutorial-stage > img {
+    bottom: -18%;
+    width: clamp(150px, 25vw, 260px);
+    height: 135%;
+  }
+
+  .coach-deck-tutorial-intent {
+    top: 5%;
+    width: min(290px, 38vw);
+    padding: 5px 7px;
+  }
+
+  .coach-deck-tutorial-intent small,
+  .coach-deck-tutorial-intent em,
+  .coach-deck-tutorial-player-name {
+    display: none;
+  }
+
+  .coach-deck-tutorial-dock {
+    grid-template-columns: minmax(145px, 0.78fr) minmax(315px, 1.7fr) minmax(170px, 0.9fr);
+    gap: 5px;
+    padding: 5px 7px;
+  }
+
+  .coach-deck-tutorial-lesson,
+  .coach-deck-tutorial-decision,
+  .coach-deck-tutorial-card {
+    border-radius: 7px;
+    padding: 6px;
+  }
+
+  .coach-deck-tutorial-lesson h1 {
+    margin: 2px 0;
+    font-size: 12px;
+  }
+
+  .coach-deck-tutorial-lesson p {
+    font-size: 7px;
+    -webkit-line-clamp: 2;
+  }
+
+  .coach-deck-tutorial-stat-link {
+    margin-top: 4px;
+    padding: 4px;
+  }
+
+  .coach-deck-tutorial-card > small {
+    -webkit-line-clamp: 2;
+  }
+
+  .coach-deck-tutorial-card > strong {
+    margin-top: 4px;
+    font-size: 10px;
+  }
+
+  .coach-deck-tutorial-card > em {
+    font-size: 6px;
+  }
+
+  .coach-deck-tutorial-decision > p {
+    font-size: 6px;
+    -webkit-line-clamp: 2;
+  }
+
+  .coach-deck-tutorial-help {
+    top: 54px;
+  }
+}
+
+@media (max-width: 720px) and (orientation: landscape) {
+  .coach-deck-tutorial-header {
+    grid-template-columns: auto minmax(220px, 1fr) auto;
+  }
+
+  .coach-deck-tutorial-brand {
+    display: none;
+  }
+
+  .coach-deck-tutorial-dock {
+    grid-template-columns: minmax(130px, 0.72fr) minmax(300px, 1.72fr) minmax(160px, 0.88fr);
+  }
+
+  .coach-deck-tutorial-stat-link > svg,
+  .coach-deck-tutorial-card > small {
+    display: none;
+  }
+
+  .coach-deck-tutorial-stat-link {
+    grid-template-columns: 1fr auto 1fr;
+  }
+
+  .coach-deck-tutorial-card > b {
+    top: 3px;
+    right: 3px;
+  }
+}
+
+@media (max-width: 700px) and (orientation: portrait) {
+  .coach-deck-tutorial-screen {
+    position: absolute;
+    min-height: 100dvh;
+    height: auto;
+    grid-template-rows: auto 240px auto;
+    overflow-y: auto;
+  }
+
+  .coach-deck-tutorial-header {
+    grid-template-columns: auto 1fr auto;
+  }
+
+  .coach-deck-tutorial-brand {
+    display: none;
+  }
+
+  .coach-deck-tutorial-dock {
+    grid-template-columns: 1fr;
+  }
+
+  .coach-deck-tutorial-hand {
+    min-height: 230px;
+  }
+
+  .coach-deck-tutorial-help {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .coach-deck-header-tools > button span {
+    display: none;
+  }
+
+  .coach-deck-header-tools > button {
+    width: 40px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .coach-deck-history-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .coach-deck-decision-history article {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .coach-deck-decision-history article > aside {
+    grid-column: 2;
+    border-top: 1px solid rgba(148, 163, 184, 0.16);
+    border-left: 0;
+    padding-top: 5px;
+    padding-left: 0;
+    text-align: left;
+  }
+
+  .coach-deck-decision-history article > aside strong {
+    justify-content: flex-start;
+  }
+}
+
 body {
   margin: 0;
   min-width: 320px;
@@ -11367,4 +12684,273 @@ button.lobby-mini-bag:active:not(:disabled) {
 .is-state .coach-deck-diagram-symbol {
   width: min(4.2vw, 7.47dvh);
   height: min(4.2vw, 7.47dvh);
+}
+
+/* Tutoriel Coach Deck : guide superpose a la vraie interface de match. */
+.coach-deck-guided-tutorial .coach-deck-match-card.is-tutorial-answer,
+.coach-deck-guided-tutorial .coach-deck-decision-actions button.is-tutorial-answer {
+  border-color: #fbbf24;
+  box-shadow:
+    inset 0 0 0 min(0.12vw, 0.22dvh) rgba(251, 191, 36, 0.62),
+    0 0 min(1.15vw, 2.05dvh) rgba(251, 191, 36, 0.48);
+  animation: coach-tutorial-answer-pulse 1.2s ease-in-out infinite;
+}
+
+.coach-deck-tutorial-match-guide {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 45;
+  width: var(--coach-canvas-width);
+  height: var(--coach-canvas-height);
+  color: #f5f7fb;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.coach-deck-tutorial-match-guide > button {
+  position: absolute;
+  top: 2.15%;
+  left: 1.25%;
+  display: grid;
+  width: 2.55%;
+  aspect-ratio: 1;
+  padding: 0;
+  border: min(0.07vw, 0.13dvh) solid rgba(94, 234, 212, 0.48);
+  border-radius: min(0.5vw, 0.9dvh);
+  color: #ccfbf1;
+  background: rgba(3, 18, 32, 0.94);
+  box-shadow: 0 0 min(0.7vw, 1.25dvh) rgba(45, 212, 191, 0.18);
+  cursor: pointer;
+  pointer-events: auto;
+  place-items: center;
+}
+
+.coach-deck-tutorial-match-guide > button svg {
+  width: 48%;
+  height: 48%;
+}
+
+.coach-deck-tutorial-match-guide > section {
+  position: absolute;
+  top: 1.25%;
+  left: 4.3%;
+  box-sizing: border-box;
+  width: 21.5%;
+  min-height: 9.45%;
+  padding: 0.7% 0.9% 0.65% 1.1%;
+  overflow: hidden;
+  border: min(0.12vw, 0.21dvh) solid rgba(94, 234, 212, 0.76);
+  border-radius: min(0.6vw, 1.07dvh);
+  background: linear-gradient(135deg, rgba(4, 35, 50, 0.99), rgba(2, 13, 27, 0.99));
+  box-shadow:
+    inset min(0.25vw, 0.44dvh) 0 0 #38e8b4,
+    0 0 0 min(0.08vw, 0.14dvh) rgba(2, 6, 23, 0.82),
+    0 min(0.65vw, 1.16dvh) min(1.5vw, 2.67dvh) rgba(0, 0, 0, 0.58),
+    0 0 min(1vw, 1.78dvh) rgba(45, 212, 191, 0.24);
+}
+
+.coach-deck-tutorial-match-guide > section span,
+.coach-deck-tutorial-match-guide > section strong,
+.coach-deck-tutorial-match-guide > section small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coach-deck-tutorial-match-guide > section span {
+  width: max-content;
+  padding: 0.12em 0.48em;
+  border-radius: 999px;
+  color: #03131e;
+  background: #5eead4;
+  font-size: min(0.61vw, 1.08dvh);
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.coach-deck-tutorial-match-guide > section strong {
+  margin-top: 0.35%;
+  font-size: min(0.86vw, 1.53dvh);
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.coach-deck-tutorial-match-guide > section small {
+  display: -webkit-box;
+  margin-top: 0.3%;
+  color: #e2edf6;
+  font-size: min(0.61vw, 1.08dvh);
+  line-height: 1.25;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.coach-deck-tutorial-match-guide > div {
+  position: absolute;
+  top: 3.05%;
+  right: 1.5%;
+  display: flex;
+  gap: min(0.35vw, 0.62dvh);
+}
+
+.coach-deck-tutorial-match-guide > div i {
+  width: min(0.48vw, 0.85dvh);
+  aspect-ratio: 1;
+  border: min(0.07vw, 0.13dvh) solid rgba(148, 163, 184, 0.7);
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.92);
+}
+
+.coach-deck-tutorial-match-guide > div i.is-active {
+  border-color: #5eead4;
+  background: #34d399;
+  box-shadow: 0 0 min(0.55vw, 0.98dvh) rgba(52, 211, 153, 0.62);
+}
+
+.coach-deck-tutorial-feedback {
+  position: absolute;
+  top: 45.2%;
+  left: 34%;
+  display: grid;
+  box-sizing: border-box;
+  width: 32%;
+  min-height: 10.2%;
+  padding: 0.65% 1.1% 0.7%;
+  overflow: hidden;
+  border: min(0.12vw, 0.21dvh) solid #fbbf24;
+  border-radius: min(0.7vw, 1.24dvh);
+  color: #fff7d6;
+  background: linear-gradient(135deg, rgba(44, 27, 4, 0.99), rgba(14, 12, 14, 0.99));
+  box-shadow:
+    inset 0 0 min(1.2vw, 2.13dvh) rgba(251, 191, 36, 0.09),
+    0 0 0 min(0.1vw, 0.18dvh) rgba(2, 6, 23, 0.88),
+    0 min(0.8vw, 1.42dvh) min(1.8vw, 3.2dvh) rgba(0, 0, 0, 0.68),
+    0 0 min(1.3vw, 2.31dvh) rgba(251, 191, 36, 0.28);
+}
+
+.coach-deck-tutorial-feedback.is-success {
+  border-color: #5eead4;
+  color: #d8fff5;
+  background: linear-gradient(135deg, rgba(3, 50, 45, 0.99), rgba(2, 18, 28, 0.99));
+  box-shadow:
+    inset 0 0 min(1.2vw, 2.13dvh) rgba(45, 212, 191, 0.1),
+    0 0 0 min(0.1vw, 0.18dvh) rgba(2, 6, 23, 0.88),
+    0 min(0.8vw, 1.42dvh) min(1.8vw, 3.2dvh) rgba(0, 0, 0, 0.68),
+    0 0 min(1.3vw, 2.31dvh) rgba(45, 212, 191, 0.3);
+}
+
+.coach-deck-tutorial-feedback > span {
+  display: flex;
+  align-items: center;
+  gap: min(0.32vw, 0.57dvh);
+  color: #fbbf24;
+  font-size: min(0.58vw, 1.03dvh);
+  font-weight: 1000;
+  letter-spacing: 0.13em;
+}
+
+.coach-deck-tutorial-feedback.is-success > span {
+  color: #5eead4;
+}
+
+.coach-deck-tutorial-feedback > span svg {
+  width: min(0.78vw, 1.39dvh);
+  height: min(0.78vw, 1.39dvh);
+  stroke-width: 3;
+}
+
+.coach-deck-tutorial-feedback > strong {
+  margin-top: 0.15%;
+  font-size: min(0.9vw, 1.6dvh);
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+.coach-deck-tutorial-feedback > p {
+  margin: 0.3% 0 0;
+  font-size: min(0.7vw, 1.24dvh);
+  font-weight: 750;
+  line-height: 1.22;
+}
+
+.coach-deck-tutorial-feedback > small {
+  margin-top: 0.25%;
+  color: #f8dfa0;
+  font-size: min(0.57vw, 1.01dvh);
+  font-weight: 750;
+}
+
+.coach-deck-tutorial-feedback.is-success > small {
+  color: #a7f3d0;
+}
+
+.coach-deck-guided-tutorial:has(.coach-deck-tutorial-feedback) .coach-deck-selected-effect {
+  opacity: 0;
+}
+
+.coach-deck-tutorial-result {
+  z-index: 200;
+}
+
+.coach-deck-tutorial-result-checklist {
+  display: grid;
+  width: 100%;
+  margin: min(0.75vw, 1.33dvh) 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: min(0.42vw, 0.75dvh);
+}
+
+.coach-deck-tutorial-result-checklist span {
+  display: flex;
+  align-items: center;
+  gap: min(0.3vw, 0.53dvh);
+  padding: min(0.42vw, 0.75dvh);
+  border: min(0.06vw, 0.11dvh) solid rgba(94, 234, 212, 0.28);
+  border-radius: min(0.38vw, 0.68dvh);
+  color: #d9fff5;
+  background: rgba(6, 78, 59, 0.16);
+  font-size: min(0.66vw, 1.17dvh);
+  font-weight: 800;
+}
+
+.coach-deck-tutorial-result-checklist svg {
+  width: min(0.82vw, 1.46dvh);
+  height: min(0.82vw, 1.46dvh);
+  color: #5eead4;
+}
+
+@keyframes coach-tutorial-answer-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.16);
+  }
+}
+
+@media (orientation: landscape) and (max-height: 430px) {
+  .coach-deck-tutorial-match-guide > section {
+    top: 1.1%;
+    min-height: 9.8%;
+  }
+
+  .coach-deck-tutorial-match-guide > section small {
+    font-size: min(0.62vw, 1.1dvh);
+  }
+
+  .coach-deck-tutorial-feedback {
+    top: 44.5%;
+    min-height: 10.8%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coach-deck-guided-tutorial .coach-deck-match-card.is-tutorial-answer,
+  .coach-deck-guided-tutorial .coach-deck-decision-actions button.is-tutorial-answer {
+    animation: none;
+  }
 }

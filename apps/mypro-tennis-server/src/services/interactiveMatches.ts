@@ -4,6 +4,7 @@ import {
   COACHING_INSTRUCTIONS,
   COACH_CARDS,
   COACH_DECK_PROFILE_STAT_KEYS,
+  OPPONENT_INTENTS,
   advanceInteractiveMatch,
   applyCoachDeckDecision,
   applyCoachingDecision,
@@ -89,6 +90,7 @@ export function publicInteractiveMatchSession(session: InteractiveSessionWithPla
     playerB: publicPlayer(session.playerB),
     coachingInstructions: COACHING_INSTRUCTIONS,
     coachCards: state.coachDeck ? COACH_CARDS : [],
+    coachIntents: state.coachDeck ? OPPONENT_INTENTS : [],
     coachHandPreviews,
     matchState: safeMatchState(state)
   };

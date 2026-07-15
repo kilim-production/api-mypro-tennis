@@ -9,6 +9,7 @@ import {
   Eye,
   Gauge,
   HeartPulse,
+  History,
   Layers3,
   ListFilter,
   Pause,
@@ -103,7 +104,39 @@ type CoachDeckRuntime = {
     remainingPoints: number | null;
     remainingGames: number | null;
   }>;
-  history: Array<{ cardId: string | null; focusSpent: number; intentMatched: boolean }>;
+  history: Array<{
+    windowId: string;
+    pointIndex: number;
+    cardId: string | null;
+    variantId?: "IMPACT" | "FLOW" | null;
+    focusSpent: number;
+    intentId: string;
+    intentMatched: boolean;
+    pointChanceDelta: number;
+  }>;
+};
+
+type CoachIntent = {
+  id: string;
+  label: string;
+  description: string;
+  targetStats: string[];
+  recommendedCardIds: string[];
+  durationPoints: number;
+};
+
+type ProbabilityBreakdown = {
+  service: number;
+  statistics: number;
+  physical: number;
+  confidence: number;
+  momentum: number;
+  surface: number;
+  tactic: number;
+  risk: number;
+  coaching: number;
+  coachDeck: number;
+  total: number;
 };
 
 type ScoreView = {
@@ -117,10 +150,14 @@ type ScoreView = {
 
 type InteractivePointEvent = {
   index: number;
+  serverId: string;
   winnerId: string;
   action: string;
   rallyLength: number;
   score: ScoreView;
+  probabilityForPlayerA: number;
+  probabilityBreakdown: ProbabilityBreakdown;
+  roll: number;
   energy: [number, number];
   confidence: [number, number];
   momentum: number;
@@ -128,6 +165,8 @@ type InteractivePointEvent = {
   isSetPoint: boolean;
   isMatchPoint: boolean;
   statKey?: string;
+  statLabel?: string;
+  activeCoachCardIds?: string[];
 };
 
 type InteractiveMatchSession = {
@@ -142,6 +181,7 @@ type InteractiveMatchSession = {
   playerB: Player;
   coachingInstructions: CoachingInstruction[];
   coachCards: CoachCard[];
+  coachIntents?: CoachIntent[];
   coachHandPreviews: Array<{ instanceId: string; preview: CoachCardPreview }>;
   coachDeckRewards: {
     totalMasteryXp: number;
@@ -237,6 +277,18 @@ const tacticalStatLabels: Record<string, string> = {
   explosiveness: "Explosivité",
   strength: "Force",
   recovery: "Récupération"
+};
+const probabilityFactorLabels: Record<Exclude<keyof ProbabilityBreakdown, "total">, string> = {
+  service: "Avantage au service",
+  statistics: "Statistiques du point",
+  physical: "Énergie et physique",
+  confidence: "Confiance",
+  momentum: "Momentum",
+  surface: "Affinité avec la surface",
+  tactic: "Style tactique",
+  risk: "Prise de risque",
+  coaching: "Consigne classique",
+  coachDeck: "Cartes Coach actives"
 };
 const profileStatKeys = [
   "service",
@@ -553,6 +605,25 @@ function coachCardPreviewLines(preview: CoachCardPreview | undefined) {
   return lines.slice(0, 2);
 }
 
+function probabilityFactorEntries(event: InteractivePointEvent) {
+  return (
+    Object.keys(probabilityFactorLabels) as Array<Exclude<keyof ProbabilityBreakdown, "total">>
+  )
+    .map((key) => ({
+      key,
+      label: probabilityFactorLabels[key],
+      value: event.probabilityBreakdown[key]
+    }))
+    .filter((factor) => Math.abs(factor.value) >= 0.001)
+    .sort((left, right) => Math.abs(right.value) - Math.abs(left.value));
+}
+
+function probabilityEdgeLabel(value: number) {
+  const points = Math.round(value * 100);
+  if (points === 0) return "0 pt";
+  return `${points > 0 ? "+" : ""}${points} pt${Math.abs(points) > 1 ? "s" : ""}`;
+}
+
 function CoachDeckMatchCard({
   card,
   preview,
@@ -647,6 +718,7 @@ export function InteractiveMatchPage({
   const [matchupOpen, setMatchupOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(
     () => localStorage.getItem("mypro-match-sound") === "1"
   );
@@ -954,6 +1026,23 @@ export function InteractiveMatchPage({
         : playerA.overall > playerB.overall
           ? "Contre-performance : l’adversaire a renversé le rapport de force initial."
           : "L’adversaire a confirmé son avantage, mais vos décisions serviront au prochain match.";
+  const selectedIntentTargets =
+    coachDeck?.opponentIntent?.targetStats.map((key) => tacticalStatLabels[key] ?? key) ?? [];
+  const selectedCardStats =
+    selectedCoachCard?.primaryStats.map((key) => tacticalStatLabels[key] ?? key) ?? [];
+  const tacticalHistory = (coachDeck?.history ?? []).map((decision, index) => {
+    const card = session.coachCards.find((candidate) => candidate.id === decision.cardId) ?? null;
+    const intent =
+      session.coachIntents?.find((candidate) => candidate.id === decision.intentId) ?? null;
+    const nextEvent =
+      session.matchState.events.find((event) => event.index >= decision.pointIndex) ?? null;
+    const chanceAfter = nextEvent?.probabilityForPlayerA ?? null;
+    const chanceBefore =
+      chanceAfter === null
+        ? null
+        : Math.max(0.18, Math.min(0.82, chanceAfter - decision.pointChanceDelta));
+    return { index, decision, card, intent, nextEvent, chanceBefore, chanceAfter };
+  });
 
   return (
     <main
@@ -1004,6 +1093,16 @@ export function InteractiveMatchPage({
           </div>
         </section>
         <div className="interactive-header-actions">
+          {isCoachDeck ? (
+            <button
+              aria-label="Historique tactique"
+              onClick={() => setHistoryOpen(true)}
+              title="Historique tactique"
+              type="button"
+            >
+              <History size={18} />
+            </button>
+          ) : null}
           <button
             aria-label={soundEnabled ? "Couper le son" : "Activer le son"}
             onClick={toggleSound}
@@ -1334,6 +1433,13 @@ export function InteractiveMatchPage({
             >
               <BarChart3 size={15} /> 12 stats
             </button>
+            <button
+              className="coach-deck-stats-button coach-deck-history-button"
+              onClick={() => setHistoryOpen(true)}
+              type="button"
+            >
+              <History size={15} /> Historique
+            </button>
           </header>
 
           <div
@@ -1369,12 +1475,13 @@ export function InteractiveMatchPage({
           {selectedCoachCard && selectedCoachPreview ? (
             <div className="coach-deck-selected-effect">
               <strong>
-                {coachCardPreviewLines(selectedCoachPreview)[0]} ·{" "}
-                {coachCardDuration(selectedCoachCard)}
+                {selectedCoachPreview.intentMatched ? "CONTRE DIRECT" : "BONUS TACTIQUE"} ·{" "}
+                {selectedCardStats.join(" + ")}
               </strong>
               <small>
                 {Math.round(selectedCoachPreview.pointChanceBefore * 100)} →{" "}
-                {Math.round(selectedCoachPreview.pointChanceAfter * 100)} %
+                {Math.round(selectedCoachPreview.pointChanceAfter * 100)} % ·{" "}
+                {coachCardDuration(selectedCoachCard)}
               </small>
             </div>
           ) : null}
@@ -1403,6 +1510,25 @@ export function InteractiveMatchPage({
                   <b>{Math.round(selectedCoachPreview.pointChanceAfter * 100)}%</b>
                 </span>
                 {selectedCoachPreview.intentMatched ? <strong>CONTRE PARFAIT</strong> : null}
+              </div>
+            ) : null}
+            {selectedCoachCard && selectedCoachPreview && coachDeck.opponentIntent ? (
+              <div className="coach-deck-choice-explanation">
+                <strong>
+                  {selectedCoachPreview.intentMatched
+                    ? "✓ Réponse directe à l’intention"
+                    : "Effet utile, sans contre direct"}
+                </strong>
+                <span>
+                  L’adversaire cible {selectedIntentTargets.join(" + ")}. Cette carte utilise{" "}
+                  {selectedCardStats.join(" + ")}.
+                </span>
+                <small>
+                  Résultat estimé :{" "}
+                  {Math.round(selectedCoachPreview.pointChanceDelta * 100) >= 0 ? "+" : ""}
+                  {Math.round(selectedCoachPreview.pointChanceDelta * 100)} point(s) de chance sur
+                  le prochain point. Le résultat reste incertain.
+                </small>
               </div>
             ) : null}
             <div className="coach-deck-decision-actions">
@@ -1549,6 +1675,168 @@ export function InteractiveMatchPage({
                 />
               ))}
             </div>
+          </section>
+        </div>
+      ) : null}
+
+      {historyOpen && isCoachDeck ? (
+        <div
+          className="interactive-catalog-overlay coach-deck-history-overlay"
+          onClick={() => setHistoryOpen(false)}
+        >
+          <section
+            aria-labelledby="coach-deck-history-title"
+            className="interactive-catalog-panel coach-deck-history-panel"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header>
+              <div>
+                <p>Transparence du match</p>
+                <h2 id="coach-deck-history-title">Historique tactique détaillé</h2>
+              </div>
+              <button aria-label="Fermer" onClick={() => setHistoryOpen(false)} type="button">
+                <X size={18} />
+              </button>
+            </header>
+            <div className="coach-deck-history-explainer">
+              <CircleHelp />
+              <p>
+                Chaque point part de 50 %. Le service, les statistiques adaptées à l’échange,
+                l’énergie, la confiance, le momentum, la surface, la tactique et vos cartes
+                déplacent cette chance. Un tirage d’incertitude décide ensuite le point : mieux
+                jouer augmente vos chances sans supprimer les exploits ni les contre-performances.
+              </p>
+            </div>
+            <div className="coach-deck-history-summary">
+              <span>
+                <small>Décisions</small>
+                <strong>{tacticalHistory.length}</strong>
+              </span>
+              <span>
+                <small>Contres directs</small>
+                <strong>
+                  {tacticalHistory.filter((item) => item.decision.intentMatched).length}
+                </strong>
+              </span>
+              <span>
+                <small>Focus dépensé</small>
+                <strong>
+                  {tacticalHistory.reduce((total, item) => total + item.decision.focusSpent, 0)}
+                </strong>
+              </span>
+              <span>
+                <small>Points joués</small>
+                <strong>{session.matchState.events.length}</strong>
+              </span>
+            </div>
+
+            <section className="coach-deck-decision-history">
+              <h3>Vos décisions Coach</h3>
+              {tacticalHistory.length ? (
+                <div>
+                  {tacticalHistory.map((item) => (
+                    <article key={`${item.decision.windowId}-${item.index}`}>
+                      <span className={item.decision.intentMatched ? "is-success" : ""}>
+                        {item.index + 1}
+                      </span>
+                      <div>
+                        <small>INTENTION · {item.intent?.label ?? item.decision.intentId}</small>
+                        <strong>{item.card?.name ?? "Laisser jouer"}</strong>
+                        <p>
+                          {item.card
+                            ? item.decision.intentMatched
+                              ? "Contre direct : la carte répondait précisément à l’intention affichée."
+                              : "Bonus appliqué, mais la carte ne contrait pas directement cette intention."
+                            : "Aucun Focus dépensé : vous avez gardé vos ressources pour une prochaine décision."}
+                        </p>
+                        {item.nextEvent ? (
+                          <em>
+                            Point suivant :{" "}
+                            {item.nextEvent.winnerId === playerA.id ? "gagné" : "perdu"} ·{" "}
+                            {item.nextEvent.statLabel ??
+                              tacticalStatLabels[item.nextEvent.statKey ?? ""] ??
+                              "échange"}
+                          </em>
+                        ) : null}
+                      </div>
+                      <aside>
+                        <small>Chance estimée</small>
+                        <strong>
+                          {item.chanceBefore === null
+                            ? "—"
+                            : `${Math.round(item.chanceBefore * 100)} %`}
+                          <ChevronLeft className="is-forward" />
+                          {item.chanceAfter === null
+                            ? "—"
+                            : `${Math.round(item.chanceAfter * 100)} %`}
+                        </strong>
+                        <span>
+                          {item.decision.focusSpent} Focus ·{" "}
+                          {probabilityEdgeLabel(item.decision.pointChanceDelta)}
+                        </span>
+                      </aside>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="coach-deck-empty-history">
+                  Votre première décision apparaîtra ici avec son intention, son coût et son effet.
+                </p>
+              )}
+            </section>
+
+            <section className="coach-deck-point-history">
+              <h3>Calcul des points</h3>
+              <div>
+                {[...session.matchState.events].reverse().map((event) => {
+                  const factors = probabilityFactorEntries(event);
+                  return (
+                    <details key={event.index}>
+                      <summary>
+                        <span>POINT {event.index + 1}</span>
+                        <strong>
+                          {event.statLabel ?? tacticalStatLabels[event.statKey ?? ""] ?? "Échange"}
+                        </strong>
+                        <em>{Math.round(event.probabilityForPlayerA * 100)} % pour vous</em>
+                        <b className={event.winnerId === playerA.id ? "is-won" : "is-lost"}>
+                          {event.winnerId === playerA.id ? "GAGNÉ" : "PERDU"}
+                        </b>
+                      </summary>
+                      <div className="coach-deck-point-detail">
+                        <p>
+                          {event.action} · {event.rallyLength} frappe(s)
+                        </p>
+                        <div className="coach-deck-probability-formula">
+                          <span>
+                            <small>Base</small>
+                            <strong>50 %</strong>
+                          </span>
+                          {factors.map((factor) => (
+                            <span
+                              className={factor.value >= 0 ? "is-positive" : "is-negative"}
+                              key={factor.key}
+                            >
+                              <small>{factor.label}</small>
+                              <strong>{probabilityEdgeLabel(factor.value)}</strong>
+                            </span>
+                          ))}
+                          <span className="is-total">
+                            <small>Chance finale</small>
+                            <strong>{Math.round(event.probabilityForPlayerA * 100)} %</strong>
+                          </span>
+                        </div>
+                        <small>
+                          Tirage d’incertitude : {Math.round(event.roll * 100)} %. Votre joueur
+                          gagne lorsque le tirage tombe dans sa zone de chance. Ce tirage explique
+                          qu’un favori puisse perdre un point, sans annuler l’avantage statistique
+                          sur la durée.
+                        </small>
+                      </div>
+                    </details>
+                  );
+                })}
+              </div>
+            </section>
           </section>
         </div>
       ) : null}
@@ -1729,9 +2017,16 @@ export function InteractiveMatchPage({
                 </>
               )}
             </ul>
-            <button className="is-primary" onClick={() => setHelpOpen(false)} type="button">
-              Compris
-            </button>
+            <div className="interactive-help-actions">
+              {isCoachDeck ? (
+                <button onClick={() => navigate("/coach-deck/tutorial")} type="button">
+                  Rejouer le tutoriel
+                </button>
+              ) : null}
+              <button className="is-primary" onClick={() => setHelpOpen(false)} type="button">
+                Compris
+              </button>
+            </div>
           </section>
         </div>
       ) : null}
@@ -1864,8 +2159,11 @@ export function InteractiveMatchPage({
               <button className="is-primary" onClick={() => navigate("/dashboard")} type="button">
                 Retour au hub
               </button>
-              <button onClick={() => navigate("/matches")} type="button">
-                Voir l’historique
+              <button
+                onClick={() => (isCoachDeck ? setHistoryOpen(true) : navigate("/matches"))}
+                type="button"
+              >
+                {isCoachDeck ? "Détail tactique" : "Voir l’historique"}
               </button>
             </div>
           </section>

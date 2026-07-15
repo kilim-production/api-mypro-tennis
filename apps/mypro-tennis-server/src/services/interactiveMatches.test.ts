@@ -226,6 +226,7 @@ describe("sessions de match interactif", () => {
       coachDeckCardVariants: { "power-forehand": "IMPACT" }
     });
     expect(deckMatch.session.coachCards).toHaveLength(24);
+    expect(deckMatch.session.coachIntents).toHaveLength(8);
     expect(deckMatch.session.matchState.coachDeck?.hand).toHaveLength(4);
     const runtimeCards = [
       ...(deckMatch.session.matchState.coachDeck?.hand ?? []),

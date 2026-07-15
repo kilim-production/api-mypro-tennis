@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Check,
+  CircleHelp,
   CopyPlus,
   HeartPulse,
   Layers3,
@@ -334,10 +335,16 @@ export function CoachDeckBuilderPage() {
           <h1>CONSTRUCTEUR DE DECK</h1>
           <p>12 cartes · main de 4 · {state.rules.focusPerSet} Focus par set</p>
         </div>
-        <div className="coach-deck-header-state">
-          <Sparkles />
-          <span>Niveau</span>
-          <strong>{player?.playerLevel ?? 0}</strong>
+        <div className="coach-deck-header-tools">
+          <button onClick={() => navigate("/coach-deck/tutorial")} type="button">
+            <CircleHelp />
+            <span>TUTORIEL</span>
+          </button>
+          <div className="coach-deck-header-state">
+            <Sparkles />
+            <span>Niveau</span>
+            <strong>{player?.playerLevel ?? 0}</strong>
+          </div>
         </div>
       </header>
 
