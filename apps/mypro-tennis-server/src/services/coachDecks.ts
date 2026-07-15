@@ -1,11 +1,17 @@
-import type { Player } from "@prisma/client";
+import type { Player, Prisma } from "@prisma/client";
 import { prisma } from "@mypro/database";
 import {
+  COACH_CARD_MASTERY_VARIANTS,
   COACH_CARDS,
   COACH_DECK_FOCUS_PER_SET,
   COACH_DECK_HAND_SIZE,
   COACH_DECK_SIZE,
   STARTER_COACH_DECK_CARD_IDS,
+  coachCardFocusCost,
+  coachCardMasteryLevelForXp,
+  coachCardMasteryProgress,
+  coachCardMasteryVariant,
+  coachCardVariantUnlocked,
   validateCoachDeck
 } from "@mypro/match-engine-tennis";
 
@@ -130,12 +136,23 @@ async function statePayload(player: Player) {
     activeDeckId: decks.find((deck) => deck.isActive)?.id ?? null,
     catalog: COACH_CARDS.map((card) => {
       const owned = ownedById.get(card.id);
+      const mastery = coachCardMasteryProgress(owned?.masteryXp ?? 0);
+      const selectedVariant = coachCardVariantUnlocked(owned?.selectedVariant, mastery.level)
+        ? (coachCardMasteryVariant(owned?.selectedVariant)?.id ?? null)
+        : null;
       return {
         ...card,
         unlocked: Boolean(owned),
         masteryXp: owned?.masteryXp ?? 0,
-        masteryLevel: owned?.masteryLevel ?? 0,
-        selectedVariant: owned?.selectedVariant ?? null
+        masteryLevel: mastery.level,
+        mastery,
+        selectedVariant,
+        effectiveFocusCost: coachCardFocusCost(card, selectedVariant),
+        variants: COACH_CARD_MASTERY_VARIANTS.map((variant) => ({
+          ...variant,
+          unlocked: mastery.level >= variant.unlockMasteryLevel,
+          selected: selectedVariant === variant.id
+        }))
       };
     }),
     decks: decks.map((deck) => ({
@@ -165,22 +182,59 @@ export async function getCoachDeckSnapshot(player: Player, requestedDeckId?: str
   });
   if (!deck) throw new CoachDeckError("Deck Coach actif introuvable.", 404);
   const cardIds = deck.cards.map((card) => card.cardId);
-  await validateOwnedDeck(player, cardIds);
-  return { id: deck.id, name: deck.name, version: deck.version, cardIds };
+  const ownedCards = await validateOwnedDeck(player, cardIds);
+  const ownedById = new Map(ownedCards.map((card) => [card.cardId, card]));
+  const cardVariants = Object.fromEntries(
+    [...new Set(cardIds)].map((cardId) => {
+      const owned = ownedById.get(cardId);
+      const level = coachCardMasteryLevelForXp(owned?.masteryXp ?? 0);
+      const variant = coachCardVariantUnlocked(owned?.selectedVariant, level)
+        ? coachCardMasteryVariant(owned?.selectedVariant)?.id
+        : undefined;
+      return [cardId, variant ?? null];
+    })
+  );
+  return { id: deck.id, name: deck.name, version: deck.version, cardIds, cardVariants };
 }
 
 async function validateOwnedDeck(player: Player, cardIds: readonly string[]) {
   await unlockEligibleCards(player);
   const owned = await prisma.playerCoachCard.findMany({
-    where: { playerId: player.id },
-    select: { cardId: true }
+    where: { playerId: player.id }
   });
   const validation = validateCoachDeck(cardIds, {
     playerLevel: player.playerLevel,
     unlockedCardIds: owned.map((card) => card.cardId)
   });
   if (!validation.valid) throw new CoachDeckError(validation.errors[0] ?? "Deck invalide.", 400);
-  return validation;
+  return owned;
+}
+
+export async function selectCoachCardVariant(
+  player: Player,
+  cardId: string,
+  variantId: string | null
+) {
+  const card = COACH_CARDS.find((candidate) => candidate.id === cardId);
+  if (!card) throw new CoachDeckError("Carte Coach inconnue.", 404);
+  await unlockEligibleCards(player);
+  const owned = await prisma.playerCoachCard.findUnique({
+    where: { playerId_cardId: { playerId: player.id, cardId } }
+  });
+  if (!owned) throw new CoachDeckError("Cette carte n’est pas encore débloquée.", 403);
+  const level = coachCardMasteryLevelForXp(owned.masteryXp);
+  if (!coachCardVariantUnlocked(variantId, level)) {
+    throw new CoachDeckError("Cette variante demande davantage de maîtrise.", 403);
+  }
+  const selectedVariant = variantId === null ? null : coachCardMasteryVariant(variantId)?.id;
+  if (variantId !== null && !selectedVariant) {
+    throw new CoachDeckError("Variante Coach inconnue.", 400);
+  }
+  await prisma.playerCoachCard.update({
+    where: { id: owned.id },
+    data: { selectedVariant: selectedVariant ?? null }
+  });
+  return statePayload(player);
 }
 
 export async function createCoachDeck(input: {
@@ -260,4 +314,149 @@ export async function activateCoachDeck(player: Player, deckId: string) {
     prisma.coachDeck.update({ where: { id: deck.id }, data: { isActive: true } })
   ]);
   return statePayload(player);
+}
+
+export type CoachDeckMatchRewards = {
+  totalMasteryXp: number;
+  won: boolean;
+  abandoned: boolean;
+  cards: Array<{
+    cardId: string;
+    name: string;
+    plays: number;
+    intentMatches: number;
+    xpGained: number;
+    xpBefore: number;
+    xpAfter: number;
+    levelBefore: number;
+    levelAfter: number;
+    nextLevelXp: number | null;
+    progress: number;
+    unlockedVariants: Array<{ id: string; name: string; description: string }>;
+  }>;
+  unlockedCards: Array<{
+    cardId: string;
+    name: string;
+    family: string;
+    unlockLevel: number;
+  }>;
+};
+
+export async function awardCoachDeckMatchProgress(
+  tx: Prisma.TransactionClient,
+  input: {
+    playerId: string;
+    won: boolean;
+    abandoned: boolean;
+    history: ReadonlyArray<{
+      cardId: string | null;
+      intentMatched: boolean;
+      pointChanceDelta: number;
+    }>;
+  }
+): Promise<CoachDeckMatchRewards> {
+  const empty: CoachDeckMatchRewards = {
+    totalMasteryXp: 0,
+    won: input.won,
+    abandoned: input.abandoned,
+    cards: [],
+    unlockedCards: []
+  };
+  if (input.abandoned) return empty;
+
+  const usage = new Map<string, { plays: number; intentMatches: number; impact: number }>();
+  for (const entry of input.history) {
+    if (!entry.cardId) continue;
+    const current = usage.get(entry.cardId) ?? { plays: 0, intentMatches: 0, impact: 0 };
+    current.plays += 1;
+    current.intentMatches += entry.intentMatched ? 1 : 0;
+    current.impact += Math.abs(entry.pointChanceDelta);
+    usage.set(entry.cardId, current);
+  }
+
+  const ownedBefore = await tx.playerCoachCard.findMany({ where: { playerId: input.playerId } });
+  const ownedById = new Map(ownedBefore.map((card) => [card.cardId, card]));
+  const cardRewards: CoachDeckMatchRewards["cards"] = [];
+
+  for (const [cardId, stats] of usage) {
+    const definition = COACH_CARDS.find((card) => card.id === cardId);
+    if (!definition) continue;
+    const owned = ownedById.get(cardId);
+    const xpBefore = owned?.masteryXp ?? 0;
+    const levelBefore = coachCardMasteryLevelForXp(xpBefore);
+    const impactBonus = Math.min(12, Math.round(stats.impact * 100));
+    const rewardedPlays = Math.min(5, stats.plays);
+    const rewardedCounters = Math.min(rewardedPlays, stats.intentMatches);
+    const xpGained =
+      rewardedPlays * 14 + rewardedCounters * 6 + impactBonus + 4 + (input.won ? 4 : 2);
+    const xpAfter = xpBefore + xpGained;
+    const masteryAfter = coachCardMasteryProgress(xpAfter);
+    await tx.playerCoachCard.upsert({
+      where: { playerId_cardId: { playerId: input.playerId, cardId } },
+      create: {
+        playerId: input.playerId,
+        cardId,
+        masteryXp: xpAfter,
+        masteryLevel: masteryAfter.level
+      },
+      update: {
+        masteryXp: xpAfter,
+        masteryLevel: masteryAfter.level
+      }
+    });
+    cardRewards.push({
+      cardId,
+      name: definition.name,
+      plays: stats.plays,
+      intentMatches: stats.intentMatches,
+      xpGained,
+      xpBefore,
+      xpAfter,
+      levelBefore,
+      levelAfter: masteryAfter.level,
+      nextLevelXp: masteryAfter.nextLevelXp,
+      progress: masteryAfter.progress,
+      unlockedVariants: COACH_CARD_MASTERY_VARIANTS.filter(
+        (variant) =>
+          variant.unlockMasteryLevel > levelBefore &&
+          variant.unlockMasteryLevel <= masteryAfter.level
+      ).map((variant) => ({
+        id: variant.id,
+        name: variant.name,
+        description: variant.description
+      }))
+    });
+  }
+
+  const player = await tx.player.findUniqueOrThrow({ where: { id: input.playerId } });
+  const ownedAfterMastery = new Set(
+    (
+      await tx.playerCoachCard.findMany({
+        where: { playerId: input.playerId },
+        select: { cardId: true }
+      })
+    ).map((card) => card.cardId)
+  );
+  const newlyUnlockedDefinitions = COACH_CARDS.filter(
+    (card) => card.unlockLevel <= player.playerLevel && !ownedAfterMastery.has(card.id)
+  );
+  for (const card of newlyUnlockedDefinitions) {
+    await tx.playerCoachCard.create({ data: { playerId: input.playerId, cardId: card.id } });
+  }
+
+  cardRewards.sort(
+    (left, right) => right.xpGained - left.xpGained || left.name.localeCompare(right.name)
+  );
+  return {
+    totalMasteryXp: cardRewards.reduce((total, reward) => total + reward.xpGained, 0),
+    won: input.won,
+    abandoned: false,
+    cards: cardRewards,
+    unlockedCards: newlyUnlockedDefinitions.map((card) => ({
+      cardId: card.id,
+      name: card.name,
+      family: card.family,
+      unlockLevel: card.unlockLevel
+    }))
+  };
 }

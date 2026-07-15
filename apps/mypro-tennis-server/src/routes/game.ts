@@ -3,6 +3,7 @@ import { prisma } from "@mypro/database";
 import { calculateOverall } from "@mypro/core";
 import {
   challengeSchema,
+  coachCardVariantSelectionSchema,
   coachDeckSaveSchema,
   cosmeticEquipSchema,
   cosmeticMarketSchema,
@@ -28,6 +29,7 @@ import {
   createCoachDeck,
   getCoachDeckState,
   getCoachDeckSnapshot,
+  selectCoachCardVariant,
   updateCoachDeck
 } from "../services/coachDecks";
 import {
@@ -879,6 +881,26 @@ gameRouter.get("/coach-decks", requireAuth, async (request, response) => {
   }
 });
 
+gameRouter.put(
+  "/coach-cards/:cardId/variant",
+  requireAuth,
+  validateBody(coachCardVariantSelectionSchema),
+  async (request, response) => {
+    const cardId = request.params.cardId;
+    if (!cardId) return response.status(400).json({ message: "Identifiant de carte requis." });
+    const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
+    if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+    try {
+      return response.json(await selectCoachCardVariant(player, cardId, request.body.variantId));
+    } catch (error) {
+      if (error instanceof CoachDeckError) {
+        return response.status(error.statusCode).json({ message: error.message });
+      }
+      return response.status(500).json({ message: "Sélection de variante impossible." });
+    }
+  }
+);
+
 gameRouter.post(
   "/coach-decks",
   requireAuth,
@@ -1542,7 +1564,8 @@ gameRouter.post(
         risk: request.body.risk ?? "Normale",
         format: request.body.format ?? "Deux sets gagnants",
         type: player.proUnlocked ? "Duel professionnel interactif" : "Duel amateur interactif",
-        coachDeckCardIds: coachDeck.cardIds
+        coachDeckCardIds: coachDeck.cardIds,
+        coachDeckCardVariants: coachDeck.cardVariants
       });
       return response.status(result.created ? 201 : 200).json(result.session);
     } catch (error) {

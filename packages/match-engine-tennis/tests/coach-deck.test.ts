@@ -9,6 +9,8 @@ import {
   advanceInteractiveMatch,
   applyCoachDeckDecision,
   coachCardById,
+  coachCardFocusCost,
+  coachCardMasteryProgress,
   coachDeckAiTierForRanking,
   createInteractiveMatch,
   generateOpponentIntent,
@@ -145,6 +147,36 @@ describe("effets Coach Deck", () => {
         COACH_DECK_MAX_POINT_CHANCE_DELTA
       );
     }
+  });
+
+  it("fait progresser la maîtrise selon des paliers lisibles", () => {
+    expect(coachCardMasteryProgress(0)).toMatchObject({ level: 0, nextLevelXp: 30 });
+    expect(coachCardMasteryProgress(30)).toMatchObject({ level: 1, nextLevelXp: 90 });
+    expect(coachCardMasteryProgress(200)).toMatchObject({
+      level: 3,
+      nextLevelXp: null,
+      progress: 1
+    });
+  });
+
+  it("propose des variantes latérales avec une contrepartie de Focus", () => {
+    const card = coachCardById("power-forehand");
+    expect(card).not.toBeNull();
+    const standard = previewCoachCard(card!, profileStats(70), { basePointChance: 0.5 });
+    const impact = previewCoachCard(card!, profileStats(70), {
+      basePointChance: 0.5,
+      variantId: "IMPACT"
+    });
+    const flow = previewCoachCard(card!, profileStats(70), {
+      basePointChance: 0.5,
+      variantId: "FLOW"
+    });
+
+    expect(impact.pointChanceDelta).toBeGreaterThan(standard.pointChanceDelta);
+    expect(impact.focusCost).toBe(coachCardFocusCost(card!, "IMPACT"));
+    expect(impact.focusCost).toBeGreaterThan(standard.focusCost);
+    expect(flow.pointChanceDelta).toBeLessThan(standard.pointChanceDelta);
+    expect(flow.focusCost).toBeLessThan(standard.focusCost);
   });
 });
 

@@ -58,6 +58,9 @@ type CoachCard = {
 
 type CoachCardPreview = {
   cardId: string;
+  variantId: "IMPACT" | "FLOW" | null;
+  variantName: string | null;
+  focusCost: number;
   intentMatched: boolean;
   scaledStatBoosts: Record<string, number>;
   pointChanceBefore: number;
@@ -76,7 +79,11 @@ type CoachCardPreview = {
 };
 
 type CoachDeckRuntime = {
-  hand: Array<{ instanceId: string; cardId: string }>;
+  hand: Array<{
+    instanceId: string;
+    cardId: string;
+    variantId?: "IMPACT" | "FLOW" | null;
+  }>;
   focus: number;
   focusPerSet: number;
   setIndex: number;
@@ -136,6 +143,31 @@ type InteractiveMatchSession = {
   coachingInstructions: CoachingInstruction[];
   coachCards: CoachCard[];
   coachHandPreviews: Array<{ instanceId: string; preview: CoachCardPreview }>;
+  coachDeckRewards: {
+    totalMasteryXp: number;
+    won: boolean;
+    abandoned: boolean;
+    cards: Array<{
+      cardId: string;
+      name: string;
+      plays: number;
+      intentMatches: number;
+      xpGained: number;
+      xpBefore: number;
+      xpAfter: number;
+      levelBefore: number;
+      levelAfter: number;
+      nextLevelXp: number | null;
+      progress: number;
+      unlockedVariants: Array<{ id: string; name: string; description: string }>;
+    }>;
+    unlockedCards: Array<{
+      cardId: string;
+      name: string;
+      family: string;
+      unlockLevel: number;
+    }>;
+  } | null;
   matchState: {
     status: "PLAYING" | "AWAITING_COACH" | "FINISHED";
     score: {
@@ -563,6 +595,9 @@ function CoachDeckMatchCard({
       <span className="coach-deck-card-family">
         <Icon size={15} /> {coachCardFamilyLabels[card.family]}
       </span>
+      {preview?.variantName ? (
+        <span className="coach-deck-card-variant">{preview.variantName}</span>
+      ) : null}
       {selected ? (
         <span className="coach-deck-card-selected">
           <Check size={12} /> Votre choix
@@ -1310,10 +1345,13 @@ export function InteractiveMatchPage({
             {coachDeck.hand.map((instance) => {
               const card = session.coachCards.find((candidate) => candidate.id === instance.cardId);
               if (!card) return null;
-              const effectiveCost = Math.max(0, card.focusCost - coachDeck.nextCardFocusDiscount);
               const preview = session.coachHandPreviews.find(
                 (entry) => entry.instanceId === instance.instanceId
               )?.preview;
+              const effectiveCost = Math.max(
+                0,
+                (preview?.focusCost ?? card.focusCost) - coachDeck.nextCardFocusDiscount
+              );
               return (
                 <CoachDeckMatchCard
                   card={card}
@@ -1733,6 +1771,56 @@ export function InteractiveMatchPage({
               </span>
             </div>
             <p className="interactive-result-fact">{resultFact}</p>
+            {isCoachDeck && session.coachDeckRewards ? (
+              <section className="coach-deck-result-rewards">
+                <header>
+                  <span>
+                    <Sparkles size={15} /> PROGRESSION DES CARTES
+                  </span>
+                  <strong>+{session.coachDeckRewards.totalMasteryXp} XP DE MAÎTRISE</strong>
+                </header>
+                {session.coachDeckRewards.abandoned ? (
+                  <p>La maîtrise n’est pas accordée après un abandon.</p>
+                ) : session.coachDeckRewards.cards.length ? (
+                  <div className="coach-deck-reward-list">
+                    {session.coachDeckRewards.cards.map((reward) => (
+                      <article key={reward.cardId}>
+                        <div>
+                          <strong>{reward.name}</strong>
+                          <span>
+                            {reward.plays} utilisation{reward.plays > 1 ? "s" : ""}
+                            {reward.intentMatches
+                              ? ` · ${reward.intentMatches} contre${reward.intentMatches > 1 ? "s" : ""} réussi${reward.intentMatches > 1 ? "s" : ""}`
+                              : ""}
+                          </span>
+                        </div>
+                        <b>+{reward.xpGained} XP</b>
+                        <i>
+                          <span style={{ width: `${Math.round(reward.progress * 100)}%` }} />
+                        </i>
+                        <small>
+                          Maîtrise {reward.levelAfter}
+                          {reward.levelAfter > reward.levelBefore ? " · NIVEAU SUPÉRIEUR" : ""}
+                        </small>
+                        {reward.unlockedVariants.map((variant) => (
+                          <em key={variant.id}>VARIANTE DÉBLOQUÉE · {variant.name}</em>
+                        ))}
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p>Jouez une carte pendant le match pour gagner de la maîtrise.</p>
+                )}
+                {session.coachDeckRewards.unlockedCards.length ? (
+                  <div className="coach-deck-unlocked-cards">
+                    <strong>NOUVELLES CARTES</strong>
+                    {session.coachDeckRewards.unlockedCards.map((card) => (
+                      <span key={card.cardId}>{card.name}</span>
+                    ))}
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
             <section className="interactive-beta-feedback">
               <p>Ce match vous a semblé...</p>
               <div className="interactive-balance-feedback">

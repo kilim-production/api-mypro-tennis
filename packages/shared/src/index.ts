@@ -235,6 +235,10 @@ export const coachDeckSaveSchema = z.object({
   activate: z.boolean().default(false)
 });
 
+export const coachCardVariantSelectionSchema = z.object({
+  variantId: z.enum(["IMPACT", "FLOW"]).nullable()
+});
+
 export const challengeSchema = z.object({
   targetPlayerId: z.string().min(1),
   surface: matchRequestSchema.shape.surface,

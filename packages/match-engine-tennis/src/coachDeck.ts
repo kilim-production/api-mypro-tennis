@@ -31,6 +31,74 @@ export type CoachCardFamily = "BOOST" | "COUNTER" | "STATE" | "DECK";
 export type CoachCardTier = "STARTER" | "ADVANCED" | "SIGNATURE";
 export type CoachCardDurationUnit = "POINTS" | "GAMES" | "IMMEDIATE" | "NEXT_WINDOW";
 export type CoachDeckAiTier = "BEGINNER" | "CLUB" | "COMPETITIVE" | "ELITE";
+export type CoachCardMasteryVariantId = "IMPACT" | "FLOW";
+
+export const COACH_CARD_MASTERY_LEVEL_XP = [0, 30, 90, 200] as const;
+
+export const COACH_CARD_MASTERY_VARIANTS = [
+  {
+    id: "IMPACT",
+    name: "Impact maximal",
+    description: "Effet renforcé de 18 %, mais la carte coûte 1 Focus supplémentaire.",
+    unlockMasteryLevel: 1,
+    effectMultiplier: 1.18,
+    focusDelta: 1
+  },
+  {
+    id: "FLOW",
+    name: "Jeu fluide",
+    description: "Coût réduit de 1 Focus, avec un effet diminué de 25 %.",
+    unlockMasteryLevel: 3,
+    effectMultiplier: 0.75,
+    focusDelta: -1
+  }
+] as const satisfies readonly {
+  id: CoachCardMasteryVariantId;
+  name: string;
+  description: string;
+  unlockMasteryLevel: number;
+  effectMultiplier: number;
+  focusDelta: number;
+}[];
+
+export function coachCardMasteryLevelForXp(masteryXp: number) {
+  const xp = Math.max(0, Math.floor(masteryXp));
+  let level = 0;
+  for (let index = 1; index < COACH_CARD_MASTERY_LEVEL_XP.length; index += 1) {
+    if (xp >= COACH_CARD_MASTERY_LEVEL_XP[index]!) level = index;
+  }
+  return level;
+}
+
+export function coachCardMasteryProgress(masteryXp: number) {
+  const xp = Math.max(0, Math.floor(masteryXp));
+  const level = coachCardMasteryLevelForXp(xp);
+  const levelFloorXp = COACH_CARD_MASTERY_LEVEL_XP[level] ?? 0;
+  const nextLevelXp = COACH_CARD_MASTERY_LEVEL_XP[level + 1] ?? null;
+  const progress =
+    nextLevelXp === null ? 1 : (xp - levelFloorXp) / Math.max(1, nextLevelXp - levelFloorXp);
+  return {
+    xp,
+    level,
+    levelFloorXp,
+    nextLevelXp,
+    progress: rounded(clamp(progress, 0, 1), 3),
+    maxLevel: COACH_CARD_MASTERY_LEVEL_XP.length - 1
+  };
+}
+
+export function coachCardMasteryVariant(variantId: string | null | undefined) {
+  return COACH_CARD_MASTERY_VARIANTS.find((variant) => variant.id === variantId) ?? null;
+}
+
+export function coachCardVariantUnlocked(
+  variantId: string | null | undefined,
+  masteryLevel: number
+) {
+  if (variantId === null || variantId === undefined) return true;
+  const variant = coachCardMasteryVariant(variantId);
+  return Boolean(variant && masteryLevel >= variant.unlockMasteryLevel);
+}
 
 export type OpponentIntentId =
   | "ATTACK_BACKHAND"
@@ -789,10 +857,14 @@ export type CoachCardPreviewContext = {
   opponentIntentId?: OpponentIntentId | null;
   basePointChance?: number;
   currentMomentum?: number;
+  variantId?: CoachCardMasteryVariantId | null;
 };
 
 export type CoachCardPreview = {
   cardId: string;
+  variantId: CoachCardMasteryVariantId | null;
+  variantName: string | null;
+  focusCost: number;
   effectiveness: number;
   intentMatched: boolean;
   scaledStatBoosts: Partial<Record<CoachDeckProfileStatKey, number>>;
@@ -812,12 +884,22 @@ export type CoachCardPreview = {
   nextCardFocusDiscount: number;
 };
 
+export function coachCardFocusCost(
+  card: CoachCardDefinition,
+  variantId: CoachCardMasteryVariantId | null | undefined
+) {
+  const variant = coachCardMasteryVariant(variantId);
+  return clamp(card.focusCost + (variant?.focusDelta ?? 0), 0, COACH_DECK_FOCUS_PER_SET);
+}
+
 export function previewCoachCard(
   card: CoachCardDefinition,
   stats: CoachDeckProfileStats,
   context: CoachCardPreviewContext = {}
 ): CoachCardPreview {
-  const effectiveness = cardEffectiveness(card, stats);
+  const variant = coachCardMasteryVariant(context.variantId);
+  const variantMultiplier = variant?.effectMultiplier ?? 1;
+  const effectiveness = cardEffectiveness(card, stats) * variantMultiplier;
   const boosts: Partial<Record<CoachDeckProfileStatKey, number>> = {};
   let enginePointChanceModifier = 0;
   let energyDelta = 0;
@@ -867,11 +949,17 @@ export function previewCoachCard(
       enginePointChanceModifier += (effect.pointChanceModifier ?? 0) * effectiveness;
       continue;
     }
-    draw += effect.draw ?? 0;
-    discardThenDraw += effect.discardThenDraw ?? 0;
-    retain += effect.retain ?? 0;
+    const scaleDeckValue = (value: number | undefined) => {
+      if (!value) return 0;
+      if (variant?.id === "IMPACT") return Math.ceil(value * variantMultiplier);
+      if (variant?.id === "FLOW") return Math.floor(value * variantMultiplier);
+      return value;
+    };
+    draw += scaleDeckValue(effect.draw);
+    discardThenDraw += scaleDeckValue(effect.discardThenDraw);
+    retain += scaleDeckValue(effect.retain);
     revealIntentPrecision += effect.revealIntentPrecision ?? 0;
-    nextCardFocusDiscount += effect.nextCardFocusDiscount ?? 0;
+    nextCardFocusDiscount += scaleDeckValue(effect.nextCardFocusDiscount);
   }
 
   const boostedStatTotal = Object.values(boosts).reduce<number>(
@@ -898,6 +986,9 @@ export function previewCoachCard(
 
   return {
     cardId: card.id,
+    variantId: variant?.id ?? null,
+    variantName: variant?.name ?? null,
+    focusCost: coachCardFocusCost(card, variant?.id),
     effectiveness: rounded(effectiveness, 3),
     intentMatched,
     scaledStatBoosts: boosts,
@@ -1079,6 +1170,7 @@ export function simulateCoachDeckBalance(simulatedMatches = 10_000): CoachDeckBa
 export type CoachDeckCardInstance = {
   instanceId: string;
   cardId: CoachCardId;
+  variantId?: CoachCardMasteryVariantId | null;
 };
 
 export type ActiveCoachDeckEffect = {
@@ -1094,6 +1186,7 @@ export type CoachDeckPlayHistoryEntry = {
   windowId: string;
   pointIndex: number;
   cardId: CoachCardId | null;
+  variantId?: CoachCardMasteryVariantId | null;
   focusSpent: number;
   intentId: OpponentIntentId;
   intentMatched: boolean;
@@ -1136,6 +1229,7 @@ function shuffleCoachDeckInstances(
 
 export function createCoachDeckRuntimeState(input: {
   cardIds: readonly string[];
+  cardVariants?: Readonly<Record<string, CoachCardMasteryVariantId | null>>;
   seed: string;
   opponentRanking: string;
 }): CoachDeckRuntimeState {
@@ -1145,7 +1239,11 @@ export function createCoachDeckRuntimeState(input: {
   const instances = input.cardIds.map((cardId, index) => {
     const card = coachCardById(cardId);
     if (!card) throw new Error(`Carte Coach Deck inconnue : ${cardId}.`);
-    return { instanceId: `${index}-${card.id}`, cardId: card.id as CoachCardId };
+    return {
+      instanceId: `${index}-${card.id}`,
+      cardId: card.id as CoachCardId,
+      variantId: input.cardVariants?.[card.id] ?? null
+    };
   });
   return {
     version: 1,
@@ -1270,6 +1368,7 @@ export function applyCoachDeckCardDecision(
       windowId: input.windowId,
       pointIndex: input.pointIndex,
       cardId: null,
+      variantId: null,
       focusSpent: 0,
       intentId: runtime.opponentIntent.id,
       intentMatched: false,
@@ -1283,12 +1382,16 @@ export function applyCoachDeckCardDecision(
   if (!instance) throw new Error("Cette carte n’est pas dans votre main.");
   const card = coachCardById(instance.cardId);
   if (!card) throw new Error("Carte Coach Deck introuvable.");
-  const focusSpent = Math.max(0, card.focusCost - runtime.nextCardFocusDiscount);
+  const focusSpent = Math.max(
+    0,
+    coachCardFocusCost(card, instance.variantId) - runtime.nextCardFocusDiscount
+  );
   if (focusSpent > runtime.focus) throw new Error("Focus insuffisant pour jouer cette carte.");
   const preview = previewCoachCard(card, input.playerStats, {
     opponentIntentId: runtime.opponentIntent.id,
     basePointChance: input.basePointChance,
-    currentMomentum: input.currentMomentum
+    currentMomentum: input.currentMomentum,
+    variantId: instance.variantId ?? null
   });
   runtime.focus -= focusSpent;
   runtime.nextCardFocusDiscount = 0;
@@ -1324,6 +1427,7 @@ export function applyCoachDeckCardDecision(
     windowId: input.windowId,
     pointIndex: input.pointIndex,
     cardId: card.id as CoachCardId,
+    variantId: instance.variantId ?? null,
     focusSpent,
     intentId: runtime.opponentIntent.id,
     intentMatched: preview.intentMatched,

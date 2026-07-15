@@ -4,8 +4,10 @@ import { prisma } from "@mypro/database";
 import { STARTER_COACH_DECK_CARD_IDS } from "@mypro/match-engine-tennis";
 import {
   activateCoachDeck,
+  awardCoachDeckMatchProgress,
   createCoachDeck,
   getCoachDeckState,
+  selectCoachCardVariant,
   updateCoachDeck
 } from "./coachDecks";
 
@@ -72,6 +74,44 @@ describe("service Coach Deck", () => {
     const activated = await activateCoachDeck(player, second!.id);
     expect(activated.activeDeckId).toBe(second!.id);
     expect(activated.decks.filter((deck) => deck.isActive)).toHaveLength(1);
+
+    await prisma.playerCoachCard.update({
+      where: { playerId_cardId: { playerId: player.id, cardId: "power-forehand" } },
+      data: { masteryXp: 30, masteryLevel: 1 }
+    });
+    const variantState = await selectCoachCardVariant(player, "power-forehand", "IMPACT");
+    expect(variantState.catalog.find((card) => card.id === "power-forehand")).toMatchObject({
+      selectedVariant: "IMPACT",
+      masteryLevel: 1,
+      effectiveFocusCost: 3
+    });
+
+    const rewards = await prisma.$transaction((tx) =>
+      awardCoachDeckMatchProgress(tx, {
+        playerId: player.id,
+        won: true,
+        abandoned: false,
+        history: [
+          {
+            cardId: "power-forehand",
+            intentMatched: false,
+            pointChanceDelta: 0.045
+          },
+          {
+            cardId: "protect-backhand",
+            intentMatched: true,
+            pointChanceDelta: 0.052
+          }
+        ]
+      })
+    );
+    expect(rewards.totalMasteryXp).toBeGreaterThan(0);
+    expect(rewards.cards).toHaveLength(2);
+    expect(
+      rewards.cards.find((card) => card.cardId === "protect-backhand")?.xpGained
+    ).toBeGreaterThan(
+      rewards.cards.find((card) => card.cardId === "power-forehand")?.xpGained ?? 0
+    );
   });
 
   it("répare automatiquement le deck vide d’un ancien compte", async () => {

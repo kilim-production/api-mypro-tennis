@@ -36,6 +36,24 @@ type CoachCardPayload = {
   unlocked: boolean;
   masteryXp: number;
   masteryLevel: number;
+  mastery: {
+    xp: number;
+    level: number;
+    levelFloorXp: number;
+    nextLevelXp: number | null;
+    progress: number;
+    maxLevel: number;
+  };
+  selectedVariant: "IMPACT" | "FLOW" | null;
+  effectiveFocusCost: number;
+  variants: Array<{
+    id: "IMPACT" | "FLOW";
+    name: string;
+    description: string;
+    unlockMasteryLevel: number;
+    unlocked: boolean;
+    selected: boolean;
+  }>;
 };
 
 type CoachDeckPayload = {
@@ -153,7 +171,7 @@ export function CoachDeckBuilderPage() {
     return counts;
   }, [cardMap, workingCardIds]);
   const totalFocus = workingCardIds.reduce(
-    (total, cardId) => total + (cardMap.get(cardId)?.focusCost ?? 0),
+    (total, cardId) => total + (cardMap.get(cardId)?.effectiveFocusCost ?? 0),
     0
   );
   const deckComplete = workingCardIds.length === (state?.rules.deckSize ?? 12);
@@ -241,6 +259,30 @@ export function CoachDeckBuilderPage() {
       setMessage("✓ Ce deck sera utilisé pour le prochain match Coach.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Activation impossible.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function selectVariant(card: CoachCardPayload, variantId: "IMPACT" | "FLOW" | null) {
+    if (busy || !card.unlocked || card.selectedVariant === variantId) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const payload = await api<CoachDeckState>(`/coach-cards/${card.id}/variant`, {
+        method: "PUT",
+        body: JSON.stringify({ variantId })
+      });
+      setState(payload);
+      const label =
+        variantId === null
+          ? "Version standard"
+          : payload.catalog
+              .find((item) => item.id === card.id)
+              ?.variants.find((variant) => variant.id === variantId)?.name;
+      setMessage(`✓ ${label ?? "Variante"} sélectionnée pour ${card.name}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Sélection impossible.");
     } finally {
       setBusy(false);
     }
@@ -356,7 +398,7 @@ export function CoachDeckBuilderPage() {
                     <>
                       <FamilyIcon family={card.family} />
                       <span>{card.shortName}</span>
-                      <small>{card.focusCost} F</small>
+                      <small>{card.effectiveFocusCost} F</small>
                       <Trash2 className="coach-deck-remove" />
                     </>
                   ) : (
@@ -448,7 +490,7 @@ export function CoachDeckBuilderPage() {
                     <span>
                       <FamilyIcon family={card.family} /> {familyLabels[card.family]}
                     </span>
-                    <strong>{card.focusCost} FOCUS</strong>
+                    <strong>{card.effectiveFocusCost} FOCUS</strong>
                   </header>
                   <div className="coach-builder-card-visual">
                     {card.unlocked ? <FamilyIcon family={card.family} /> : <Lock />}
@@ -464,6 +506,48 @@ export function CoachDeckBuilderPage() {
                       </span>
                     ))}
                   </div>
+                  {card.unlocked ? (
+                    <div className="coach-card-mastery">
+                      <div>
+                        <span>MAÎTRISE {card.mastery.level}</span>
+                        <strong>
+                          {card.mastery.nextLevelXp === null
+                            ? "MAX"
+                            : `${card.mastery.xp}/${card.mastery.nextLevelXp} XP`}
+                        </strong>
+                      </div>
+                      <i>
+                        <span style={{ width: `${Math.round(card.mastery.progress * 100)}%` }} />
+                      </i>
+                    </div>
+                  ) : null}
+                  {card.unlocked ? (
+                    <div className="coach-card-variants" aria-label={`Variantes de ${card.name}`}>
+                      <button
+                        className={card.selectedVariant === null ? "is-selected" : ""}
+                        disabled={busy}
+                        onClick={() => void selectVariant(card, null)}
+                        type="button"
+                        title="Effet et coût d’origine"
+                      >
+                        Standard
+                      </button>
+                      {card.variants.map((variant) => (
+                        <button
+                          className={variant.selected ? "is-selected" : ""}
+                          disabled={busy || !variant.unlocked}
+                          key={variant.id}
+                          onClick={() => void selectVariant(card, variant.id)}
+                          type="button"
+                          title={variant.description}
+                        >
+                          {variant.unlocked
+                            ? variant.name
+                            : `Maîtrise ${variant.unlockMasteryLevel}`}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                   <footer>
                     <span>{durationLabel(card)}</span>
                     <button

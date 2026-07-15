@@ -73,6 +73,17 @@ Règles d’équilibrage :
 - les paliers de maîtrise ouvrent des variantes latérales : plus courte et forte, plus longue et modérée, ou moins coûteuse mais conditionnelle ;
 - la taille du deck et la main restent identiques pour tous.
 
+Progression implémentée :
+
+- paliers de maîtrise à 30, 90 et 200 XP ;
+- XP accordée uniquement aux cartes réellement jouées, avec un bonus pour un contre réussi ;
+- cinq utilisations maximum récompensées par carte et par match pour empêcher le farming ;
+- aucun gain de maîtrise après un abandon ;
+- variante **Impact maximal** au niveau de maîtrise 1 : effet +18 %, coût +1 Focus ;
+- variante **Jeu fluide** au niveau de maîtrise 3 : effet -25 %, coût -1 Focus ;
+- version standard toujours disponible et changement de variante gratuit depuis la collection ;
+- aucune variante, maîtrise ou carte Coach n’est vendue contre des gemmes ou de l’argent réel.
+
 ### Classement
 
 Le classement ne donne pas artificiellement de meilleures cartes. Il détermine :
@@ -244,11 +255,19 @@ est accessible sans défilement sur chaque résolution.
 
 ### Étape 5 — Progression, maîtrise et récompenses
 
-- [ ] Débloquer progressivement les cartes par niveau.
-- [ ] Ajouter l’expérience de maîtrise et les variantes latérales.
-- [ ] Adapter la stratégie adverse au classement.
-- [ ] Afficher clairement les gains de fin de match.
-- [ ] Empêcher tout système pay-to-win.
+- [x] Débloquer progressivement les cartes par niveau.
+- [x] Ajouter l’expérience de maîtrise et les variantes latérales.
+- [x] Adapter la stratégie adverse au classement.
+- [x] Afficher clairement les gains de fin de match.
+- [x] Empêcher tout système pay-to-win.
+
+Le constructeur affiche désormais le niveau, la jauge XP, les deux variantes et leur coût
+effectif. Le rapport final détaille les cartes utilisées, les bons contres, l’XP gagnée, les
+niveaux de maîtrise, les variantes et les nouvelles cartes débloquées. L’attribution est
+transactionnelle et idempotente : recharger un match terminé ne redonne jamais les gains.
+
+Validation effectuée à 844 × 390 et 1920 × 1080, avec détail défilable dans la fenêtre de
+résultat mobile et aucune sortie horizontale.
 
 **Terminé lorsque :** la progression augmente les possibilités de construction sans rendre les nouveaux joueurs incapables de gagner.
 

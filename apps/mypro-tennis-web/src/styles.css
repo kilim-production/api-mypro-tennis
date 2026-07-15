@@ -6866,6 +6866,127 @@ button:disabled,
   text-transform: none;
 }
 
+.coach-deck-result-rewards {
+  margin-top: 9px;
+  border: 1px solid rgba(94, 234, 212, 0.26);
+  border-radius: 9px;
+  padding: 9px;
+  background: rgba(10, 45, 53, 0.48);
+  text-align: left;
+}
+
+.coach-deck-result-rewards > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.coach-deck-result-rewards > header span,
+.coach-deck-result-rewards > header strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #72f2d1;
+  font-size: clamp(7px, 0.67vw, 10px);
+  font-weight: 1000;
+  letter-spacing: 0.06em;
+}
+
+.coach-deck-result-rewards > header strong {
+  color: #f7d375;
+  white-space: nowrap;
+}
+
+.coach-deck-result-rewards > p {
+  margin: 8px 0 0;
+  color: #a8bac6;
+  font-size: clamp(7px, 0.68vw, 10px);
+  text-align: center;
+}
+
+.coach-deck-reward-list {
+  display: grid;
+  max-height: min(22dvh, 175px);
+  gap: 5px;
+  margin-top: 7px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.coach-deck-result-rewards article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 7px;
+  padding: 6px 7px;
+  background: rgba(2, 13, 26, 0.56);
+}
+
+.coach-deck-result-rewards article > div strong,
+.coach-deck-result-rewards article > div span {
+  display: block;
+}
+
+.coach-deck-result-rewards article > div strong {
+  color: #f1f8fb;
+  font-size: clamp(7px, 0.69vw, 10px);
+}
+
+.coach-deck-result-rewards article > div span,
+.coach-deck-result-rewards article > small {
+  color: #8fa5b3;
+  font-size: clamp(6px, 0.58vw, 8px);
+}
+
+.coach-deck-result-rewards article > b {
+  align-self: center;
+  color: #f7d375;
+  font-size: clamp(7px, 0.69vw, 10px);
+}
+
+.coach-deck-result-rewards article > i,
+.coach-deck-result-rewards article > small,
+.coach-deck-result-rewards article > em {
+  grid-column: 1 / -1;
+}
+
+.coach-deck-result-rewards article > em {
+  border-radius: 4px;
+  padding: 3px 5px;
+  color: #031c22;
+  background: linear-gradient(90deg, #5eead4, #6ee7b7);
+  font-size: clamp(6px, 0.57vw, 8px);
+  font-style: normal;
+  font-weight: 1000;
+  text-align: center;
+}
+
+.coach-deck-unlocked-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 7px;
+}
+
+.coach-deck-unlocked-cards strong,
+.coach-deck-unlocked-cards span {
+  border-radius: 999px;
+  padding: 3px 6px;
+  font-size: clamp(6px, 0.58vw, 8px);
+  font-weight: 950;
+}
+
+.coach-deck-unlocked-cards strong {
+  color: #f7d375;
+}
+
+.coach-deck-unlocked-cards span {
+  color: #041e24;
+  background: #72f2d1;
+}
+
 .interactive-beta-feedback {
   margin-top: 9px;
   border: 1px solid rgba(94, 234, 212, 0.2);
@@ -7634,6 +7755,20 @@ button:disabled,
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.coach-deck-card-variant {
+  justify-self: start;
+  margin-top: 3px;
+  border: 1px solid color-mix(in srgb, var(--coach-card-accent) 45%, transparent);
+  border-radius: 999px;
+  padding: 1px 5px;
+  color: var(--coach-card-accent);
+  background: color-mix(in srgb, var(--coach-card-accent) 10%, transparent);
+  font-size: clamp(5px, 0.48vw, 7px);
+  font-style: normal;
+  font-weight: 950;
+  text-transform: uppercase;
 }
 
 .coach-deck-card-selected {
@@ -10011,6 +10146,78 @@ button.lobby-mini-bag:active:not(:disabled) {
 
 .coach-builder-card-stats strong {
   color: var(--coach-family);
+}
+
+.coach-card-mastery {
+  display: grid;
+  gap: 0.28rem;
+  margin-bottom: 0.45rem;
+}
+
+.coach-card-mastery > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  color: #8ca4b2;
+  font-size: 0.5rem;
+  font-weight: 900;
+}
+
+.coach-card-mastery > div span {
+  color: var(--coach-family);
+  letter-spacing: 0.06em;
+}
+
+.coach-card-mastery > i,
+.coach-deck-result-rewards article > i {
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+}
+
+.coach-card-mastery > i span,
+.coach-deck-result-rewards article > i span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--coach-family, #42e3bc), #88f7da);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--coach-family, #42e3bc) 55%, transparent);
+}
+
+.coach-card-variants {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.22rem;
+  margin-bottom: 0.5rem;
+}
+
+.coach-card-variants button {
+  min-width: 0;
+  min-height: 29px;
+  overflow: hidden;
+  border: 1px solid rgba(139, 163, 176, 0.18);
+  border-radius: 0.35rem;
+  padding: 0.22rem;
+  color: #8ba1af;
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 0.45rem;
+  font-weight: 900;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+}
+
+.coach-card-variants button.is-selected {
+  border-color: color-mix(in srgb, var(--coach-family) 70%, transparent);
+  color: var(--coach-family);
+  background: color-mix(in srgb, var(--coach-family) 15%, transparent);
+}
+
+.coach-card-variants button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
 }
 
 .coach-builder-card > footer > span {

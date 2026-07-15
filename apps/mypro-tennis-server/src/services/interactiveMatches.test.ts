@@ -222,10 +222,16 @@ describe("sessions de match interactif", () => {
       risk: "Normale",
       format: "Un set",
       type: "Coach Deck de test",
-      coachDeckCardIds: STARTER_COACH_DECK_CARD_IDS
+      coachDeckCardIds: STARTER_COACH_DECK_CARD_IDS,
+      coachDeckCardVariants: { "power-forehand": "IMPACT" }
     });
     expect(deckMatch.session.coachCards).toHaveLength(24);
     expect(deckMatch.session.matchState.coachDeck?.hand).toHaveLength(4);
+    const runtimeCards = [
+      ...(deckMatch.session.matchState.coachDeck?.hand ?? []),
+      ...(deckMatch.session.matchState.coachDeck?.drawPile ?? [])
+    ];
+    expect(runtimeCards.find((card) => card.cardId === "power-forehand")?.variantId).toBe("IMPACT");
     const firstCard = deckMatch.session.matchState.coachDeck?.hand[0];
     expect(firstCard).toBeDefined();
     const deckRevision = deckMatch.session.revision;
@@ -255,5 +261,22 @@ describe("sessions de match interactif", () => {
     }
     expect(deckSession.status).toBe("FINISHED");
     expect(deckSession.matchState.coachDeck?.history.length).toBeGreaterThan(0);
+    expect(deckSession.coachDeckRewards?.totalMasteryXp).toBeGreaterThan(0);
+    expect(deckSession.coachDeckRewards?.cards.length).toBeGreaterThan(0);
+    const rewardedCardId = deckSession.coachDeckRewards!.cards[0]!.cardId;
+    const masteryAfterFinish = await prisma.playerCoachCard.findUniqueOrThrow({
+      where: { playerId_cardId: { playerId: playerA.id, cardId: rewardedCardId } }
+    });
+    const repeatedFinish = await playCoachDeckCardSession({
+      sessionId: deckSession.id,
+      userId: user.id,
+      revision: deckSession.revision,
+      cardInstanceId: null
+    });
+    const masteryAfterRetry = await prisma.playerCoachCard.findUniqueOrThrow({
+      where: { playerId_cardId: { playerId: playerA.id, cardId: rewardedCardId } }
+    });
+    expect(repeatedFinish.coachDeckRewards).toEqual(deckSession.coachDeckRewards);
+    expect(masteryAfterRetry.masteryXp).toBe(masteryAfterFinish.masteryXp);
   });
 });

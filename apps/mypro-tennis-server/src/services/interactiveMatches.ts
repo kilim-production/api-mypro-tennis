@@ -9,6 +9,7 @@ import {
   applyCoachingDecision,
   createInteractiveMatch,
   previewCoachCard,
+  type CoachCardMasteryVariantId,
   type CoachDeckProfileStats,
   type CoachingInstructionId,
   type InteractiveMatchState,
@@ -16,6 +17,7 @@ import {
 } from "@mypro/match-engine-tennis";
 import type { RiskMode, TennisSurface, TennisTactic } from "@mypro/sports-tennis";
 import { decodeJson, encodeJson } from "./json";
+import { awardCoachDeckMatchProgress, type CoachDeckMatchRewards } from "./coachDecks";
 import { persistServerMatchOutcome, toEnginePlayer } from "./matches";
 import { publicPlayer } from "./playerMapper";
 
@@ -63,7 +65,8 @@ export function publicInteractiveMatchSession(session: InteractiveSessionWithPla
         preview: previewCoachCard(card, playerStats, {
           opponentIntentId: state.coachDeck?.opponentIntent?.id ?? null,
           basePointChance: latestPointChance,
-          currentMomentum: state.momentum
+          currentMomentum: state.momentum,
+          variantId: instance.variantId ?? null
         })
       }
     ];
@@ -79,6 +82,9 @@ export function publicInteractiveMatchSession(session: InteractiveSessionWithPla
     createdAt: session.createdAt.toISOString(),
     updatedAt: session.updatedAt.toISOString(),
     completedAt: session.completedAt?.toISOString() ?? null,
+    coachDeckRewards: session.coachDeckRewards
+      ? decodeJson<CoachDeckMatchRewards>(session.coachDeckRewards)
+      : null,
     playerA: publicPlayer(session.playerA),
     playerB: publicPlayer(session.playerB),
     coachingInstructions: COACHING_INSTRUCTIONS,
@@ -125,6 +131,7 @@ export async function createInteractiveMatchSession(input: {
   format: MatchFormat;
   type: string;
   coachDeckCardIds?: readonly string[];
+  coachDeckCardVariants?: Readonly<Record<string, CoachCardMasteryVariantId | null>>;
 }) {
   const existing = await activeInteractiveMatchSession(input.playerA.id);
   if (existing) return { created: false, session: publicInteractiveMatchSession(existing) };
@@ -137,7 +144,11 @@ export async function createInteractiveMatchSession(input: {
     format: input.format,
     seed,
     ...(input.coachDeckCardIds
-      ? { coachDeckCardIds: input.coachDeckCardIds, opponentRanking: input.playerB.fftRanking }
+      ? {
+          coachDeckCardIds: input.coachDeckCardIds,
+          coachDeckCardVariants: input.coachDeckCardVariants,
+          opponentRanking: input.playerB.fftRanking
+        }
       : {})
   });
   const session = await prisma.interactiveMatchSession.create({
@@ -217,6 +228,7 @@ async function finishSession(
         409
       );
     }
+    const replayPayload = completedReplayPayload(session.id, state, finalStatus);
     const match = await persistServerMatchOutcome(tx, {
       playerA: session.playerA,
       playerB: session.playerB,
@@ -232,14 +244,29 @@ async function finishSession(
             ? Math.max(1, Math.round(state.events.length * 0.65))
             : Math.max(28, Math.round(state.events.length * 0.65))
       },
-      replayPayload: completedReplayPayload(session.id, state, finalStatus)
+      replayPayload
     });
+    const coachDeckRewards = state.coachDeck
+      ? await awardCoachDeckMatchProgress(tx, {
+          playerId: session.playerAId,
+          won: winnerId === session.playerAId,
+          abandoned: finalStatus === "ABANDONED",
+          history: state.coachDeck.history
+        })
+      : null;
+    if (coachDeckRewards) {
+      await tx.match.update({
+        where: { id: match.id },
+        data: { replay: encodeJson({ ...replayPayload, coachDeckRewards }) }
+      });
+    }
     return tx.interactiveMatchSession.update({
       where: { id: session.id },
       data: {
         state: encodeJson(state),
         status: finalStatus,
         completedMatchId: match.id,
+        coachDeckRewards: coachDeckRewards ? encodeJson(coachDeckRewards) : null,
         completedAt: new Date()
       },
       include: interactiveSessionInclude

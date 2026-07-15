@@ -9,6 +9,7 @@ import {
   createCoachDeckRuntimeState,
   prepareCoachDeckWindow,
   resetCoachDeckFocusForNewSet,
+  type CoachCardMasteryVariantId,
   type CoachDeckProfileStats,
   type CoachDeckRuntimeState
 } from "./coachDeck";
@@ -331,6 +332,7 @@ export type CreateInteractiveMatchInput = {
   format: MatchFormat;
   seed: string | number;
   coachDeckCardIds?: readonly string[];
+  coachDeckCardVariants?: Readonly<Record<string, CoachCardMasteryVariantId | null>>;
   opponentRanking?: string;
 };
 
@@ -1072,6 +1074,7 @@ export function createInteractiveMatch(input: CreateInteractiveMatchInput): Inte
     coachDeck: input.coachDeckCardIds
       ? createCoachDeckRuntimeState({
           cardIds: input.coachDeckCardIds,
+          ...(input.coachDeckCardVariants ? { cardVariants: input.coachDeckCardVariants } : {}),
           seed,
           opponentRanking: input.opponentRanking ?? "NC"
         })
