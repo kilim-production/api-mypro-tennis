@@ -1,0 +1,15 @@
+.git
+.github
+.agents
+.codex
+node_modules
+tmp
+artifacts
+coverage
+.env
+.env.*
+*.db
+*.db-journal
+*.log
+apps/*/dist
+packages/*/dist

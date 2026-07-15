@@ -4,6 +4,7 @@ coverage
 .agents
 .codex
 tmp
+artifacts
 .env
 .env.local
 *.db
