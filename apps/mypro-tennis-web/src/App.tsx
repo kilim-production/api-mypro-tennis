@@ -66,7 +66,7 @@ import {
   Zap
 } from "lucide-react";
 import { countries, countryLabel, normalizeCountryCode, type Country } from "@mypro/shared";
-import { API_URL, api, saveToken } from "./api";
+import { API_URL, SOCKET_URL, api, saveToken } from "./api";
 import { LobbyActionButton } from "./components/lobby/LobbyActionButton";
 import { LobbyPlayerHero } from "./components/lobby/LobbyPlayerHero";
 import { LobbySeasonTrack } from "./components/lobby/LobbySeasonTrack";
@@ -75,7 +75,7 @@ import { CoachDeckTutorialPage } from "./components/coach-deck/CoachDeckTutorial
 import { InteractiveMatchPage, playMatchSound } from "./components/match/InteractiveMatchPage";
 import { useGameStore, type GameNotification, type Player } from "./store";
 
-const socketUrl = import.meta.env.VITE_SOCKET_URL ?? "http://localhost:4000";
+const socketUrl = SOCKET_URL;
 const discordInviteUrl = import.meta.env.VITE_DISCORD_INVITE_URL ?? "";
 
 const nav = [

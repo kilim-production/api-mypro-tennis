@@ -1,4 +1,34 @@
-export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
+const productionApiOrigin = "https://mypro-tennis-api.onrender.com";
+
+function isLocalServiceUrl(value: string) {
+  try {
+    const hostname = new URL(value).hostname;
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  } catch {
+    return false;
+  }
+}
+
+function resolveServiceUrl(
+  configured: string | undefined,
+  productionUrl: string,
+  localUrl: string
+) {
+  if (import.meta.env.PROD && (!configured || isLocalServiceUrl(configured))) return productionUrl;
+  return configured ?? localUrl;
+}
+
+export const API_URL = resolveServiceUrl(
+  import.meta.env.VITE_API_URL,
+  `${productionApiOrigin}/api`,
+  "http://localhost:4000/api"
+);
+
+export const SOCKET_URL = resolveServiceUrl(
+  import.meta.env.VITE_SOCKET_URL,
+  productionApiOrigin,
+  "http://localhost:4000"
+);
 
 export class ApiError extends Error {
   status: number;
