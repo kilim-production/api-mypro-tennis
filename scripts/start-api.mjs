@@ -35,4 +35,8 @@ if (process.env.DISABLE_XP_BACKFILL !== "1") {
   await run(npmCommand, ["run", "xp:backfill"]);
 }
 
+if (process.env.DISABLE_COACH_DECK_BACKFILL !== "1") {
+  await run(npmCommand, ["run", "coach-deck:backfill"]);
+}
+
 await run(npmCommand, ["exec", "tsx", "apps/mypro-tennis-server/src/server.ts"]);

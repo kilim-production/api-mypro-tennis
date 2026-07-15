@@ -1,12 +1,14 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { calculateOverall } from "@mypro/core";
 import { prisma } from "@mypro/database";
+import { STARTER_COACH_DECK_CARD_IDS } from "@mypro/match-engine-tennis";
 import { createStatsForArchetype } from "@mypro/sports-tennis";
 import {
   abandonInteractiveMatchSession,
   coachInteractiveMatchSession,
   createInteractiveMatchSession,
   getInteractiveMatchSession,
+  playCoachDeckCardSession,
   saveInteractiveMatchFeedback
 } from "./interactiveMatches";
 
@@ -209,5 +211,49 @@ describe("sessions de match interactif", () => {
     expect(abandoned.completedMatchId).toBeTruthy();
     expect(loserAfterAbandon?.losses).toBe(lossesBeforeAbandon + 1);
     expect(winnerAfterAbandon?.wins).toBe(winsBeforeAbandon + 1);
+
+    const deckPlayerA = await prisma.player.findUniqueOrThrow({ where: { id: playerA.id } });
+    const deckPlayerB = await prisma.player.findUniqueOrThrow({ where: { id: playerB.id } });
+    const deckMatch = await createInteractiveMatchSession({
+      playerA: deckPlayerA,
+      playerB: deckPlayerB,
+      surface: "Dur",
+      tactic: "Équilibré",
+      risk: "Normale",
+      format: "Un set",
+      type: "Coach Deck de test",
+      coachDeckCardIds: STARTER_COACH_DECK_CARD_IDS
+    });
+    expect(deckMatch.session.coachCards).toHaveLength(24);
+    expect(deckMatch.session.matchState.coachDeck?.hand).toHaveLength(4);
+    const firstCard = deckMatch.session.matchState.coachDeck?.hand[0];
+    expect(firstCard).toBeDefined();
+    const deckRevision = deckMatch.session.revision;
+    let deckSession = await playCoachDeckCardSession({
+      sessionId: deckMatch.session.id,
+      userId: user.id,
+      revision: deckRevision,
+      cardInstanceId: firstCard!.instanceId
+    });
+    await expect(
+      playCoachDeckCardSession({
+        sessionId: deckMatch.session.id,
+        userId: user.id,
+        revision: deckRevision,
+        cardInstanceId: null
+      })
+    ).rejects.toMatchObject({ statusCode: 409 });
+    let deckGuard = 0;
+    while (deckSession.status === "ACTIVE" && deckGuard < 200) {
+      deckSession = await playCoachDeckCardSession({
+        sessionId: deckSession.id,
+        userId: user.id,
+        revision: deckSession.revision,
+        cardInstanceId: null
+      });
+      deckGuard += 1;
+    }
+    expect(deckSession.status).toBe("FINISHED");
+    expect(deckSession.matchState.coachDeck?.history.length).toBeGreaterThan(0);
   });
 });

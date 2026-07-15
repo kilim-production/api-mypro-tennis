@@ -28,6 +28,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "overall:backfill": "tsx scripts/backfill-player-overalls.ts",
     "xp:backfill": "tsx scripts/backfill-player-xp.ts",
+    "coach-deck:backfill": "tsx scripts/backfill-coach-decks.ts",
     "discord:setup": "node scripts/setup-discord-server.mjs"
   },
   "devDependencies": {

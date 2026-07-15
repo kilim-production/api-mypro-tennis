@@ -3,9 +3,11 @@ import { prisma } from "@mypro/database";
 import { calculateOverall } from "@mypro/core";
 import {
   challengeSchema,
+  coachDeckSaveSchema,
   cosmeticEquipSchema,
   cosmeticMarketSchema,
   interactiveCoachingDecisionSchema,
+  interactiveCoachCardDecisionSchema,
   interactiveMatchAbandonSchema,
   interactiveMatchFeedbackSchema,
   matchRequestSchema,
@@ -20,6 +22,14 @@ import {
 import { requireAuth } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 import { spendCareerAction } from "../services/actionEnergy";
+import {
+  CoachDeckError,
+  activateCoachDeck,
+  createCoachDeck,
+  getCoachDeckState,
+  getCoachDeckSnapshot,
+  updateCoachDeck
+} from "../services/coachDecks";
 import {
   chestPublicCatalog,
   getChestState,
@@ -41,6 +51,7 @@ import {
   createInteractiveMatchSession,
   getActiveInteractiveMatchSession,
   getInteractiveMatchSession,
+  playCoachDeckCardSession,
   saveInteractiveMatchFeedback
 } from "../services/interactiveMatches";
 import { publicPlayer } from "../services/playerMapper";
@@ -854,6 +865,84 @@ gameRouter.get("/rankings", async (_request, response) => {
   );
 });
 
+gameRouter.get("/coach-decks", requireAuth, async (request, response) => {
+  const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
+  if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+  try {
+    return response.json(await getCoachDeckState(player));
+  } catch (error) {
+    console.error("Initialisation du Coach Deck impossible", error);
+    return response.status(503).json({
+      message:
+        "Votre deck de départ n’a pas pu être préparé. Réessayez après le redémarrage du serveur."
+    });
+  }
+});
+
+gameRouter.post(
+  "/coach-decks",
+  requireAuth,
+  validateBody(coachDeckSaveSchema),
+  async (request, response) => {
+    const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
+    if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+    try {
+      return response.status(201).json(
+        await createCoachDeck({
+          player,
+          name: request.body.name,
+          cardIds: request.body.cardIds,
+          activate: request.body.activate
+        })
+      );
+    } catch (error) {
+      if (error instanceof CoachDeckError) {
+        return response.status(error.statusCode).json({ message: error.message });
+      }
+      throw error;
+    }
+  }
+);
+
+gameRouter.put(
+  "/coach-decks/:id",
+  requireAuth,
+  validateBody(coachDeckSaveSchema),
+  async (request, response) => {
+    const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
+    if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+    try {
+      return response.json(
+        await updateCoachDeck({
+          player,
+          deckId: request.params.id!,
+          name: request.body.name,
+          cardIds: request.body.cardIds,
+          activate: request.body.activate
+        })
+      );
+    } catch (error) {
+      if (error instanceof CoachDeckError) {
+        return response.status(error.statusCode).json({ message: error.message });
+      }
+      throw error;
+    }
+  }
+);
+
+gameRouter.post("/coach-decks/:id/activate", requireAuth, async (request, response) => {
+  const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
+  if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+  try {
+    return response.json(await activateCoachDeck(player, request.params.id!));
+  } catch (error) {
+    if (error instanceof CoachDeckError) {
+      return response.status(error.statusCode).json({ message: error.message });
+    }
+    throw error;
+  }
+});
+
 gameRouter.get("/chests", requireAuth, async (request, response) => {
   const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
   if (!player) return response.status(404).json({ message: "Joueur introuvable." });
@@ -1424,6 +1513,19 @@ gameRouter.post(
       }
     }
 
+    let coachDeck: Awaited<ReturnType<typeof getCoachDeckSnapshot>>;
+    try {
+      coachDeck = await getCoachDeckSnapshot(player, request.body.coachDeckId);
+    } catch (error) {
+      if (error instanceof CoachDeckError) {
+        return response.status(error.statusCode).json({ message: error.message });
+      }
+      console.error("Chargement du Coach Deck avant match impossible", error);
+      return response.status(503).json({
+        message: "Votre Coach Deck est en cours d’initialisation. Réessayez dans quelques secondes."
+      });
+    }
+
     try {
       await spendCareerAction(player);
     } catch (error) {
@@ -1439,7 +1541,8 @@ gameRouter.post(
         tactic: request.body.tactic ?? "Équilibré",
         risk: request.body.risk ?? "Normale",
         format: request.body.format ?? "Deux sets gagnants",
-        type: player.proUnlocked ? "Duel professionnel interactif" : "Duel amateur interactif"
+        type: player.proUnlocked ? "Duel professionnel interactif" : "Duel amateur interactif",
+        coachDeckCardIds: coachDeck.cardIds
       });
       return response.status(result.created ? 201 : 200).json(result.session);
     } catch (error) {
@@ -1487,6 +1590,34 @@ gameRouter.post(
       return response.status(409).json({
         message: error instanceof Error ? error.message : "Décision de coaching impossible."
       });
+    }
+  }
+);
+
+gameRouter.post(
+  "/matches/interactive/:id/card",
+  requireAuth,
+  validateBody(interactiveCoachCardDecisionSchema),
+  async (request, response) => {
+    const sessionId = request.params.id;
+    if (!sessionId) return response.status(400).json({ message: "Identifiant de session requis." });
+    try {
+      return response.json(
+        await playCoachDeckCardSession({
+          sessionId,
+          userId: request.session!.userId,
+          revision: request.body.revision,
+          cardInstanceId: request.body.cardInstanceId,
+          ...(request.body.retainInstanceId !== undefined
+            ? { retainInstanceId: request.body.retainInstanceId }
+            : {})
+        })
+      );
+    } catch (error) {
+      if (error instanceof InteractiveMatchSessionError) {
+        return response.status(error.statusCode).json({ message: error.message });
+      }
+      return response.status(409).json({ message: "Décision Coach Deck impossible." });
     }
   }
 );

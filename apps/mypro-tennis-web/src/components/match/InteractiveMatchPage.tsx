@@ -2,10 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   BarChart3,
+  Check,
   ChevronLeft,
   CircleHelp,
   Crosshair,
+  Eye,
   Gauge,
+  HeartPulse,
+  Layers3,
   ListFilter,
   Pause,
   ShieldCheck,
@@ -37,6 +41,62 @@ type CoachingInstruction = {
   category: CoachingCategory;
   durationGames: number;
   energyMultiplier: number;
+};
+
+type CoachCardFamily = "BOOST" | "COUNTER" | "STATE" | "DECK";
+
+type CoachCard = {
+  id: string;
+  family: CoachCardFamily;
+  name: string;
+  shortName: string;
+  description: string;
+  focusCost: number;
+  duration: { unit: "POINTS" | "GAMES" | "IMMEDIATE" | "NEXT_WINDOW"; amount: number };
+  primaryStats: string[];
+};
+
+type CoachCardPreview = {
+  cardId: string;
+  intentMatched: boolean;
+  scaledStatBoosts: Record<string, number>;
+  pointChanceBefore: number;
+  pointChanceAfter: number;
+  pointChanceDelta: number;
+  energyDelta: number;
+  confidenceDelta: number;
+  momentumDelta: number;
+  momentumTowardZero: number;
+  energyDrainMultiplier: number;
+  draw: number;
+  discardThenDraw: number;
+  retain: number;
+  revealIntentPrecision: number;
+  nextCardFocusDiscount: number;
+};
+
+type CoachDeckRuntime = {
+  hand: Array<{ instanceId: string; cardId: string }>;
+  focus: number;
+  focusPerSet: number;
+  setIndex: number;
+  nextCardFocusDiscount: number;
+  opponentIntent: {
+    id: string;
+    label: string;
+    description: string;
+    targetStats: string[];
+    recommendedCardIds: string[];
+    confidence: number;
+    intensity: 1 | 2 | 3;
+    reason: string;
+  } | null;
+  activeEffects: Array<{
+    sourceCardId: string;
+    remainingPoints: number | null;
+    remainingGames: number | null;
+  }>;
+  history: Array<{ cardId: string | null; focusSpent: number; intentMatched: boolean }>;
 };
 
 type ScoreView = {
@@ -74,6 +134,8 @@ type InteractiveMatchSession = {
   playerA: Player;
   playerB: Player;
   coachingInstructions: CoachingInstruction[];
+  coachCards: CoachCard[];
+  coachHandPreviews: Array<{ instanceId: string; preview: CoachCardPreview }>;
   matchState: {
     status: "PLAYING" | "AWAITING_COACH" | "FINISHED";
     score: {
@@ -97,6 +159,7 @@ type InteractiveMatchSession = {
       instructionId: string | null;
       pointIndex: number;
     }>;
+    coachDeck?: CoachDeckRuntime | null;
     coachWindow: {
       id: string;
       type: "PRE_MATCH" | "CHANGEOVER" | "PRESSURE" | "SET_BREAK";
@@ -417,6 +480,119 @@ function InstructionCard({
   );
 }
 
+const coachCardFamilyLabels: Record<CoachCardFamily, string> = {
+  BOOST: "Boost",
+  COUNTER: "Contre",
+  STATE: "Mental & physique",
+  DECK: "Tactique"
+};
+
+function coachCardDuration(card: CoachCard) {
+  if (card.duration.unit === "IMMEDIATE") return "Immédiat";
+  if (card.duration.unit === "NEXT_WINDOW") return "Prochaine décision";
+  const unit = card.duration.unit === "GAMES" ? "jeu" : "point";
+  return `${card.duration.amount} ${unit}${card.duration.amount > 1 ? "s" : ""}`;
+}
+
+function coachCardPreviewLines(preview: CoachCardPreview | undefined) {
+  if (!preview) return ["Aperçu en cours de calcul"];
+  const lines: string[] = [];
+  const boosts = Object.entries(preview.scaledStatBoosts)
+    .filter(([, value]) => value > 0)
+    .slice(0, 2)
+    .map(([key, value]) => `+${Math.round(value)} ${tacticalStatLabels[key] ?? key}`);
+  lines.push(...boosts);
+  if (preview.energyDelta)
+    lines.push(`${preview.energyDelta > 0 ? "+" : ""}${Math.round(preview.energyDelta)} énergie`);
+  if (preview.confidenceDelta)
+    lines.push(
+      `${preview.confidenceDelta > 0 ? "+" : ""}${Math.round(preview.confidenceDelta)} confiance`
+    );
+  if (preview.draw) lines.push(`Pioche ${preview.draw} carte${preview.draw > 1 ? "s" : ""}`);
+  if (preview.discardThenDraw)
+    lines.push(
+      `Renouvelle ${preview.discardThenDraw} carte${preview.discardThenDraw > 1 ? "s" : ""}`
+    );
+  if (preview.nextCardFocusDiscount)
+    lines.push(`-${preview.nextCardFocusDiscount} Focus sur la prochaine carte`);
+  if (preview.energyDrainMultiplier < 0.99) lines.push("Réduit la dépense d’énergie");
+  if (lines.length === 0 && preview.pointChanceDelta > 0)
+    lines.push("Avantage temporaire sur les prochains points");
+  return lines.slice(0, 2);
+}
+
+function CoachDeckMatchCard({
+  card,
+  preview,
+  selected,
+  disabled,
+  effectiveCost,
+  onSelect
+}: {
+  card: CoachCard;
+  preview?: CoachCardPreview | undefined;
+  selected: boolean;
+  disabled: boolean;
+  effectiveCost: number;
+  onSelect: () => void;
+}) {
+  const Icon =
+    card.family === "BOOST"
+      ? Zap
+      : card.family === "COUNTER"
+        ? ShieldCheck
+        : card.family === "STATE"
+          ? HeartPulse
+          : Layers3;
+  const DiagramIcon =
+    card.family === "COUNTER"
+      ? ShieldCheck
+      : card.family === "STATE"
+        ? HeartPulse
+        : card.family === "DECK"
+          ? Eye
+          : Zap;
+  return (
+    <button
+      aria-pressed={selected}
+      className={`coach-deck-match-card is-${card.family.toLowerCase()} ${selected ? "is-selected" : ""}`}
+      disabled={disabled}
+      onClick={onSelect}
+      type="button"
+    >
+      <span className="coach-deck-card-family">
+        <Icon size={15} /> {coachCardFamilyLabels[card.family]}
+      </span>
+      {selected ? (
+        <span className="coach-deck-card-selected">
+          <Check size={12} /> Votre choix
+        </span>
+      ) : null}
+      <strong>{card.name}</strong>
+      <small>{card.description}</small>
+      <span className="coach-deck-card-diagram" aria-hidden="true">
+        <DiagramIcon className="coach-deck-diagram-symbol" />
+        <i />
+        <i />
+        <i />
+        <em />
+        <em />
+      </span>
+      <span className="coach-deck-card-effects">
+        {coachCardPreviewLines(preview).map((line) => (
+          <em key={line}>{line}</em>
+        ))}
+      </span>
+      <span className="coach-deck-card-footer">
+        <em>{coachCardDuration(card)}</em>
+        <b>
+          <Sparkles size={12} /> {effectiveCost}
+        </b>
+      </span>
+    </button>
+  );
+}
+
 export function InteractiveMatchPage({
   resolveHeroSource,
   resolvePictureSource
@@ -429,6 +605,9 @@ export function InteractiveMatchPage({
   const [actionMessage, setActionMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [selectedInstructionId, setSelectedInstructionId] = useState<string | null>(null);
+  const [selectedCoachCardInstanceId, setSelectedCoachCardInstanceId] = useState<string | null>(
+    null
+  );
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [matchupOpen, setMatchupOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
@@ -449,6 +628,7 @@ export function InteractiveMatchPage({
         if (cancelled) return;
         setSession(payload);
         setSelectedInstructionId(null);
+        setSelectedCoachCardInstanceId(null);
       })
       .catch((caught) => {
         if (!cancelled) setError(caught instanceof Error ? caught.message : "Match introuvable.");
@@ -463,6 +643,7 @@ export function InteractiveMatchPage({
     const payload = await api<InteractiveMatchSession>(`/matches/interactive/${id}`);
     setSession(payload);
     setSelectedInstructionId(null);
+    setSelectedCoachCardInstanceId(null);
     setActionMessage(message);
   }
 
@@ -471,6 +652,59 @@ export function InteractiveMatchPage({
     setBusy(true);
     setActionMessage("");
     if (soundEnabled) playMatchSound("confirm");
+    const coachDeck = session.matchState.coachDeck;
+    const selectedCoachInstance = coachDeck?.hand.find(
+      (instance) => instance.instanceId === selectedCoachCardInstanceId
+    );
+    const selectedCoachCard = session.coachCards.find(
+      (card) => card.id === selectedCoachInstance?.cardId
+    );
+    if (coachDeck) {
+      try {
+        const payload = await api<InteractiveMatchSession>(`/matches/interactive/${id}/card`, {
+          method: "POST",
+          body: JSON.stringify({
+            revision: session.revision,
+            cardInstanceId: selectedCoachCardInstanceId
+          })
+        });
+        setSession(payload);
+        setSelectedCoachCardInstanceId(null);
+        setActionMessage(
+          selectedCoachCard
+            ? `✓ Carte jouée : ${selectedCoachCard.name}. Son effet temporaire est maintenant actif.`
+            : "✓ Décision enregistrée : votre joueur continue sans dépenser de Focus."
+        );
+        if (payload.status === "FINISHED" || payload.matchState.status === "FINISHED") {
+          if (soundEnabled) {
+            playMatchSound(
+              payload.matchState.winnerId === payload.playerA.id ? "finish" : "negative"
+            );
+          }
+          await refreshPlayer();
+        } else if (soundEnabled) {
+          const latest = payload.matchState.events.at(-1);
+          playMatchSound(latest?.winnerId === payload.playerA.id ? "positive" : "negative");
+        }
+      } catch (caught) {
+        if (caught instanceof ApiError && caught.status === 409) {
+          try {
+            await reloadCurrentSession(
+              "Le match avait déjà progressé sur un autre appareil. Le score affiché est à jour."
+            );
+          } catch (reloadError) {
+            setActionMessage(
+              reloadError instanceof Error ? reloadError.message : "Actualisation impossible."
+            );
+          }
+        } else {
+          setActionMessage(caught instanceof Error ? caught.message : "Carte impossible à jouer.");
+        }
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     const isFreePlan = session.matchState.coachWindow?.type === "PRE_MATCH";
     const chosenInstruction = session.coachingInstructions.find(
       (instruction) => instruction.id === selectedInstructionId
@@ -632,6 +866,17 @@ export function InteractiveMatchPage({
   const score = scoreFromSession(session);
   const playerA = session.playerA;
   const playerB = session.playerB;
+  const coachDeck = session.matchState.coachDeck ?? null;
+  const isCoachDeck = Boolean(coachDeck);
+  const selectedCoachInstance = coachDeck?.hand.find(
+    (instance) => instance.instanceId === selectedCoachCardInstanceId
+  );
+  const selectedCoachCard = session.coachCards.find(
+    (card) => card.id === selectedCoachInstance?.cardId
+  );
+  const selectedCoachPreview = session.coachHandPreviews.find(
+    (entry) => entry.instanceId === selectedCoachCardInstanceId
+  )?.preview;
   const isPreMatch = session.matchState.coachWindow?.type === "PRE_MATCH";
   const canChooseInstruction = isPreMatch || session.matchState.coachingPoints[0] > 0;
   const insights = matchupInsights(playerA, playerB);
@@ -662,9 +907,10 @@ export function InteractiveMatchPage({
     (longest, event) => Math.max(longest, event.rallyLength),
     0
   );
-  const usedInstructions = session.matchState.coachingHistory.filter(
-    (decision) => decision.instructionId !== null
-  ).length;
+  const usedInstructions = isCoachDeck
+    ? (coachDeck?.history.filter((decision) => decision.cardId !== null).length ?? 0)
+    : session.matchState.coachingHistory.filter((decision) => decision.instructionId !== null)
+        .length;
   const resultFact =
     session.matchState.winnerId === playerA.id && playerA.overall < playerB.overall
       ? `Exploit : victoire face à un adversaire mieux noté de ${playerB.overall - playerA.overall} point(s).`
@@ -675,7 +921,9 @@ export function InteractiveMatchPage({
           : "L’adversaire a confirmé son avantage, mais vos décisions serviront au prochain match.";
 
   return (
-    <main className={`interactive-match-screen ${busy ? "is-resolving" : ""}`}>
+    <main
+      className={`interactive-match-screen ${isCoachDeck ? "is-coach-deck" : ""} ${busy ? "is-resolving" : ""}`}
+    >
       <div className="interactive-arena-layer" aria-hidden="true" />
       <header className="interactive-match-header">
         <MatchBrand />
@@ -697,11 +945,17 @@ export function InteractiveMatchPage({
               <span>SETS</span>
               <strong>{score.sets[1]}</strong>
             </div>
+            <div
+              aria-label={`Jeux : ${score.games[0]} à ${score.games[1]}`}
+              className="interactive-game-score"
+            >
+              <strong>{score.games[0]}</strong>
+              <span>JEUX</span>
+              <strong>{score.games[1]}</strong>
+            </div>
             <div className="interactive-point-score">
               <strong>{score.points[0]}</strong>
-              <span>
-                {score.games[0]} - {score.games[1]}
-              </span>
+              <span>POINTS</span>
               <strong>{score.points[1]}</strong>
             </div>
             <em>{contextLabel(session)}</em>
@@ -756,17 +1010,150 @@ export function InteractiveMatchPage({
           side="right"
         />
 
+        {isCoachDeck && coachDeck ? (
+          <>
+            <aside className="coach-deck-player-dashboard">
+              <section className="coach-deck-player-vitals">
+                <div>
+                  <span>
+                    <Zap size={18} /> Énergie
+                  </span>
+                  <strong>{clampPercent(session.matchState.energy[0])}/100</strong>
+                  <i>
+                    <b style={{ width: `${clampPercent(session.matchState.energy[0])}%` }} />
+                  </i>
+                </div>
+                <div>
+                  <span>
+                    <ShieldCheck size={18} /> Confiance
+                  </span>
+                  <strong>{clampPercent(session.matchState.confidence[0])}</strong>
+                  <i>
+                    <b style={{ width: `${clampPercent(session.matchState.confidence[0])}%` }} />
+                  </i>
+                </div>
+                <div className="is-momentum">
+                  <span>
+                    <Activity size={18} /> Momentum
+                  </span>
+                  <strong>{momentumLabel(session.matchState.momentum)}</strong>
+                  <i>
+                    {Array.from({ length: 5 }, (_, index) => (
+                      <b
+                        className={
+                          index <
+                          Math.max(
+                            1,
+                            Math.min(5, Math.round((session.matchState.momentum + 50) / 20))
+                          )
+                            ? "is-filled"
+                            : ""
+                        }
+                        key={index}
+                      />
+                    ))}
+                  </i>
+                </div>
+              </section>
+              <section className="coach-deck-stat-comparison">
+                <h2>Comparaison 12 stats</h2>
+                {profileStatKeys.map((key) => {
+                  const playerValue = Math.round(playerA.stats[key] ?? 0);
+                  const opponentValue = Math.round(playerB.stats[key] ?? 0);
+                  const targeted = coachDeck.opponentIntent?.targetStats.includes(key) ?? false;
+                  return (
+                    <div className={targeted ? "is-targeted" : ""} key={key}>
+                      <b>{playerValue}</b>
+                      <span>{tacticalStatLabels[key]}</span>
+                      <i>
+                        <em style={{ width: `${clampPercent(playerValue)}%` }} />
+                        <em style={{ width: `${clampPercent(opponentValue)}%` }} />
+                      </i>
+                      <b>{opponentValue}</b>
+                    </div>
+                  );
+                })}
+              </section>
+            </aside>
+
+            <aside className="coach-deck-opponent-scouting">
+              <h2>Scouting adversaire</h2>
+              <section className="coach-deck-opponent-level">
+                <small>Niveau</small>
+                <div>
+                  <b>{playerB.fftRanking}</b>
+                  <strong>Niv. {playerB.playerLevel}</strong>
+                </div>
+              </section>
+              <section className="coach-deck-scout-block is-strength">
+                <small>Point fort</small>
+                <strong>{insights.threat.label}</strong>
+                <span>{insights.threat.opponent}</span>
+                <Zap size={29} />
+              </section>
+              <section className="coach-deck-scout-block is-weakness">
+                <small>Point faible</small>
+                <strong>{insights.weakness.label}</strong>
+                <span>{insights.weakness.opponent}</span>
+                <Target size={29} />
+              </section>
+              <section className="coach-deck-opponent-style">
+                <small>Style de jeu</small>
+                <strong>{playerB.archetype}</strong>
+                <div aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                  <span />
+                  <span />
+                </div>
+              </section>
+            </aside>
+          </>
+        ) : null}
+
         <aside className="interactive-analysis-panel">
-          <div className="interactive-panel-kicker">
-            <Activity size={14} /> {isPreMatch ? "Analyse adversaire" : "Analyse live"}
-          </div>
-          <h2>{session.matchState.coachWindow?.title ?? "Temps fort"}</h2>
-          <p>{analysis}</p>
-          <div className="interactive-analysis-event">
-            <Crosshair size={14} />
-            <span>{latestEvent?.action ?? "Lecture tactique prête"}</span>
-          </div>
-          <TacticalCourt momentum={session.matchState.momentum} />
+          {isCoachDeck ? (
+            <>
+              <div className="interactive-panel-kicker">
+                <Crosshair size={14} /> Scouting adverse
+              </div>
+              <h2>{playerName(playerB)}</h2>
+              <p>
+                {coachDeck?.opponentIntent
+                  ? `Lecture basée sur ${coachDeck.opponentIntent.targetStats
+                      .map((key) => tacticalStatLabels[key] ?? key)
+                      .join(", ")} et l’état actuel du match.`
+                  : "Lisez l’intention adverse avant de choisir votre réponse."}
+              </p>
+              <div className="interactive-analysis-event is-coach-intent">
+                <Target size={14} />
+                <span>
+                  Menace : {insights.threat.label} {insights.threat.opponent}
+                </span>
+              </div>
+              <button
+                className="interactive-open-matchup"
+                onClick={() => setMatchupOpen(true)}
+                type="button"
+              >
+                <BarChart3 size={14} /> Comparer les 12 stats
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="interactive-panel-kicker">
+                <Activity size={14} /> {isPreMatch ? "Analyse adversaire" : "Analyse live"}
+              </div>
+              <h2>{session.matchState.coachWindow?.title ?? "Temps fort"}</h2>
+              <p>{analysis}</p>
+              <div className="interactive-analysis-event">
+                <Crosshair size={14} />
+                <span>{latestEvent?.action ?? "Lecture tactique prête"}</span>
+              </div>
+              <TacticalCourt momentum={session.matchState.momentum} />
+            </>
+          )}
         </aside>
 
         <div className="interactive-court-perspective" aria-hidden="true">
@@ -775,7 +1162,18 @@ export function InteractiveMatchPage({
           <span className="interactive-court-ball" />
         </div>
 
-        {isPreMatch ? (
+        {isCoachDeck && coachDeck?.opponentIntent ? (
+          <section className="coach-deck-intent-banner">
+            <Target className="coach-deck-intent-icon" size={34} />
+            <span>INTENTION ADVERSE</span>
+            <strong>{coachDeck.opponentIntent.label}</strong>
+            <small>{coachDeck.opponentIntent.description}</small>
+            <em>
+              Lecture {Math.round(coachDeck.opponentIntent.confidence * 100)} % · Intensité{" "}
+              {coachDeck.opponentIntent.intensity}/3
+            </em>
+          </section>
+        ) : isPreMatch ? (
           <section className="interactive-strategy-brief">
             <header>
               <span>SCOUTING DE L’ADVERSAIRE</span>
@@ -861,7 +1259,12 @@ export function InteractiveMatchPage({
               <span style={{ left: `${clampPercent(50 + session.matchState.momentum / 2)}%` }} />
             </div>
           </div>
-          {session.matchState.activeInstructions[0] ? (
+          {isCoachDeck && coachDeck?.activeEffects.length ? (
+            <div className="interactive-active-plan is-coach-card-active">
+              <Sparkles size={13} />
+              <span>{coachDeck.activeEffects.length} effet(s) de carte actif(s)</span>
+            </div>
+          ) : session.matchState.activeInstructions[0] ? (
             <div className="interactive-active-plan">
               <Target size={13} />
               <span>
@@ -873,81 +1276,211 @@ export function InteractiveMatchPage({
         </aside>
       </section>
 
-      <section className="interactive-coaching-dock">
-        <div className="interactive-coaching-heading">
-          <span>
-            <strong>{isPreMatch ? "PLAN DE MATCH" : "COACHING"}</strong>
-            <small>
-              {isPreMatch
-                ? "GRATUIT · 3 INTERVENTIONS CONSERVÉES"
-                : `${session.matchState.coachingPoints[0]} INTERVENTION(S) DISPONIBLE(S)`}
-            </small>
-          </span>
-          <div className="interactive-coaching-tools">
-            <button onClick={() => setCatalogOpen(true)} type="button">
-              <ListFilter size={15} /> Consignes
+      {isCoachDeck && coachDeck ? (
+        <section className="coach-deck-match-dock">
+          <header className="coach-deck-dock-header">
+            <span>
+              <strong>VOTRE MAIN</strong>
+              <small>Choisissez une carte ou laissez votre joueur continuer</small>
+            </span>
+            <div className="coach-deck-focus" aria-label={`${coachDeck.focus} Focus disponible`}>
+              <em>FOCUS</em>
+              {Array.from({ length: coachDeck.focusPerSet }, (_, index) => (
+                <i className={index < coachDeck.focus ? "is-filled" : ""} key={index} />
+              ))}
+              <b>
+                {coachDeck.focus}/{coachDeck.focusPerSet}
+              </b>
+            </div>
+            <button
+              className="coach-deck-stats-button"
+              onClick={() => setMatchupOpen(true)}
+              type="button"
+            >
+              <BarChart3 size={15} /> 12 stats
             </button>
-            <button onClick={() => setMatchupOpen(true)} type="button">
-              <BarChart3 size={15} /> Statistiques
+          </header>
+
+          <div
+            className="coach-deck-hand"
+            style={{
+              gridTemplateColumns: `repeat(${Math.max(1, coachDeck.hand.length)}, minmax(0, 1fr))`
+            }}
+          >
+            {coachDeck.hand.map((instance) => {
+              const card = session.coachCards.find((candidate) => candidate.id === instance.cardId);
+              if (!card) return null;
+              const effectiveCost = Math.max(0, card.focusCost - coachDeck.nextCardFocusDiscount);
+              const preview = session.coachHandPreviews.find(
+                (entry) => entry.instanceId === instance.instanceId
+              )?.preview;
+              return (
+                <CoachDeckMatchCard
+                  card={card}
+                  disabled={busy || effectiveCost > coachDeck.focus}
+                  effectiveCost={effectiveCost}
+                  key={instance.instanceId}
+                  onSelect={() => setSelectedCoachCardInstanceId(instance.instanceId)}
+                  preview={preview}
+                  selected={selectedCoachCardInstanceId === instance.instanceId}
+                />
+              );
+            })}
+          </div>
+
+          {selectedCoachCard && selectedCoachPreview ? (
+            <div className="coach-deck-selected-effect">
+              <strong>
+                {coachCardPreviewLines(selectedCoachPreview)[0]} ·{" "}
+                {coachCardDuration(selectedCoachCard)}
+              </strong>
+              <small>
+                {Math.round(selectedCoachPreview.pointChanceBefore * 100)} →{" "}
+                {Math.round(selectedCoachPreview.pointChanceAfter * 100)} %
+              </small>
+            </div>
+          ) : null}
+
+          <aside
+            className={`coach-deck-selection-preview ${selectedCoachCard ? "has-selection" : ""}`}
+          >
+            <div>
+              <small>{selectedCoachCard ? "CARTE SÉLECTIONNÉE" : "DÉCISION ACTUELLE"}</small>
+              <strong>{selectedCoachCard?.name ?? "Laisser jouer"}</strong>
+              <span>
+                {selectedCoachCard
+                  ? "La carte sera consommée uniquement après confirmation."
+                  : "Aucun Focus dépensé. La main sera renouvelée à la prochaine décision."}
+              </span>
+            </div>
+            {selectedCoachPreview ? (
+              <div className="coach-deck-chance-preview">
+                <span>
+                  <small>Chance estimée</small>
+                  <b>{Math.round(selectedCoachPreview.pointChanceBefore * 100)}%</b>
+                </span>
+                <em>→</em>
+                <span className="is-after">
+                  <small>Avec la carte</small>
+                  <b>{Math.round(selectedCoachPreview.pointChanceAfter * 100)}%</b>
+                </span>
+                {selectedCoachPreview.intentMatched ? <strong>CONTRE PARFAIT</strong> : null}
+              </div>
+            ) : null}
+            <div className="coach-deck-decision-actions">
+              <button
+                className={!selectedCoachCard ? "is-selected" : ""}
+                disabled={busy}
+                onClick={() => setSelectedCoachCardInstanceId(null)}
+                type="button"
+              >
+                Laisser jouer
+              </button>
+              <button
+                className="is-confirm"
+                disabled={
+                  busy ||
+                  session.status !== "ACTIVE" ||
+                  session.matchState.status !== "AWAITING_COACH"
+                }
+                onClick={() => void submitCoachingDecision()}
+                type="button"
+              >
+                <span>
+                  {busy ? "ACTION EN COURS..." : selectedCoachCard ? "CONFIRMER" : "CONTINUER"}
+                </span>
+                <small>
+                  {selectedCoachCard ? selectedCoachCard.shortName : "Sans dépenser de Focus"}
+                </small>
+              </button>
+            </div>
+          </aside>
+          {actionMessage ? (
+            <p
+              className={`interactive-action-message ${actionMessage.startsWith("✓") ? "is-success" : ""}`}
+              role="status"
+            >
+              {actionMessage}
+            </p>
+          ) : null}
+        </section>
+      ) : (
+        <section className="interactive-coaching-dock">
+          <div className="interactive-coaching-heading">
+            <span>
+              <strong>{isPreMatch ? "PLAN DE MATCH" : "COACHING"}</strong>
+              <small>
+                {isPreMatch
+                  ? "GRATUIT · 3 INTERVENTIONS CONSERVÉES"
+                  : `${session.matchState.coachingPoints[0]} INTERVENTION(S) DISPONIBLE(S)`}
+              </small>
+            </span>
+            <div className="interactive-coaching-tools">
+              <button onClick={() => setCatalogOpen(true)} type="button">
+                <ListFilter size={15} /> Consignes
+              </button>
+              <button onClick={() => setMatchupOpen(true)} type="button">
+                <BarChart3 size={15} /> Statistiques
+              </button>
+            </div>
+            <button
+              className={selectedInstructionId === null ? "is-selected" : ""}
+              onClick={() => setSelectedInstructionId(null)}
+              type="button"
+            >
+              {isPreMatch ? "Commencer sans plan" : "Laisser jouer"}
             </button>
           </div>
+          <div className="interactive-coaching-options">
+            {visibleInstructions.map((instruction) => (
+              <InstructionCard
+                disabled={!canChooseInstruction}
+                instruction={instruction}
+                key={instruction.id}
+                onSelect={() => setSelectedInstructionId(instruction.id)}
+                reason={instructionReason(instruction, playerA, playerB)}
+                selected={selectedInstructionId === instruction.id}
+              />
+            ))}
+          </div>
           <button
-            className={selectedInstructionId === null ? "is-selected" : ""}
-            onClick={() => setSelectedInstructionId(null)}
+            className={`interactive-validate-button ${busy ? "is-busy" : ""}`}
+            disabled={
+              busy || session.status !== "ACTIVE" || session.matchState.status !== "AWAITING_COACH"
+            }
+            onClick={() => void submitCoachingDecision()}
             type="button"
           >
-            {isPreMatch ? "Commencer sans plan" : "Laisser jouer"}
+            <span>
+              {busy
+                ? "ACTION PRISE EN COMPTE..."
+                : isPreMatch
+                  ? selectedInstruction
+                    ? "CONFIRMER LE PLAN"
+                    : "LANCER LE MATCH"
+                  : selectedInstruction
+                    ? "CONFIRMER"
+                    : "LAISSER JOUER"}
+            </span>
+            <small>
+              {!canChooseInstruction
+                ? "Continuer sans consigne"
+                : (selectedInstruction?.shortLabel ??
+                  (isPreMatch ? "Aucun point dépensé" : "Conserver le plan actuel"))}
+            </small>
           </button>
-        </div>
-        <div className="interactive-coaching-options">
-          {visibleInstructions.map((instruction) => (
-            <InstructionCard
-              disabled={!canChooseInstruction}
-              instruction={instruction}
-              key={instruction.id}
-              onSelect={() => setSelectedInstructionId(instruction.id)}
-              reason={instructionReason(instruction, playerA, playerB)}
-              selected={selectedInstructionId === instruction.id}
-            />
-          ))}
-        </div>
-        <button
-          className={`interactive-validate-button ${busy ? "is-busy" : ""}`}
-          disabled={
-            busy || session.status !== "ACTIVE" || session.matchState.status !== "AWAITING_COACH"
-          }
-          onClick={() => void submitCoachingDecision()}
-          type="button"
-        >
-          <span>
-            {busy
-              ? "ACTION PRISE EN COMPTE..."
-              : isPreMatch
-                ? selectedInstruction
-                  ? "CONFIRMER LE PLAN"
-                  : "LANCER LE MATCH"
-                : selectedInstruction
-                  ? "CONFIRMER"
-                  : "LAISSER JOUER"}
-          </span>
-          <small>
-            {!canChooseInstruction
-              ? "Continuer sans consigne"
-              : (selectedInstruction?.shortLabel ??
-                (isPreMatch ? "Aucun point dépensé" : "Conserver le plan actuel"))}
-          </small>
-        </button>
-        {actionMessage ? (
-          <p
-            className={`interactive-action-message ${actionMessage.startsWith("✓") ? "is-success" : ""}`}
-            role="status"
-          >
-            {actionMessage}
-          </p>
-        ) : null}
-      </section>
+          {actionMessage ? (
+            <p
+              className={`interactive-action-message ${actionMessage.startsWith("✓") ? "is-success" : ""}`}
+              role="status"
+            >
+              {actionMessage}
+            </p>
+          ) : null}
+        </section>
+      )}
 
-      {catalogOpen ? (
+      {catalogOpen && !isCoachDeck ? (
         <div className="interactive-catalog-overlay" onClick={() => setCatalogOpen(false)}>
           <section
             aria-labelledby="interactive-catalog-title"
@@ -1114,22 +1647,49 @@ export function InteractiveMatchPage({
                 L’endurance et la récupération ralentissent ensuite la perte d’énergie pendant les
                 échanges, surtout lors des longs rallyes.
               </li>
-              <li>
-                Le plan d’avant-match est gratuit. Une carte marquée « Votre choix » sera appliquée
-                seulement après avoir appuyé sur « Confirmer ».
-              </li>
-              <li>
-                Une consigne agit pendant un à trois jeux. « Laisser jouer » continue sans dépenser
-                de point de coaching.
-              </li>
-              <li>
-                Pour gagner, ciblez une faiblesse adverse avec une force de votre joueur, protégez
-                son énergie et adaptez-vous si la confiance ou le momentum chutent.
-              </li>
-              <li>
-                Vous récupérez un point entre les sets, sans jamais dépasser trois points de
-                coaching.
-              </li>
+              {isCoachDeck ? (
+                <>
+                  <li>
+                    L’intention adverse annonce sa prochaine stratégie. Les cartes « Contre » sont
+                    plus fortes lorsqu’elles répondent directement à cette intention.
+                  </li>
+                  <li>
+                    Chaque carte coûte du Focus et améliore temporairement les statistiques qui y
+                    sont inscrites. Le Focus est entièrement restauré au début de chaque set.
+                  </li>
+                  <li>
+                    La comparaison « avant / avec la carte » estime l’effet sur le prochain point.
+                    Une carte marquée « Votre choix » ne sera jouée qu’après confirmation.
+                  </li>
+                  <li>
+                    « Laisser jouer » ne dépense aucun Focus. Garder vos meilleures réponses pour
+                    une balle de break ou une intention dangereuse fait partie de la stratégie.
+                  </li>
+                  <li>
+                    Pour gagner, combinez vos meilleures statistiques, les faiblesses adverses,
+                    votre énergie et le bon timing : aucune carte ne garantit le point.
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li>
+                    Le plan d’avant-match est gratuit. Une consigne marquée « Votre choix » sera
+                    appliquée seulement après avoir appuyé sur « Confirmer ».
+                  </li>
+                  <li>
+                    Une consigne agit pendant un à trois jeux. « Laisser jouer » continue sans
+                    dépenser de point de coaching.
+                  </li>
+                  <li>
+                    Pour gagner, ciblez une faiblesse adverse avec une force de votre joueur,
+                    protégez son énergie et adaptez-vous si la confiance ou le momentum chutent.
+                  </li>
+                  <li>
+                    Vous récupérez un point entre les sets, sans jamais dépasser trois points de
+                    coaching.
+                  </li>
+                </>
+              )}
             </ul>
             <button className="is-primary" onClick={() => setHelpOpen(false)} type="button">
               Compris
@@ -1164,7 +1724,7 @@ export function InteractiveMatchPage({
                 <strong>{longestRally} frappes</strong>
               </span>
               <span>
-                <small>Consignes utilisées</small>
+                <small>{isCoachDeck ? "Cartes jouées" : "Consignes utilisées"}</small>
                 <strong>{usedInstructions}</strong>
               </span>
               <span>

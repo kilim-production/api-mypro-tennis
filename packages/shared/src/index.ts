@@ -189,6 +189,7 @@ export const trainingStartSchema = z.object({
 
 export const matchRequestSchema = z.object({
   opponentId: z.string().optional(),
+  coachDeckId: z.string().min(1).optional(),
   surface: z.enum(["Dur", "Terre battue", "Gazon", "Indoor"]).default("Dur").optional(),
   tactic: z
     .enum([
@@ -211,6 +212,12 @@ export const interactiveCoachingDecisionSchema = z.object({
   instructionId: z.string().min(1).nullable()
 });
 
+export const interactiveCoachCardDecisionSchema = z.object({
+  revision: z.number().int().min(0),
+  cardInstanceId: z.string().min(1).nullable(),
+  retainInstanceId: z.string().min(1).nullable().optional()
+});
+
 export const interactiveMatchAbandonSchema = z.object({
   revision: z.number().int().min(0)
 });
@@ -220,6 +227,12 @@ export const interactiveMatchFeedbackSchema = z.object({
   enjoyment: z.number().int().min(1).max(5).optional(),
   viewport: z.enum(["MOBILE_LANDSCAPE", "DESKTOP", "OTHER"]).default("OTHER"),
   comment: z.string().trim().max(500).default("")
+});
+
+export const coachDeckSaveSchema = z.object({
+  name: z.string().trim().min(2).max(30),
+  cardIds: z.array(z.string().trim().min(1)).length(12),
+  activate: z.boolean().default(false)
 });
 
 export const challengeSchema = z.object({

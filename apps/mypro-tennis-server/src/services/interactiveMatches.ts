@@ -2,9 +2,14 @@ import type { Player, Prisma } from "@prisma/client";
 import { prisma } from "@mypro/database";
 import {
   COACHING_INSTRUCTIONS,
+  COACH_CARDS,
+  COACH_DECK_PROFILE_STAT_KEYS,
   advanceInteractiveMatch,
+  applyCoachDeckDecision,
   applyCoachingDecision,
   createInteractiveMatch,
+  previewCoachCard,
+  type CoachDeckProfileStats,
   type CoachingInstructionId,
   type InteractiveMatchState,
   type MatchFormat
@@ -45,6 +50,24 @@ function safeMatchState(state: InteractiveMatchState) {
 
 export function publicInteractiveMatchSession(session: InteractiveSessionWithPlayers) {
   const state = decodeJson<InteractiveMatchState>(session.state);
+  const latestPointChance = state.events.at(-1)?.probabilityForPlayerA ?? 0.5;
+  const playerStats = Object.fromEntries(
+    COACH_DECK_PROFILE_STAT_KEYS.map((key) => [key, state.players[0].stats[key]])
+  ) as CoachDeckProfileStats;
+  const coachHandPreviews = (state.coachDeck?.hand ?? []).flatMap((instance) => {
+    const card = COACH_CARDS.find((candidate) => candidate.id === instance.cardId);
+    if (!card) return [];
+    return [
+      {
+        instanceId: instance.instanceId,
+        preview: previewCoachCard(card, playerStats, {
+          opponentIntentId: state.coachDeck?.opponentIntent?.id ?? null,
+          basePointChance: latestPointChance,
+          currentMomentum: state.momentum
+        })
+      }
+    ];
+  });
   return {
     id: session.id,
     type: session.type,
@@ -59,6 +82,8 @@ export function publicInteractiveMatchSession(session: InteractiveSessionWithPla
     playerA: publicPlayer(session.playerA),
     playerB: publicPlayer(session.playerB),
     coachingInstructions: COACHING_INSTRUCTIONS,
+    coachCards: state.coachDeck ? COACH_CARDS : [],
+    coachHandPreviews,
     matchState: safeMatchState(state)
   };
 }
@@ -99,6 +124,7 @@ export async function createInteractiveMatchSession(input: {
   risk: RiskMode;
   format: MatchFormat;
   type: string;
+  coachDeckCardIds?: readonly string[];
 }) {
   const existing = await activeInteractiveMatchSession(input.playerA.id);
   if (existing) return { created: false, session: publicInteractiveMatchSession(existing) };
@@ -109,7 +135,10 @@ export async function createInteractiveMatchSession(input: {
     playerB: toEnginePlayer(input.playerB, "Équilibré", "Normale", input.playerB.actionEnergy),
     surface: input.surface,
     format: input.format,
-    seed
+    seed,
+    ...(input.coachDeckCardIds
+      ? { coachDeckCardIds: input.coachDeckCardIds, opponentRanking: input.playerB.fftRanking }
+      : {})
   });
   const session = await prisma.interactiveMatchSession.create({
     data: {
@@ -138,6 +167,8 @@ function completedReplayPayload(
     momentum: state.events.map((event) => event.momentum),
     finalScore: state.events.at(-1)?.score ?? null,
     coachingHistory: state.coachingHistory,
+    coachDeckHistory: state.coachDeck?.history ?? [],
+    coachDeckCardIds: state.coachDeck?.deckCardIds ?? [],
     finalEnergy: state.energy,
     finalConfidence: state.confidence,
     winnerId: state.winnerId,
@@ -241,6 +272,45 @@ export async function coachInteractiveMatchSession(input: {
   const state = decodeJson<InteractiveMatchState>(session.state);
   const instructed = applyCoachingDecision(state, instructionId);
   const advanced = advanceInteractiveMatch(instructed);
+  const updated =
+    advanced.status === "FINISHED"
+      ? await finishSession(session, advanced)
+      : await saveProgress(session, advanced);
+  return publicInteractiveMatchSession(updated);
+}
+
+export async function playCoachDeckCardSession(input: {
+  sessionId: string;
+  userId: string;
+  revision: number;
+  cardInstanceId: string | null;
+  retainInstanceId?: string | null;
+}) {
+  const session = await ownedSession(input.sessionId, input.userId);
+  if (session.status !== "ACTIVE") {
+    if (session.status === "FINISHED") return publicInteractiveMatchSession(session);
+    throw new InteractiveMatchSessionError("Cette session de match n’est plus active.", 409);
+  }
+  if (session.revision !== input.revision) {
+    throw new InteractiveMatchSessionError(
+      "Le match a déjà progressé. Rechargez la session avant de continuer.",
+      409
+    );
+  }
+  const state = decodeJson<InteractiveMatchState>(session.state);
+  if (!state.coachDeck) {
+    throw new InteractiveMatchSessionError("Cette session n’utilise pas de Coach Deck.", 400);
+  }
+  let coached: InteractiveMatchState;
+  try {
+    coached = applyCoachDeckDecision(state, input.cardInstanceId, input.retainInstanceId ?? null);
+  } catch (error) {
+    throw new InteractiveMatchSessionError(
+      error instanceof Error ? error.message : "Carte Coach Deck invalide.",
+      400
+    );
+  }
+  const advanced = advanceInteractiveMatch(coached);
   const updated =
     advanced.status === "FINISHED"
       ? await finishSession(session, advanced)

@@ -93,6 +93,8 @@ model Player {
   seasonDailyRewardClaims  SeasonDailyRewardClaim[]
   tennisBagChests          TennisBagChest[]
   statCards                PlayerStatCard[]
+  coachCards               PlayerCoachCard[]
+  coachDecks               CoachDeck[]
   cosmetics                PlayerCosmetic[]
   clubPresidencies         Club[]                     @relation("ClubPresident")
   clubMembership           ClubMembership?
@@ -288,6 +290,46 @@ model PlayerStatCard {
   updatedAt DateTime @updatedAt
 
   @@unique([playerId, statKey])
+}
+
+model PlayerCoachCard {
+  id              String   @id @default(cuid())
+  playerId        String
+  player          Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  cardId          String
+  masteryXp       Int      @default(0)
+  masteryLevel    Int      @default(0)
+  selectedVariant String?
+  unlockedAt      DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([playerId, cardId])
+  @@index([playerId, masteryLevel])
+}
+
+model CoachDeck {
+  id        String          @id @default(cuid())
+  playerId  String
+  player    Player          @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  name      String
+  isActive  Boolean         @default(false)
+  version   Int             @default(1)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  cards     CoachDeckCard[]
+
+  @@index([playerId, isActive, updatedAt])
+}
+
+model CoachDeckCard {
+  id       String    @id @default(cuid())
+  deckId   String
+  deck     CoachDeck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  cardId   String
+  position Int
+
+  @@unique([deckId, position])
+  @@index([deckId, cardId])
 }
 
 model PlayerCosmetic {

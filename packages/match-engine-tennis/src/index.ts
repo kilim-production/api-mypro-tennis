@@ -207,6 +207,7 @@ const mirroredPointStatLabels: Record<string, string> = {
 };
 
 export * from "./interactive";
+export * from "./coachDeck";
 
 function resolveMirroredPoint(players: readonly [EnginePlayer, EnginePlayer], rng: SeededRandom) {
   const statKey = mirroredPointStats[rng.int(0, mirroredPointStats.length - 1)] ?? "service";

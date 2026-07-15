@@ -70,10 +70,8 @@ import { API_URL, api, saveToken } from "./api";
 import { LobbyActionButton } from "./components/lobby/LobbyActionButton";
 import { LobbyPlayerHero } from "./components/lobby/LobbyPlayerHero";
 import { LobbySeasonTrack } from "./components/lobby/LobbySeasonTrack";
-import {
-  InteractiveMatchPage,
-  playMatchSound
-} from "./components/match/InteractiveMatchPage";
+import { CoachDeckBuilderPage } from "./components/coach-deck/CoachDeckBuilderPage";
+import { InteractiveMatchPage, playMatchSound } from "./components/match/InteractiveMatchPage";
 import { useGameStore, type GameNotification, type Player } from "./store";
 
 const socketUrl = import.meta.env.VITE_SOCKET_URL ?? "http://localhost:4000";
@@ -543,10 +541,7 @@ type CareerProfile = {
   };
 };
 type RankedPlayer = Player & { rank: number };
-type MatchSummaryPlayer = Pick<
-  Player,
-  "id" | "firstName" | "lastName" | "fftRanking" | "avatar"
->;
+type MatchSummaryPlayer = Pick<Player, "id" | "firstName" | "lastName" | "fftRanking" | "avatar">;
 type MatchListItem = {
   id: string;
   winnerId: string;
@@ -2824,11 +2819,7 @@ function LobbyBagsCard({
   ).length;
 
   return (
-    <div
-      aria-label={`Sacs, ${readyBags} prêt(s)`}
-      className="lobby-bags-card"
-      role="region"
-    >
+    <div aria-label={`Sacs, ${readyBags} prêt(s)`} className="lobby-bags-card" role="region">
       <div className="lobby-bags-heading">
         <span className="lobby-card-kicker">Sacs</span>
         <button
@@ -4129,6 +4120,7 @@ function SkillsPage() {
 }
 
 function CollectionPage() {
+  const navigate = useNavigate();
   const [data, setData] = useState<ChestState | null>(null);
   const refreshPlayer = useGameStore((state) => state.refresh);
   const [busyCosmetic, setBusyCosmetic] = useState<string | null>(null);
@@ -4211,9 +4203,7 @@ function CollectionPage() {
       await loadCollection();
       await refreshPlayer();
       const refundLabel =
-        result.refund > 0
-          ? ` Remboursement amélioration : ${formatCredits(result.refund)}.`
-          : "";
+        result.refund > 0 ? ` Remboursement amélioration : ${formatCredits(result.refund)}.` : "";
       setCollectionMessage(
         result.money > 0
           ? `Marché validé : ${result.recipe}. Vous récupérez ${formatCredits(result.totalMoney)}.${refundLabel}`
@@ -4258,6 +4248,13 @@ function CollectionPage() {
             <h1 className="text-2xl font-black">Collection</h1>
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              className="collection-coach-deck-link"
+              type="button"
+              onClick={() => navigate("/collection/coach-deck")}
+            >
+              <Sparkles size={15} /> Coach Deck
+            </button>
             <div className="inline-flex items-center gap-2 rounded-md bg-white/[0.08] px-3 py-1 text-sm text-slate-200">
               <Gem size={15} /> {data?.gems ?? 0} gemmes
             </div>
@@ -5385,10 +5382,7 @@ function SeasonPage() {
                     />
                     <GameMiniMetric label="Statut" value={statusLabel} />
                     <GameMiniMetric label="Zone haute" value={competition.rankingRange.best} />
-                    <GameMiniMetric
-                      label="Dotation"
-                      value={formatCredits(cashPrize)}
-                    />
+                    <GameMiniMetric label="Dotation" value={formatCredits(cashPrize)} />
                   </div>
                   <div className="mt-4 rounded-md border border-cyan-300/15 bg-cyan-300/10 p-3">
                     <div className="flex items-start justify-between gap-3">
@@ -5752,10 +5746,7 @@ function TeamChampionshipPanel({ club }: { club: ClubDetails }) {
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <Metric label="Joueurs à jour" value={`${dues.eligibleCount}/${club.memberCount}`} />
-          <Metric
-            label="Crédits du club"
-            value={formatCredits(data.club?.budget ?? club.budget)}
-          />
+          <Metric label="Crédits du club" value={formatCredits(data.club?.budget ?? club.budget)} />
           <Metric
             label="Statut"
             value={
@@ -6366,10 +6357,7 @@ function ClubPage() {
             <Metric label="Membres" value={club.memberCount} />
             <Metric label="Places libres" value={club.openSlots} />
             <Metric label="Classement requis" value={club.minimumRanking} />
-            <Metric
-              label="Cotisation"
-              value={formatCredits(clubDuesAmount(club))}
-            />
+            <Metric label="Cotisation" value={formatCredits(clubDuesAmount(club))} />
             <Metric label="Niveau compétitif" value={club.competitiveLevel} />
             <Metric label="Crédits du club" value={formatCredits(club.budget)} />
           </div>
@@ -6412,9 +6400,7 @@ function ClubPage() {
                 <span className="block text-[10px] uppercase tracking-[0.14em] text-emerald-200">
                   Crédits
                 </span>
-                <span className="font-black text-white">
-                  {formatCredits(club.budget)}
-                </span>
+                <span className="font-black text-white">{formatCredits(club.budget)}</span>
               </div>
             </div>
 
@@ -6899,9 +6885,17 @@ function MatchStartPage() {
     setLoadingId(opponentId);
     try {
       const endpoint = selectedMode === "coach" ? "/matches/interactive" : "/matches/quick";
+      let coachDeckId: string | undefined;
+      if (selectedMode === "coach") {
+        const coachDeck = await api<{ activeDeckId: string | null }>("/coach-decks");
+        if (!coachDeck.activeDeckId) {
+          throw new Error("Aucun Coach Deck actif. Ouvrez votre collection puis réessayez.");
+        }
+        coachDeckId = coachDeck.activeDeckId;
+      }
       const match = await api<{ id: string }>(endpoint, {
         method: "POST",
-        body: JSON.stringify({ opponentId, format: "Deux sets gagnants" })
+        body: JSON.stringify({ opponentId, format: "Deux sets gagnants", coachDeckId })
       });
       await refresh();
       if (selectedMode === "coach") {
@@ -7130,9 +7124,9 @@ function MatchStartPage() {
               {[
                 {
                   id: "coach",
-                  label: "Mode Coach",
+                  label: "Coach Deck",
                   duration: "5 à 8 min",
-                  meta: "Analyse de l’adversaire, plan initial gratuit et interventions aux moments clés.",
+                  meta: "Lisez l’intention adverse, jouez vos cartes et gérez votre Focus aux moments clés.",
                   badge: "Recommandé",
                   Icon: Target
                 },
@@ -8229,10 +8223,12 @@ function useFitMobileModals() {
 
     const modalSelector = ".game-modal-panel, .header-menu-panel";
     const containsModal = (node: Node) =>
-      node instanceof Element && (node.matches(modalSelector) || Boolean(node.querySelector(modalSelector)));
+      node instanceof Element &&
+      (node.matches(modalSelector) || Boolean(node.querySelector(modalSelector)));
     const observer = new MutationObserver((mutations) => {
       const shouldFit = mutations.some((mutation) => {
-        if (mutation.target instanceof Element && mutation.target.closest(modalSelector)) return true;
+        if (mutation.target instanceof Element && mutation.target.closest(modalSelector))
+          return true;
         return [...mutation.addedNodes, ...mutation.removedNodes].some(containsModal);
       });
       if (shouldFit) schedule();
@@ -8372,6 +8368,16 @@ export function App() {
               <NeedAuth>
                 <NeedPlayer>
                   <CollectionPage />
+                </NeedPlayer>
+              </NeedAuth>
+            }
+          />
+          <Route
+            path="/collection/coach-deck"
+            element={
+              <NeedAuth>
+                <NeedPlayer>
+                  <CoachDeckBuilderPage />
                 </NeedPlayer>
               </NeedAuth>
             }

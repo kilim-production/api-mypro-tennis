@@ -1,5 +1,17 @@
 import type { TennisStatKey, TennisStats, TennisSurface } from "@mypro/sports-tennis";
 import type { EnginePlayer, MatchFormat } from "./index";
+import {
+  COACH_DECK_PROFILE_STAT_KEYS,
+  activeCoachDeckEnergyDrainMultiplier,
+  activeCoachDeckPointChanceModifier,
+  advanceCoachDeckEffects,
+  applyCoachDeckCardDecision,
+  createCoachDeckRuntimeState,
+  prepareCoachDeckWindow,
+  resetCoachDeckFocusForNewSet,
+  type CoachDeckProfileStats,
+  type CoachDeckRuntimeState
+} from "./coachDeck";
 
 export type CoachingInstructionCategory =
   | "target"
@@ -271,6 +283,7 @@ export type InteractivePointEvent = {
   statKey: TennisStatKey;
   statLabel: string;
   activeInstructionIds: [CoachingInstructionId | null, CoachingInstructionId | null];
+  activeCoachCardIds: string[];
 };
 
 export type InteractiveProbabilityBreakdown = {
@@ -283,11 +296,12 @@ export type InteractiveProbabilityBreakdown = {
   tactic: number;
   risk: number;
   coaching: number;
+  coachDeck: number;
   total: number;
 };
 
 export type InteractiveMatchState = {
-  version: 2;
+  version: 2 | 3;
   seed: string;
   surface: TennisSurface;
   format: MatchFormat;
@@ -302,6 +316,7 @@ export type InteractiveMatchState = {
   activeInstructions: [ActiveCoachingInstruction | null, ActiveCoachingInstruction | null];
   coachWindow: CoachWindow | null;
   coachingHistory: CoachingDecision[];
+  coachDeck?: CoachDeckRuntimeState | null;
   events: InteractivePointEvent[];
   lastPressureWindowPoint: number | null;
   lastCoachWindowPoint: number | null;
@@ -315,6 +330,8 @@ export type CreateInteractiveMatchInput = {
   surface: TennisSurface;
   format: MatchFormat;
   seed: string | number;
+  coachDeckCardIds?: readonly string[];
+  opponentRanking?: string;
 };
 
 type PressureContext = {
@@ -334,6 +351,12 @@ function clamp(value: number, min: number, max: number) {
 
 function cloneState(state: InteractiveMatchState) {
   return structuredClone(state);
+}
+
+function coachDeckProfileStats(player: EnginePlayer): CoachDeckProfileStats {
+  return Object.fromEntries(
+    COACH_DECK_PROFILE_STAT_KEYS.map((key) => [key, player.stats[key]])
+  ) as CoachDeckProfileStats;
 }
 
 function hashRandom(seed: string, pointIndex: number, salt: string) {
@@ -673,6 +696,7 @@ function pointProbability(
     surfaceModifier(playerA, state.surface) - surfaceModifier(playerB, state.surface);
   const tacticEdge = tacticModifier(playerA, playerB) - tacticModifier(playerB, playerA);
   const riskEdge = riskChance(playerA) - riskChance(playerB);
+  const coachDeckEdge = activeCoachDeckPointChanceModifier(state.coachDeck);
   const total = clamp(
     serverBase +
       skillEdge +
@@ -682,7 +706,8 @@ function pointProbability(
       surfaceEdge +
       tacticEdge +
       riskEdge +
-      instructionEdge,
+      instructionEdge +
+      coachDeckEdge,
     0.18,
     0.82
   );
@@ -699,6 +724,7 @@ function pointProbability(
       tactic: rounded(tacticEdge),
       risk: rounded(riskEdge),
       coaching: rounded(instructionEdge),
+      coachDeck: rounded(coachDeckEdge),
       total: rounded(total)
     }
   };
@@ -725,7 +751,8 @@ function updateEnergyAndConfidence(
     const drain =
       (0.22 + rallyLength * 0.035) *
       (1 - staminaProtection) *
-      instructionEnergyMultiplier(state, playerIndex);
+      instructionEnergyMultiplier(state, playerIndex) *
+      (playerIndex === 0 ? activeCoachDeckEnergyDrainMultiplier(state.coachDeck) : 1);
     state.energy[playerIndex] = Number(clamp(state.energy[playerIndex] - drain, 0, 100).toFixed(2));
     const won = winnerIndex === playerIndex;
     const confidenceChange = (won ? 0.42 : -0.36) * (pressure.beneficiaryIndex !== null ? 1.7 : 1);
@@ -852,9 +879,26 @@ function openCoachWindow(state: InteractiveMatchState, type: CoachWindowType, ti
   state.status = "AWAITING_COACH";
   state.coachWindow = createCoachWindow(state, type, title);
   state.lastCoachWindowPoint = state.pointIndex;
+  if (state.coachDeck) {
+    prepareCoachDeckWindow(state.coachDeck, {
+      windowId: state.coachWindow.id,
+      pointIndex: state.pointIndex,
+      seed: state.seed,
+      playerStats: coachDeckProfileStats(state.players[0]),
+      opponentStats: coachDeckProfileStats(state.players[1]),
+      playerEnergy: state.energy[0],
+      opponentEnergy: state.energy[1],
+      momentum: state.momentum
+    });
+  }
 }
 
 function canOfferInMatchCoaching(state: InteractiveMatchState) {
+  if (state.coachDeck) {
+    if (state.coachDeck.focus <= 0) return false;
+    const lastWindow = state.lastCoachWindowPoint ?? -COACH_WINDOW_COOLDOWN_POINTS;
+    return state.pointIndex - lastWindow >= COACH_WINDOW_COOLDOWN_POINTS;
+  }
   if (state.coachingPoints[0] <= 0 || state.activeInstructions[0]) return false;
   const lastWindow = state.lastCoachWindowPoint ?? -COACH_WINDOW_COOLDOWN_POINTS;
   return state.pointIndex - lastWindow >= COACH_WINDOW_COOLDOWN_POINTS;
@@ -947,9 +991,11 @@ function resolvePoint(state: InteractiveMatchState) {
     isMatchPoint: pressure.isMatchPoint,
     statKey: pattern.key,
     statLabel: pattern.label,
-    activeInstructionIds: [activeInstructionId(state, 0), activeInstructionId(state, 1)]
+    activeInstructionIds: [activeInstructionId(state, 0), activeInstructionId(state, 1)],
+    activeCoachCardIds: state.coachDeck?.activeEffects.map((effect) => effect.sourceCardId) ?? []
   };
   state.events.push(event);
+  if (state.coachDeck) advanceCoachDeckEffects(state.coachDeck, completedGame);
   state.pointIndex += 1;
   state.scoreText = scoreText(state);
 
@@ -965,6 +1011,7 @@ function resolvePoint(state: InteractiveMatchState) {
   }
 
   if (completedSet) {
+    if (state.coachDeck) resetCoachDeckFocusForNewSet(state.coachDeck);
     openCoachWindow(state, "SET_BREAK", "PAUSE ENTRE LES SETS");
     return;
   }
@@ -999,7 +1046,7 @@ export function createInteractiveMatch(input: CreateInteractiveMatchInput): Inte
       100
     );
   const state: InteractiveMatchState = {
-    version: 2,
+    version: 3,
     seed,
     surface: input.surface,
     format: input.format,
@@ -1022,6 +1069,13 @@ export function createInteractiveMatch(input: CreateInteractiveMatchInput): Inte
     activeInstructions: [null, null],
     coachWindow: null,
     coachingHistory: [],
+    coachDeck: input.coachDeckCardIds
+      ? createCoachDeckRuntimeState({
+          cardIds: input.coachDeckCardIds,
+          seed,
+          opponentRanking: input.opponentRanking ?? "NC"
+        })
+      : null,
     events: [],
     lastPressureWindowPoint: null,
     lastCoachWindowPoint: 0,
@@ -1036,6 +1090,9 @@ export function applyCoachingDecision(
   inputState: InteractiveMatchState,
   instructionId: CoachingInstructionId | null
 ) {
+  if (inputState.coachDeck) {
+    throw new Error("Cette session attend une carte Coach Deck.");
+  }
   if (inputState.status !== "AWAITING_COACH" || !inputState.coachWindow) {
     throw new Error("Aucune décision de coaching n'est attendue.");
   }
@@ -1059,6 +1116,54 @@ export function applyCoachingDecision(
     playerIndex: 0,
     pointIndex: state.pointIndex
   });
+  state.status = "PLAYING";
+  state.coachWindow = null;
+  return state;
+}
+
+export function applyCoachDeckDecision(
+  inputState: InteractiveMatchState,
+  cardInstanceId: string | null,
+  retainInstanceId: string | null = null
+) {
+  if (inputState.status !== "AWAITING_COACH" || !inputState.coachWindow) {
+    throw new Error("Aucune décision Coach Deck n’est attendue.");
+  }
+  if (!inputState.coachDeck) throw new Error("Cette session n’utilise pas de Coach Deck.");
+  const state = cloneState(inputState);
+  const window = state.coachWindow;
+  const runtime = state.coachDeck;
+  if (!window || !runtime) throw new Error("Fenêtre Coach Deck introuvable.");
+  const patternIndex = randomInt(
+    state.seed,
+    state.pointIndex,
+    "pattern",
+    0,
+    pointPatterns.length - 1
+  );
+  const basePointChance = pointProbability(state, patternIndex, pressureContext(state)).total;
+  const result = applyCoachDeckCardDecision(runtime, {
+    windowId: window.id,
+    pointIndex: state.pointIndex,
+    cardInstanceId,
+    retainInstanceId,
+    playerStats: coachDeckProfileStats(state.players[0]),
+    basePointChance,
+    currentMomentum: state.momentum
+  });
+  const preview = result.preview;
+  if (preview) {
+    state.energy[0] = Number(clamp(state.energy[0] + preview.energyDelta, 0, 100).toFixed(2));
+    state.confidence[0] = Number(
+      clamp(state.confidence[0] + preview.confidenceDelta, 5, 100).toFixed(2)
+    );
+    state.momentum = clamp(state.momentum + preview.momentumDelta, -100, 100);
+    if (preview.momentumTowardZero > 0) {
+      const correction = Math.min(Math.abs(state.momentum), preview.momentumTowardZero);
+      state.momentum += state.momentum < 0 ? correction : -correction;
+    }
+    state.momentum = Number(clamp(state.momentum, -100, 100).toFixed(2));
+  }
   state.status = "PLAYING";
   state.coachWindow = null;
   return state;
@@ -1104,7 +1209,11 @@ export function runInteractiveMatchAutomatically(input: CreateInteractiveMatchIn
   let state = createInteractiveMatch(input);
   let guard = 0;
   while (state.status !== "FINISHED" && guard < 1200) {
-    if (state.status === "AWAITING_COACH") state = applyCoachingDecision(state, null);
+    if (state.status === "AWAITING_COACH") {
+      state = state.coachDeck
+        ? applyCoachDeckDecision(state, null)
+        : applyCoachingDecision(state, null);
+    }
     state = advanceInteractiveMatch(state);
     guard += 1;
   }

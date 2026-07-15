@@ -22,6 +22,7 @@ type CachedApiResponse = {
 
 const responseCache = new Map<string, CachedApiResponse>();
 const pendingRequests = new Map<string, Promise<unknown>>();
+const apiTimeoutMs = 45_000;
 
 function cacheDuration(path: string) {
   if (path === "/rankings" || path === "/tournaments") return 30_000;
@@ -49,23 +50,48 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   }
 
   const request = (async () => {
-    const response = await fetch(`${API_URL}${path}`, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...options.headers
-      }
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new ApiError(payload.message ?? "Action impossible.", response.status);
+    const controller = new AbortController();
+    let timeoutExpired = false;
+    const timeoutId = setTimeout(() => {
+      timeoutExpired = true;
+      controller.abort();
+    }, apiTimeoutMs);
+    const relayAbort = () => controller.abort(options.signal?.reason);
+    if (options.signal?.aborted) relayAbort();
+    else options.signal?.addEventListener("abort", relayAbort, { once: true });
 
-    if (method === "GET" && duration) {
-      responseCache.set(requestKey, { expiresAt: Date.now() + duration, value: payload });
-    } else if (method !== "GET") {
-      clearApiCache();
+    try {
+      const response = await fetch(`${API_URL}${path}`, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...options.headers
+        }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new ApiError(payload.message ?? "Action impossible.", response.status);
+
+      if (method === "GET" && duration) {
+        responseCache.set(requestKey, { expiresAt: Date.now() + duration, value: payload });
+      } else if (method !== "GET") {
+        clearApiCache();
+      }
+      return payload as T;
+    } catch (error) {
+      if (timeoutExpired) {
+        throw new ApiError(
+          "Le serveur ne répond pas. Vérifiez la connexion puis appuyez sur Réessayer.",
+          408
+        );
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+      options.signal?.removeEventListener("abort", relayAbort);
     }
-    return payload as T;
   })();
 
   if (method === "GET") pendingRequests.set(requestKey, request);
