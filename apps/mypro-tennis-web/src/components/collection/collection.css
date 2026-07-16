@@ -1973,6 +1973,368 @@
   }
 }
 
+/* Mobile paysage : même interface que sur PC, avec une densité réellement proportionnelle. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .collection-stage {
+    grid-template-rows: 34px 44px minmax(0, 1fr);
+    gap: 4px;
+    padding: max(4px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
+      max(4px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  }
+
+  .collection-header {
+    gap: 5px;
+  }
+
+  .collection-brand strong {
+    font-size: 0.88rem;
+  }
+
+  .collection-brand span {
+    margin-top: 2px;
+    font-size: 0.34rem;
+  }
+
+  .collection-header h1 {
+    font-size: 0.96rem;
+  }
+
+  .collection-header-actions {
+    gap: 3px;
+  }
+
+  .collection-icon-button,
+  .collection-coach-button,
+  .collection-resource {
+    min-height: 30px;
+  }
+
+  .collection-icon-button {
+    width: 30px;
+  }
+
+  .collection-icon-button svg,
+  .collection-coach-button svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .collection-header-help,
+  .collection-close {
+    display: grid;
+  }
+
+  .collection-resource {
+    min-width: 78px;
+    grid-template-columns: 14px minmax(0, 1fr) 14px;
+    gap: 3px;
+    padding: 2px 4px;
+  }
+
+  .collection-resource > svg,
+  .collection-resource-credits > svg {
+    display: block;
+    width: 13px;
+    height: 13px;
+  }
+
+  .collection-resource > span small,
+  .collection-resource small {
+    display: block;
+    font-size: 0.3rem;
+  }
+
+  .collection-resource strong {
+    margin-top: 1px;
+    font-size: 0.62rem;
+  }
+
+  .collection-resource > b {
+    display: grid;
+    width: 14px;
+    font-size: 0.72rem;
+  }
+
+  .collection-coach-button {
+    width: auto;
+    gap: 3px;
+    padding: 0 6px;
+    font-size: 0.5rem;
+  }
+
+  .collection-coach-button span {
+    display: inline;
+  }
+
+  .collection-tabs button {
+    gap: 5px;
+  }
+
+  .collection-tabs button > svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .collection-tabs strong {
+    font-size: 0.56rem;
+  }
+
+  .collection-tabs small {
+    display: block;
+    margin-top: 1px;
+    font-size: 0.3rem;
+  }
+
+  .collection-tabs button::after {
+    height: 3px;
+  }
+
+  .collection-tab-badge {
+    min-width: 15px;
+    height: 15px;
+    padding: 0 3px;
+    font-size: 0.42rem;
+  }
+
+  .collection-workspace {
+    grid-template-columns: minmax(185px, 27%) minmax(305px, 42%) minmax(225px, 1fr);
+    gap: 4px;
+    padding-bottom: 1px;
+  }
+
+  .collection-side-stack {
+    gap: 4px;
+  }
+
+  .collection-equipment-panel,
+  .collection-inventory-panel,
+  .collection-stats-panel,
+  .collection-market-panel {
+    padding: 5px;
+  }
+
+  .collection-panel-heading {
+    min-height: 22px;
+  }
+
+  .collection-panel-heading h2 {
+    font-size: 0.62rem;
+  }
+
+  .collection-panel-heading small,
+  .collection-sort span {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.31rem;
+  }
+
+  .collection-sort {
+    gap: 3px;
+  }
+
+  .collection-sort svg,
+  .collection-panel-heading > svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .collection-active-bonus {
+    min-width: 54px;
+    padding: 2px 4px;
+  }
+
+  .collection-active-bonus small {
+    display: block;
+    font-size: 0.28rem;
+  }
+
+  .collection-active-bonus strong {
+    margin-top: 1px;
+    font-size: 0.78rem;
+  }
+
+  .collection-player-loadout {
+    min-height: 118px;
+  }
+
+  .collection-equipment-slot {
+    width: 48px;
+  }
+
+  .collection-equipment-slot > span {
+    bottom: -12px;
+    font-size: 0.4rem;
+  }
+
+  .collection-equipment-panel > .collection-bonus-pills span {
+    padding: 4px 2px;
+    font-size: 0.38rem;
+  }
+
+  .collection-equipment-panel > .collection-bonus-pills span svg {
+    display: block;
+    width: 9px;
+    height: 9px;
+  }
+
+  .collection-equipment-actions {
+    margin-top: 3px;
+  }
+
+  .collection-danger-button,
+  .collection-outline-button,
+  .collection-card-action,
+  .collection-market-recipe > button,
+  .collection-stat-card > button,
+  .collection-panel-link {
+    min-height: 22px;
+    font-size: 0.42rem;
+  }
+
+  .collection-inventory-grid {
+    grid-auto-rows: 150px;
+    grid-template-rows: none;
+    gap: 4px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .collection-inventory-placeholder span {
+    display: block;
+    font-size: 0.36rem;
+  }
+
+  .collection-inventory-card {
+    padding: 4px;
+  }
+
+  .collection-card-topline {
+    min-height: 11px;
+    font-size: 0.38rem;
+  }
+
+  .collection-card-topline b {
+    font-size: 0.36rem;
+  }
+
+  .collection-item-visual {
+    min-height: 34px;
+    margin: 2px 0;
+  }
+
+  .collection-inventory-card h3 {
+    margin-bottom: 2px;
+    font-size: 0.44rem;
+  }
+
+  .collection-inventory-card .collection-bonus-pills span {
+    padding: 2px 3px;
+    font-size: 0.34rem;
+  }
+
+  .collection-upgrade-line {
+    gap: 3px;
+    margin-top: 2px;
+    font-size: 0.34rem;
+  }
+
+  .collection-card-action,
+  .collection-slot-buttons {
+    margin-top: 2px;
+  }
+
+  .collection-card-action,
+  .collection-slot-buttons button {
+    min-height: 19px;
+  }
+
+  .collection-stats-panel.is-expanded .collection-stat-grid {
+    grid-auto-rows: 126px;
+  }
+
+  .collection-stat-card-heading > span {
+    display: block;
+    padding: 2px 3px;
+    font-size: 0.3rem;
+  }
+
+  .collection-card-levels {
+    display: grid;
+    gap: 2px;
+    margin-bottom: 3px;
+  }
+
+  .collection-card-levels span {
+    gap: 1px;
+    padding: 2px;
+    font-size: 0.28rem;
+  }
+
+  .collection-card-levels b {
+    font-size: 0.35rem;
+  }
+
+  .collection-stat-value {
+    margin: 2px 0;
+  }
+
+  .collection-stat-card > button,
+  .collection-panel-link {
+    min-height: 20px;
+  }
+
+  .collection-market-grid {
+    grid-auto-rows: 126px;
+    gap: 4px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .collection-market-policy {
+    margin-bottom: 3px;
+    padding: 3px 4px;
+    font-size: 0.34rem;
+  }
+
+  .collection-market-panel:not(.is-expanded) .collection-refund-note {
+    display: flex;
+  }
+
+  .collection-market-panel:not(.is-expanded) .collection-recipe-strip {
+    display: grid;
+  }
+
+  .collection-recipe-strip {
+    margin-top: 2px;
+  }
+
+  .collection-recipe-strip button {
+    min-height: 28px;
+    padding: 2px;
+  }
+
+  .collection-recipe-strip strong {
+    font-size: 0.31rem;
+  }
+
+  .collection-rarity-token.is-small,
+  .collection-mini-credits {
+    width: 15px;
+    height: 15px;
+  }
+
+  .collection-rarity-token.is-small svg,
+  .collection-mini-credits svg {
+    width: 9px;
+    height: 9px;
+  }
+
+  .collection-refund-note {
+    margin-top: 2px;
+    font-size: 0.34rem;
+  }
+}
+
 @media (orientation: portrait) {
   .collection-cinematic::after {
     position: fixed;
