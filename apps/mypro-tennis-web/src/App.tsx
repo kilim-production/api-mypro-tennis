@@ -72,6 +72,7 @@ import { LobbyPlayerHero } from "./components/lobby/LobbyPlayerHero";
 import { LobbySeasonTrack } from "./components/lobby/LobbySeasonTrack";
 import { CoachDeckBuilderPage } from "./components/coach-deck/CoachDeckBuilderPage";
 import { CoachDeckTutorialPage } from "./components/coach-deck/CoachDeckTutorialPage";
+import { CollectionPage as CollectionCinematicPage } from "./components/collection/CollectionPage";
 import { InteractiveMatchPage, playMatchSound } from "./components/match/InteractiveMatchPage";
 import { useGameStore, type GameNotification, type Player } from "./store";
 
@@ -1103,32 +1104,6 @@ function fallbackDuesState(
   );
 }
 type ChestRarity = "Bronze" | "Argent" | "Or" | "Légendaire" | "Mythique";
-const rarityWeight: Record<ChestRarity, number> = {
-  Mythique: 5,
-  Légendaire: 4,
-  Or: 3,
-  Argent: 2,
-  Bronze: 1
-};
-const cosmeticMarketRecipes: Array<{
-  rarity: ChestRarity;
-  required: number;
-  resultRarity: ChestRarity | null;
-  money: number;
-  label: string;
-}> = [
-  { rarity: "Bronze", required: 3, resultRarity: "Argent", money: 0, label: "3 Bronze" },
-  { rarity: "Argent", required: 6, resultRarity: "Or", money: 0, label: "6 Argent" },
-  { rarity: "Or", required: 9, resultRarity: "Légendaire", money: 0, label: "9 Or" },
-  {
-    rarity: "Légendaire",
-    required: 12,
-    resultRarity: "Mythique",
-    money: 0,
-    label: "12 Légendaires"
-  },
-  { rarity: "Mythique", required: 1, resultRarity: null, money: 10_000, label: "1 Mythique" }
-];
 
 type TennisBagChest = {
   id: string;
@@ -1193,16 +1168,6 @@ type ChestState = {
   }>;
   cosmetics: PlayerCosmeticItem[];
   gems: number;
-};
-type CosmeticMarketResult = {
-  recipe: string;
-  consumed: number;
-  rarity: ChestRarity;
-  resultRarity: ChestRarity | null;
-  money: number;
-  refund: number;
-  totalMoney: number;
-  cosmetic: PlayerCosmeticItem | null;
 };
 type SkillState = {
   level: number;
@@ -1425,20 +1390,6 @@ function tennisBagImagePath(rarity: ChestRarity) {
   return `/visuals/chests/tennis-bag-${rarityClass(rarity).replace("rarity-", "")}.webp`;
 }
 
-function sortCosmeticsByRarity(items: PlayerCosmeticItem[]) {
-  return [...items].sort((a, b) => {
-    const rarityDelta = (rarityWeight[b.rarity] ?? 0) - (rarityWeight[a.rarity] ?? 0);
-    if (rarityDelta !== 0) return rarityDelta;
-    if (a.equippedSlot !== null && b.equippedSlot === null) return -1;
-    if (a.equippedSlot === null && b.equippedSlot !== null) return 1;
-    return a.name.localeCompare(b.name, "fr");
-  });
-}
-
-function bonusTotal(bonuses: Record<string, number>) {
-  return Object.values(bonuses).reduce((sum, value) => sum + value, 0);
-}
-
 function cosmeticIconPath(name: string) {
   const normalized = name
     .toLowerCase()
@@ -1475,28 +1426,6 @@ function CosmeticIcon({
         src={cosmeticIconPath(item.name)}
       />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/55 via-transparent to-white/5" />
-    </div>
-  );
-}
-
-function CosmeticUpgradeMeta({ item }: { item: PlayerCosmeticItem }) {
-  return (
-    <div className="mt-3 rounded-md border border-white/10 bg-slate-950/35 p-2 text-xs text-slate-300">
-      <div className="flex items-center justify-between gap-2">
-        <span>Niveau d'amélioration</span>
-        <strong className="text-emerald-200">{item.upgradeLevel}/3</strong>
-      </div>
-      <div className="mt-2 h-2 rounded-full bg-white/[0.08]">
-        <div
-          className="h-full rounded-full bg-cyan-300"
-          style={{ width: `${(item.upgradeLevel / 3) * 100}%` }}
-        />
-      </div>
-      <div className="mt-2">
-        {item.nextUpgradeCost
-          ? `Prochain niveau : ${formatCredits(item.nextUpgradeCost)}`
-          : "Niveau maximum atteint"}
-      </div>
     </div>
   );
 }
@@ -1760,6 +1689,8 @@ function Shell({ children }: { children: React.ReactNode }) {
   const showGameNav =
     user && !["/", "/login", "/signup", "/oauth/google"].includes(location.pathname);
   const isDashboard = location.pathname === "/dashboard";
+  const isCollection = location.pathname === "/collection";
+  const isFullScreenGamePage = isDashboard || isCollection;
   const navBadges = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const notification of notifications) {
@@ -1825,7 +1756,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen">
       <header
         className={`app-header sticky top-0 z-20 border-b border-white/10 bg-midnight/92 backdrop-blur ${
-          isDashboard ? "dashboard-header" : ""
+          isFullScreenGamePage ? "dashboard-header" : ""
         }`}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
@@ -1906,15 +1837,17 @@ function Shell({ children }: { children: React.ReactNode }) {
       </header>
       <div
         className={
-          isDashboard
+          isFullScreenGamePage
             ? "app-shell-content dashboard-shell-content mx-auto grid w-full max-w-none gap-0 p-0"
             : "app-shell-content mx-auto grid max-w-7xl gap-4 px-3 py-4 pb-24 sm:px-4 sm:py-5"
         }
       >
-        <main className={`min-w-0 ${isDashboard ? "dashboard-main" : ""}`}>{children}</main>
+        <main className={`min-w-0 ${isFullScreenGamePage ? "dashboard-main" : ""}`}>
+          {children}
+        </main>
       </div>
-      {showGameNav && !isDashboard ? <MobileBottomNav badges={mobileNavBadges} /> : null}
-      {!isDashboard ? (
+      {showGameNav && !isFullScreenGamePage ? <MobileBottomNav badges={mobileNavBadges} /> : null}
+      {!isFullScreenGamePage ? (
         <footer className="app-footer mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-3 px-4 pb-24 text-center text-[11px] font-black uppercase tracking-[0.28em] text-slate-500 lg:pb-5">
           <span>KILIM GAMES PRODUCTION</span>
           <span className="text-slate-700">·</span>
@@ -4117,586 +4050,6 @@ function SkillsPage() {
         </div>
       </section>
     </div>
-  );
-}
-
-function CollectionPage() {
-  const navigate = useNavigate();
-  const [data, setData] = useState<ChestState | null>(null);
-  const refreshPlayer = useGameStore((state) => state.refresh);
-  const [busyCosmetic, setBusyCosmetic] = useState<string | null>(null);
-  const [busyUpgrade, setBusyUpgrade] = useState<string | null>(null);
-  const [busyMarket, setBusyMarket] = useState<ChestRarity | null>(null);
-  const [busyCard, setBusyCard] = useState<string | null>(null);
-  const [slotPicker, setSlotPicker] = useState<number | null>(null);
-  const [collectionMessage, setCollectionMessage] = useState("");
-  const [tab, setTab] = useState<"equipment" | "cards" | "cosmetics" | "market">("equipment");
-
-  async function loadCollection() {
-    setData(await api<ChestState>("/chests"));
-  }
-
-  useEffect(() => void loadCollection(), []);
-
-  async function equip(item: PlayerCosmeticItem, slotIndex: number) {
-    setBusyCosmetic(item.id);
-    try {
-      await api(`/cosmetics/${item.id}/equip`, {
-        method: "POST",
-        body: JSON.stringify({ slotIndex })
-      });
-      await loadCollection();
-      await refreshPlayer();
-      setSlotPicker(null);
-    } finally {
-      setBusyCosmetic(null);
-    }
-  }
-
-  async function unequip(item: PlayerCosmeticItem) {
-    setBusyCosmetic(item.id);
-    try {
-      await api(`/cosmetics/${item.id}/unequip`, { method: "POST" });
-      await loadCollection();
-      await refreshPlayer();
-    } finally {
-      setBusyCosmetic(null);
-    }
-  }
-
-  async function upgradeItem(item: PlayerCosmeticItem) {
-    setBusyUpgrade(item.id);
-    setCollectionMessage("");
-    try {
-      await api(`/cosmetics/${item.id}/upgrade`, { method: "POST" });
-      await loadCollection();
-      await refreshPlayer();
-      setCollectionMessage(`${item.name} amélioré au niveau ${item.upgradeLevel + 1}.`);
-    } catch (error) {
-      setCollectionMessage(error instanceof Error ? error.message : "Amélioration impossible.");
-    } finally {
-      setBusyUpgrade(null);
-    }
-  }
-
-  async function unlockCard(statKey: string) {
-    setBusyCard(statKey);
-    setCollectionMessage("");
-    try {
-      setData(await api<ChestState>(`/cards/${statKey}/unlock`, { method: "POST" }));
-      await refreshPlayer();
-      setCollectionMessage("Bonus de carte débloqué.");
-    } catch (error) {
-      setCollectionMessage(error instanceof Error ? error.message : "Déblocage impossible.");
-    } finally {
-      setBusyCard(null);
-    }
-  }
-
-  async function exchangeOnMarket(rarity: ChestRarity) {
-    setBusyMarket(rarity);
-    setCollectionMessage("");
-    try {
-      const result = await api<CosmeticMarketResult>("/cosmetics/market/exchange", {
-        method: "POST",
-        body: JSON.stringify({ rarity })
-      });
-      await loadCollection();
-      await refreshPlayer();
-      const refundLabel =
-        result.refund > 0 ? ` Remboursement amélioration : ${formatCredits(result.refund)}.` : "";
-      setCollectionMessage(
-        result.money > 0
-          ? `Marché validé : ${result.recipe}. Vous récupérez ${formatCredits(result.totalMoney)}.${refundLabel}`
-          : `Marché validé : ${result.recipe}. Nouvel objet ${result.resultRarity} obtenu.${refundLabel}`
-      );
-    } catch (error) {
-      setCollectionMessage(error instanceof Error ? error.message : "Échange impossible.");
-    } finally {
-      setBusyMarket(null);
-    }
-  }
-
-  const equipped = Array.from({ length: 4 }, (_, slotIndex) => ({
-    slotIndex,
-    item: data?.cosmetics.find((cosmetic) => cosmetic.equippedSlot === slotIndex) ?? null
-  }));
-  const sortedCosmetics = sortCosmeticsByRarity(data?.cosmetics ?? []);
-  const marketCounts = cosmeticMarketRecipes.reduce<Record<ChestRarity, number>>(
-    (counts, recipe) => ({
-      ...counts,
-      [recipe.rarity]: sortedCosmetics.filter((item) => item.rarity === recipe.rarity).length
-    }),
-    { Bronze: 0, Argent: 0, Or: 0, Légendaire: 0, Mythique: 0 }
-  );
-  const marketReady = cosmeticMarketRecipes.filter(
-    (recipe) => marketCounts[recipe.rarity] >= recipe.required
-  ).length;
-  const totalEquipmentBonus = (data?.cosmetics ?? [])
-    .filter((item) => item.equippedSlot !== null)
-    .reduce(
-      (sum, item) => sum + Object.values(item.bonuses).reduce((inner, value) => inner + value, 0),
-      0
-    );
-  const unlockableCards = (data?.cards ?? []).filter((card) => card.unlockable).length;
-
-  return (
-    <div className="grid gap-4">
-      <section className="panel p-4 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-sm text-emerald-300">Inventaire joueur</p>
-            <h1 className="text-2xl font-black">Collection</h1>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              className="collection-coach-deck-link"
-              type="button"
-              onClick={() => navigate("/collection/coach-deck")}
-            >
-              <Sparkles size={15} /> Coach Deck
-            </button>
-            <div className="inline-flex items-center gap-2 rounded-md bg-white/[0.08] px-3 py-1 text-sm text-slate-200">
-              <Gem size={15} /> {data?.gems ?? 0} gemmes
-            </div>
-            {unlockableCards ? (
-              <div className="inline-flex items-center gap-2 rounded-md bg-emerald-300 px-3 py-1 text-sm font-black text-slate-950">
-                <Sparkles size={15} /> {unlockableCards} palier(s)
-              </div>
-            ) : null}
-          </div>
-        </div>
-        <div className="segmented-tabs mt-4">
-          {[
-            [
-              "equipment",
-              "Équipement",
-              totalEquipmentBonus ? `+${totalEquipmentBonus}` : "4 slots"
-            ],
-            ["cards", "Cartes", unlockableCards ? `${unlockableCards} prêt(s)` : "12 stats"],
-            ["cosmetics", "Objets", `${sortedCosmetics.length}`],
-            ["market", "Marché", marketReady ? `${marketReady} prêt(s)` : "occasion"]
-          ].map(([value, label, meta]) => (
-            <button
-              key={value}
-              className={tab === value ? "is-active" : ""}
-              onClick={() => setTab(value as typeof tab)}
-              type="button"
-            >
-              <span>{label}</span>
-              <small>{meta}</small>
-            </button>
-          ))}
-        </div>
-      </section>
-      {collectionMessage ? (
-        <div className="panel p-4 text-sm text-emerald-100">{collectionMessage}</div>
-      ) : null}
-      {tab === "equipment" ? (
-        <section className="panel p-4 sm:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-sm text-emerald-300">Équipement</p>
-              <h2 className="font-bold">4 objets cosmétiques actifs maximum</h2>
-            </div>
-            <div className="rounded-md bg-emerald-300 px-3 py-1 text-sm font-black text-slate-950">
-              +{totalEquipmentBonus} stats actives
-            </div>
-          </div>
-          <div className="mt-4 grid grid-cols-4 gap-1.5 sm:gap-3">
-            {equipped.map(({ slotIndex, item }) => (
-              <div key={slotIndex} className="metric min-w-0 p-2 sm:min-h-36 sm:p-3">
-                {item ? (
-                  <div className="mb-2">
-                    <CosmeticIcon item={item} />
-                  </div>
-                ) : (
-                  <div className="mb-2 grid aspect-square w-full place-items-center rounded-md border border-dashed border-white/15 bg-slate-950/35 text-[10px] text-slate-500">
-                    Vide
-                  </div>
-                )}
-                <div className="grid min-w-0 gap-2 sm:flex sm:items-start sm:justify-between sm:gap-3">
-                  <div className="min-w-0">
-                    <div className="text-center text-[10px] uppercase tracking-[0.12em] text-slate-400 sm:text-left sm:text-xs sm:tracking-[0.18em]">
-                      Slot {slotIndex + 1}
-                    </div>
-                    <div className="mt-1 truncate text-center text-[11px] font-black leading-tight sm:text-left sm:text-base">
-                      {item?.name ?? "Vide"}
-                    </div>
-                  </div>
-                  {item ? (
-                    <span
-                      className={`justify-self-center rounded-md px-1.5 py-1 text-[10px] font-black sm:justify-self-auto sm:px-2 sm:text-xs ${rarityClass(item.rarity)}`}
-                    >
-                      <span className="sm:hidden">+{bonusTotal(item.bonuses)}</span>
-                      <span className="hidden sm:inline">{item.rarity}</span>
-                    </span>
-                  ) : null}
-                </div>
-                <div className="mt-2 text-center text-[10px] leading-tight text-slate-300 sm:mt-3 sm:text-left sm:text-sm">
-                  {item ? (
-                    <>
-                      <div className="sm:hidden">Niv. {item.upgradeLevel}/3</div>
-                      <div className="hidden sm:block">
-                        <StatBonusPills bonuses={item.bonuses} />
-                        <CosmeticUpgradeMeta item={item} />
-                      </div>
-                    </>
-                  ) : (
-                    <span className="hidden sm:inline">Équipez un objet depuis l'inventaire.</span>
-                  )}
-                </div>
-                {item ? (
-                  <div className="mt-2 grid gap-1 sm:mt-4 sm:gap-2">
-                    {item.canUpgrade && item.nextUpgradeCost ? (
-                      <button
-                        className="inline-flex min-h-8 w-full items-center justify-center rounded-md bg-emerald-400 px-1 py-1 text-[10px] font-black text-slate-950 transition hover:bg-emerald-300 disabled:opacity-50 sm:min-h-10 sm:px-3 sm:py-2 sm:text-sm"
-                        onClick={() => upgradeItem(item)}
-                        disabled={busyUpgrade === item.id}
-                        type="button"
-                      >
-                        <span className="sm:hidden">+</span>
-                        <span className="hidden sm:inline">
-                          {busyUpgrade === item.id
-                            ? "Amélioration..."
-                            : `Améliorer · ${formatCredits(item.nextUpgradeCost)}`}
-                        </span>
-                      </button>
-                    ) : null}
-                    <button
-                      className="rounded-md bg-white/10 px-1 py-1 text-[10px] font-bold text-white transition hover:bg-white/15 disabled:opacity-50 sm:px-3 sm:py-2 sm:text-sm"
-                      onClick={() => unequip(item)}
-                      disabled={busyCosmetic === item.id}
-                      type="button"
-                    >
-                      <span className="sm:hidden">X</span>
-                      <span className="hidden sm:inline">Retirer</span>
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    className="mt-2 min-h-8 w-full rounded-md border border-emerald-300/40 bg-emerald-300/10 px-1 py-1 text-[10px] font-bold text-emerald-100 transition hover:bg-emerald-300/18 sm:mt-4 sm:px-3 sm:py-2 sm:text-sm"
-                    onClick={() => setSlotPicker(slotIndex)}
-                    type="button"
-                  >
-                    <span className="sm:hidden">+</span>
-                    <span className="hidden sm:inline">Choisir un objet</span>
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-      {tab === "cards" ? (
-        <section className="panel p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm text-emerald-300">Cartes de statistiques</p>
-              <h2 className="font-bold">Progression permanente</h2>
-            </div>
-            <Sparkles size={20} />
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {(data?.cards ?? []).map((card) => {
-              const progress = Math.max(
-                0,
-                Math.min(100, (card.copiesIntoLevel / Math.max(1, card.copiesNeeded)) * 100)
-              );
-              const readyLabel = card.unlockable
-                ? `Palier ${card.level + 1} prêt`
-                : `${card.remaining} doublon(s) avant le prochain palier`;
-              return (
-                <div key={card.statKey} className="metric">
-                  <div className="flex justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <StatIcon statKey={card.statKey} />
-                      <div className="min-w-0">
-                        <div className="truncate font-bold">{card.label}</div>
-                        <div className="text-xs text-slate-400">
-                          {card.copies} doublon(s) collecté(s)
-                        </div>
-                      </div>
-                    </div>
-                    <div className="rounded-md bg-white/[0.08] px-2 py-1 text-sm font-black text-emerald-300">
-                      +{card.level}
-                    </div>
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300">
-                    <span>Bonus débloqué +{card.level}</span>
-                    <span>Palier atteint +{card.earnedLevel}</span>
-                  </div>
-                  <div className="mt-3 h-2 rounded-full bg-white/[0.08]">
-                    <div
-                      className="h-full rounded-full bg-emerald-300"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                  <div className="mt-2 text-xs text-slate-400">{readyLabel}</div>
-                  {card.unlockable ? (
-                    <Button
-                      className="mt-3 w-full justify-center"
-                      onClick={() => unlockCard(card.statKey)}
-                      disabled={busyCard === card.statKey}
-                    >
-                      {busyCard === card.statKey
-                        ? "Déblocage..."
-                        : `Débloquer +1 · ${formatCredits(card.unlockCost)}`}
-                    </Button>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
-      {tab === "cosmetics" ? (
-        <section className="panel p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm text-emerald-300">Avatar</p>
-              <h2 className="font-bold">Inventaire cosmétique</h2>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-slate-300">
-              <span className="rounded-md bg-white/[0.08] px-3 py-1">Tri : rareté</span>
-              <PackageOpen size={20} />
-            </div>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {sortedCosmetics.length ? (
-              sortedCosmetics.map((item) => (
-                <div key={item.id} className={`metric ${rarityClass(item.rarity)}`}>
-                  <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-3">
-                    <CosmeticIcon item={item} compact />
-                    <div className="min-w-0">
-                      <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                        {item.rarity}
-                      </div>
-                      <div className="mt-1 truncate font-black">{item.name}</div>
-                      {item.equippedSlot !== null ? (
-                        <span className="mt-2 inline-flex rounded-md bg-emerald-300 px-2 py-1 text-xs font-black text-slate-950">
-                          Slot {item.equippedSlot + 1}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="mt-3">
-                    <StatBonusPills bonuses={item.bonuses} />
-                  </div>
-                  <CosmeticUpgradeMeta item={item} />
-                  {item.canUpgrade && item.nextUpgradeCost ? (
-                    <Button
-                      className="mt-3 w-full"
-                      onClick={() => upgradeItem(item)}
-                      disabled={busyUpgrade === item.id}
-                    >
-                      {busyUpgrade === item.id
-                        ? "Amélioration..."
-                        : `Améliorer · ${formatCredits(item.nextUpgradeCost)}`}
-                    </Button>
-                  ) : null}
-                  <div className="mt-4 grid grid-cols-4 gap-2">
-                    {[0, 1, 2, 3].map((slotIndex) => (
-                      <button
-                        key={slotIndex}
-                        className="rounded-md border border-white/10 bg-white/[0.05] px-2 py-2 text-xs font-black text-white transition hover:bg-white/[0.1] disabled:opacity-40"
-                        onClick={() => equip(item, slotIndex)}
-                        disabled={busyCosmetic === item.id || item.equippedSlot === slotIndex}
-                        type="button"
-                      >
-                        {slotIndex + 1}
-                      </button>
-                    ))}
-                  </div>
-                  {item.equippedSlot !== null ? (
-                    <button
-                      className="mt-3 rounded-md bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-50"
-                      onClick={() => unequip(item)}
-                      disabled={busyCosmetic === item.id}
-                      type="button"
-                    >
-                      Retirer l'objet
-                    </button>
-                  ) : null}
-                </div>
-              ))
-            ) : (
-              <div className="rounded-md border border-dashed border-white/15 p-4 text-sm text-slate-400">
-                Aucun cosmétique débloqué pour le moment.
-              </div>
-            )}
-          </div>
-        </section>
-      ) : null}
-      {tab === "market" ? (
-        <section className="panel p-4 sm:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-sm text-emerald-300">Marché de l'occasion</p>
-              <h2 className="font-bold">Recyclez vos objets pour monter en rareté</h2>
-              <p className="mt-1 max-w-2xl text-sm text-slate-300">
-                Le marché consomme de vrais objets de votre inventaire. Les objets non équipés sont
-                utilisés en priorité. 30 % de l'argent investi dans leurs améliorations est rendu au
-                moment de l'échange.
-              </p>
-            </div>
-            <div className="rounded-md bg-white/[0.08] px-3 py-1 text-sm font-black text-slate-200">
-              {marketReady} échange(s) prêt(s)
-            </div>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {cosmeticMarketRecipes.map((recipe) => {
-              const owned = marketCounts[recipe.rarity];
-              const canExchange = owned >= recipe.required;
-              const progress = Math.min(100, (owned / Math.max(1, recipe.required)) * 100);
-              return (
-                <article key={recipe.rarity} className={`metric ${rarityClass(recipe.rarity)}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                        Recette
-                      </div>
-                      <h3 className="mt-1 text-lg font-black">{recipe.label}</h3>
-                    </div>
-                    <div className="rounded-md bg-white/[0.08] px-2 py-1 text-sm font-black">
-                      {owned}/{recipe.required}
-                    </div>
-                  </div>
-                  <div className="mt-4 flex items-center justify-between gap-3 rounded-md bg-slate-950/35 p-3">
-                    <div className="min-w-0">
-                      <div className="text-xs text-slate-400">Vous donnez</div>
-                      <div className="mt-1 font-black text-white">
-                        {recipe.required} objet(s) {recipe.rarity}
-                      </div>
-                    </div>
-                    <Repeat2 className="shrink-0 text-emerald-300" size={22} />
-                    <div className="min-w-0 text-right">
-                      <div className="text-xs text-slate-400">Vous recevez</div>
-                      <div className="mt-1 font-black text-emerald-200">
-                        {recipe.resultRarity
-                          ? `1 objet ${recipe.resultRarity}`
-                          : formatCredits(recipe.money)}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/[0.08]">
-                    <div
-                      className="h-full rounded-full bg-emerald-300 transition-all"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                  <Button
-                    className="mt-4 w-full"
-                    disabled={!canExchange || busyMarket !== null}
-                    onClick={() => exchangeOnMarket(recipe.rarity)}
-                  >
-                    {busyMarket === recipe.rarity
-                      ? "Échange en cours..."
-                      : canExchange
-                        ? "Échanger au marché"
-                        : `${recipe.required - owned} objet(s) manquant(s)`}
-                  </Button>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
-      {slotPicker !== null ? (
-        <CosmeticSlotPicker
-          slotIndex={slotPicker}
-          cosmetics={sortedCosmetics}
-          busyCosmetic={busyCosmetic}
-          onClose={() => setSlotPicker(null)}
-          onEquip={equip}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function CosmeticSlotPicker({
-  slotIndex,
-  cosmetics,
-  busyCosmetic,
-  onClose,
-  onEquip
-}: {
-  slotIndex: number;
-  cosmetics: PlayerCosmeticItem[];
-  busyCosmetic: string | null;
-  onClose: () => void;
-  onEquip: (item: PlayerCosmeticItem, slotIndex: number) => Promise<void>;
-}) {
-  return createPortal(
-    <div className="game-modal-overlay">
-      <section className="game-modal-panel panel relative max-w-3xl">
-        <button
-          className="absolute right-4 top-4 rounded-md bg-white/10 p-2 text-slate-200 hover:bg-white/15"
-          onClick={onClose}
-          aria-label="Fermer l'inventaire"
-          type="button"
-        >
-          <X size={18} />
-        </button>
-        <div className="pr-10">
-          <p className="text-sm font-bold uppercase tracking-[0.24em] text-emerald-300">
-            Équipement
-          </p>
-          <h2 className="mt-1 text-2xl font-black">
-            Choisir un objet pour le slot {slotIndex + 1}
-          </h2>
-          <p className="mt-2 text-sm text-slate-300">
-            Inventaire trié par rareté, du plus précieux au plus commun.
-          </p>
-        </div>
-
-        <div className="mt-5 grid gap-3 md:grid-cols-2">
-          {cosmetics.length ? (
-            cosmetics.map((item) => (
-              <button
-                key={item.id}
-                className={`metric text-left transition hover:bg-white/[0.08] disabled:opacity-50 ${rarityClass(item.rarity)}`}
-                onClick={() => onEquip(item, slotIndex)}
-                disabled={busyCosmetic === item.id || item.equippedSlot === slotIndex}
-                type="button"
-              >
-                <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-3">
-                  <CosmeticIcon item={item} compact />
-                  <div className="min-w-0">
-                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                      {item.rarity}
-                    </div>
-                    <div className="mt-1 truncate font-black">{item.name}</div>
-                    {item.equippedSlot !== null ? (
-                      <span className="mt-2 inline-flex rounded-md bg-emerald-300 px-2 py-1 text-xs font-black text-slate-950">
-                        Slot {item.equippedSlot + 1}
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <StatBonusPills bonuses={item.bonuses} />
-                </div>
-                <CosmeticUpgradeMeta item={item} />
-                <div className="mt-3 text-xs font-bold text-slate-300">
-                  {item.equippedSlot === slotIndex
-                    ? "Déjà équipé ici"
-                    : item.equippedSlot !== null
-                      ? `Déplacer vers le slot ${slotIndex + 1}`
-                      : `Équiper dans le slot ${slotIndex + 1}`}
-                </div>
-              </button>
-            ))
-          ) : (
-            <div className="rounded-md border border-dashed border-white/15 p-4 text-sm text-slate-400">
-              Aucun cosmétique débloqué pour le moment.
-            </div>
-          )}
-        </div>
-      </section>
-    </div>,
-    document.body
   );
 }
 
@@ -8397,7 +7750,7 @@ export function App() {
             element={
               <NeedAuth>
                 <NeedPlayer>
-                  <CollectionPage />
+                  <CollectionCinematicPage />
                 </NeedPlayer>
               </NeedAuth>
             }
