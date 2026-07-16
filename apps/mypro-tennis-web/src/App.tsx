@@ -73,6 +73,7 @@ import { LobbySeasonTrack } from "./components/lobby/LobbySeasonTrack";
 import { CoachDeckBuilderPage } from "./components/coach-deck/CoachDeckBuilderPage";
 import { CoachDeckTutorialPage } from "./components/coach-deck/CoachDeckTutorialPage";
 import { CollectionPage as CollectionCinematicPage } from "./components/collection/CollectionPage";
+import { SkillsPage as SkillsCinematicPage } from "./components/skills/SkillsPage";
 import { InteractiveMatchPage, playMatchSound } from "./components/match/InteractiveMatchPage";
 import { useGameStore, type GameNotification, type Player } from "./store";
 
@@ -1169,37 +1170,6 @@ type ChestState = {
   cosmetics: PlayerCosmeticItem[];
   gems: number;
 };
-type SkillState = {
-  level: number;
-  xp: number;
-  skillPoints: number;
-  spentSkillPoints: number;
-  maxLevel: number;
-  statCapPerSkill: number;
-  allocations: Record<string, number>;
-  milestoneLevels: number[];
-  archetype: string;
-  activeMatchBonuses: Record<string, number>;
-  perks: Array<{
-    level: number;
-    title: string;
-    description: string;
-    bonuses: Record<string, number>;
-    unlocked: boolean;
-    active: boolean;
-  }>;
-  progress: {
-    level: number;
-    xp: number;
-    currentFloor: number;
-    nextFloor: number;
-    xpIntoLevel: number;
-    xpNeeded: number;
-    remaining: number;
-    maxLevel: number;
-  };
-};
-
 function usePageVisible() {
   const [visible, setVisible] = useState(() => !document.hidden);
   useEffect(() => {
@@ -1690,7 +1660,8 @@ function Shell({ children }: { children: React.ReactNode }) {
     user && !["/", "/login", "/signup", "/oauth/google"].includes(location.pathname);
   const isDashboard = location.pathname === "/dashboard";
   const isCollection = location.pathname === "/collection";
-  const isFullScreenGamePage = isDashboard || isCollection;
+  const isSkills = location.pathname === "/skills";
+  const isFullScreenGamePage = isDashboard || isCollection || isSkills;
   const navBadges = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const notification of notifications) {
@@ -3832,224 +3803,6 @@ function RankingSimulationCard({
         </div>
       </div>
     </section>
-  );
-}
-
-function SkillsPage() {
-  const player = useGameStore((state) => state.player)!;
-  const refreshPlayer = useGameStore((state) => state.refresh);
-  const [data, setData] = useState<SkillState | null>(null);
-  const [busyStat, setBusyStat] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
-
-  async function loadSkills() {
-    setData(await api<SkillState>("/skills"));
-  }
-
-  useEffect(() => void loadSkills(), []);
-
-  async function spendPoint(statKey: string) {
-    setBusyStat(statKey);
-    setMessage("");
-    try {
-      setData(
-        await api<SkillState>("/skills/spend", {
-          method: "POST",
-          body: JSON.stringify({ statKey })
-        })
-      );
-      await refreshPlayer();
-      setMessage(`${statLabels[statKey] ?? statKey} gagne +1.`);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Amélioration impossible.");
-    } finally {
-      setBusyStat(null);
-    }
-  }
-
-  const progress = data?.progress;
-  const progressPercent = progress
-    ? progress.xpNeeded > 0
-      ? Math.max(0, Math.min(100, (progress.xpIntoLevel / progress.xpNeeded) * 100))
-      : 100
-    : 0;
-  const skillPoints = data?.skillPoints ?? player.skillPoints;
-  const level = data?.level ?? player.playerLevel;
-
-  return (
-    <div className="grid gap-4">
-      <section className="game-hub panel overflow-hidden p-4 sm:p-5">
-        <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-          <div>
-            <p className="text-sm font-black uppercase tracking-[0.24em] text-emerald-300">
-              Progression RPG
-            </p>
-            <h1 className="mt-1 text-3xl font-black">Tableau de compétences</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-              Chaque niveau joueur donne 1 point de compétence. Dépensez-les pour renforcer
-              durablement une des 12 statistiques de match. La phase 1 limite chaque statistique à{" "}
-              {data?.statCapPerSkill ?? 20} points issus des compétences.
-            </p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-            <Metric label="Niveau joueur" value={level} />
-            <Metric label="Points disponibles" value={skillPoints} />
-            <Metric
-              label="Points dépensés"
-              value={data?.spentSkillPoints ?? player.spentSkillPoints}
-            />
-          </div>
-        </div>
-        <div className="mt-5 rounded-md border border-emerald-300/15 bg-emerald-300/10 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-            <span className="font-bold text-emerald-100">
-              XP {progress?.xpIntoLevel ?? 0}/{progress?.xpNeeded ?? 0}
-            </span>
-            <span className="text-slate-300">
-              {level >= (data?.maxLevel ?? 100)
-                ? "Niveau maximum atteint"
-                : `${progress?.remaining ?? 0} XP avant le niveau ${level + 1}`}
-            </span>
-          </div>
-          <div className="mt-3 h-3 rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,.45)]"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-        </div>
-      </section>
-
-      {message ? <div className="panel p-4 text-sm text-emerald-100">{message}</div> : null}
-
-      <section className="panel p-4 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-sm text-emerald-300">Archétype</p>
-            <h2 className="text-2xl font-black">{data?.archetype ?? player.archetype}</h2>
-            <p className="mt-1 text-sm text-slate-300">
-              Les paliers spéciaux sont automatiques. Ils ajoutent des bonus effectifs pendant les
-              matchs, sans consommer de point de compétence.
-            </p>
-          </div>
-          <div className="rounded-md bg-white/[0.08] px-3 py-2 text-sm font-black text-slate-100">
-            {Object.values(data?.activeMatchBonuses ?? {}).reduce((sum, value) => sum + value, 0)}{" "}
-            bonus actifs
-          </div>
-        </div>
-        <div className="mt-4 grid grid-cols-5 gap-2">
-          {(data?.milestoneLevels ?? [10, 25, 50, 75, 100]).map((milestone) => {
-            const unlocked = level >= milestone;
-            return (
-              <div
-                key={milestone}
-                className={`rounded-md border px-2 py-2 text-center text-xs font-black ${
-                  unlocked
-                    ? "border-emerald-300 bg-emerald-300 text-slate-950"
-                    : "border-white/10 bg-white/[0.04] text-slate-400"
-                }`}
-              >
-                Niv. {milestone}
-              </div>
-            );
-          })}
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          {(data?.perks ?? []).map((perk) => (
-            <div
-              key={perk.level}
-              className={`rounded-md border p-4 ${
-                perk.unlocked
-                  ? "border-emerald-300/60 bg-emerald-300/10"
-                  : "border-white/10 bg-white/[0.04] opacity-70"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-                    Niveau {perk.level}
-                  </div>
-                  <h3 className="mt-1 font-black">{perk.title}</h3>
-                </div>
-                {perk.unlocked ? (
-                  <CheckCircle2 className="text-emerald-300" size={18} />
-                ) : (
-                  <Lock className="text-slate-500" size={18} />
-                )}
-              </div>
-              <p className="mt-3 text-sm leading-5 text-slate-300">{perk.description}</p>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {Object.entries(perk.bonuses).map(([key, value]) => (
-                  <span
-                    key={key}
-                    className="rounded-full bg-white/[0.08] px-2 py-1 text-[11px] font-bold text-slate-100"
-                  >
-                    {statLabels[key] ?? key} +{value}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="panel p-4 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-sm text-emerald-300">12 statistiques jouables</p>
-            <h2 className="text-2xl font-black">Choisir une amélioration</h2>
-          </div>
-          <div className="rounded-md bg-cyan-300 px-3 py-2 text-sm font-black text-slate-950">
-            {skillPoints} point(s)
-          </div>
-        </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {profileStatKeys.map((key) => {
-            const value = Math.round(stat(player, key));
-            const allocated = data?.allocations[key] ?? 0;
-            const visual = statVisuals[key];
-            const cappedBySkill = data ? allocated >= data.statCapPerSkill : false;
-            const cappedByStat = value >= 100;
-            const disabled = skillPoints <= 0 || cappedBySkill || cappedByStat || busyStat !== null;
-            return (
-              <div key={key} className="metric">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <StatIcon statKey={key} />
-                    <div className="min-w-0">
-                      <div className="truncate font-black">{statLabels[key]}</div>
-                      <div className="text-xs text-slate-400">
-                        Compétences investies : {allocated}/{data?.statCapPerSkill ?? 20}
-                      </div>
-                    </div>
-                  </div>
-                  <strong className="text-xl text-white">{value}</strong>
-                </div>
-                <div className="mt-3 h-2 rounded-full bg-white/[0.08]">
-                  <div
-                    className="h-full rounded-full"
-                    style={{ width: `${value}%`, backgroundColor: visual.color }}
-                  />
-                </div>
-                <Button
-                  className="mt-4 w-full justify-center"
-                  disabled={disabled}
-                  onClick={() => spendPoint(key)}
-                >
-                  {busyStat === key
-                    ? "Amélioration..."
-                    : cappedByStat
-                      ? "Stat au maximum"
-                      : cappedBySkill
-                        ? "Limite compétence atteinte"
-                        : "+1 avec 1 point"}
-                </Button>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-    </div>
   );
 }
 
@@ -7740,7 +7493,12 @@ export function App() {
             element={
               <NeedAuth>
                 <NeedPlayer>
-                  <SkillsPage />
+                  <SkillsCinematicPage
+                    getStatLabel={(key) => statLabels[key] ?? key}
+                    getStatVisual={statVisual}
+                    resolveHeroSource={avatarHeroSource}
+                    statKeys={profileStatKeys}
+                  />
                 </NeedPlayer>
               </NeedAuth>
             }
