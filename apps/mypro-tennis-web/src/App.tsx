@@ -78,6 +78,7 @@ const loadCoachDeckTutorial = () => import("./components/coach-deck/CoachDeckTut
 const loadCollection = () => import("./components/collection/CollectionPage");
 const loadSkills = () => import("./components/skills/SkillsPage");
 const loadClub = () => import("./components/club/ClubPage");
+const loadDuel = () => import("./components/duel/DuelPage");
 
 const CoachDeckBuilderPage = lazy(() =>
   loadCoachDeckBuilder().then((module) => ({ default: module.CoachDeckBuilderPage }))
@@ -92,6 +93,7 @@ const SkillsCinematicPage = lazy(() =>
   loadSkills().then((module) => ({ default: module.SkillsPage }))
 );
 const ClubPage = lazy(() => loadClub().then((module) => ({ default: module.ClubPage })));
+const DuelPage = lazy(() => loadDuel().then((module) => ({ default: module.DuelPage })));
 
 const socketUrl = SOCKET_URL;
 const discordInviteUrl = import.meta.env.VITE_DISCORD_INVITE_URL ?? "";
@@ -1179,7 +1181,8 @@ function Shell({ children }: { children: React.ReactNode }) {
   const isCollection = location.pathname === "/collection";
   const isSkills = location.pathname === "/skills";
   const isClub = location.pathname === "/club";
-  const isFullScreenGamePage = isDashboard || isCollection || isSkills || isClub;
+  const isDuel = location.pathname === "/duel";
+  const isFullScreenGamePage = isDashboard || isCollection || isSkills || isClub || isDuel;
   const navBadges = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const notification of notifications) {
@@ -5835,7 +5838,10 @@ export function App() {
             element={
               <NeedAuth>
                 <NeedPlayer>
-                  <MatchStartPage />
+                  <DuelPage
+                    resolveHeroSource={avatarHeroSource}
+                    resolvePictureSource={avatarPictureSource}
+                  />
                 </NeedPlayer>
               </NeedAuth>
             }
