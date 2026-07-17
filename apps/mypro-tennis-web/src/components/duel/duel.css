@@ -1690,6 +1690,120 @@
   }
 }
 
+@media (orientation: landscape) and (max-width: 1120px) and (max-height: 520px) {
+  .duel-stage {
+    grid-template-rows: 42px 42px minmax(0, 1fr) 86px;
+  }
+
+  .duel-main {
+    grid-template-columns: minmax(0, 0.23fr) minmax(0, 0.49fr) minmax(0, 0.28fr);
+  }
+
+  .duel-player-visual {
+    bottom: 31px;
+    width: 45%;
+    height: calc(100% - 30px);
+    opacity: 0.9;
+  }
+
+  .duel-player-hero {
+    transform: scale(0.98);
+  }
+
+  .duel-player-summary {
+    gap: 3px;
+    margin-left: 43%;
+    padding-top: 20px;
+  }
+
+  .duel-player-summary h3 {
+    font-size: 0.64rem;
+  }
+
+  .duel-player-strengths {
+    display: none;
+  }
+
+  .duel-deck-status {
+    min-height: 29px;
+    gap: 5px;
+    padding: 2px 5px;
+  }
+
+  .duel-deck-status > svg {
+    width: 20px;
+  }
+
+  .duel-deck-status strong {
+    font-size: 0.5rem;
+  }
+
+  .duel-deck-status small {
+    font-size: 0.4rem;
+  }
+
+  .duel-opponent-card {
+    grid-template-rows: auto minmax(43px, 1fr) auto;
+    padding: 3px;
+  }
+
+  .duel-opponent-strengths,
+  .duel-opponent-select,
+  .duel-opponent-identity > small {
+    display: none;
+  }
+
+  .duel-opponent-picture {
+    max-height: 70px;
+  }
+
+  .duel-opponent-identity > strong {
+    font-size: 0.58rem;
+  }
+
+  .duel-pool-note {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.42rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .duel-analysis-panel {
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  }
+
+  .duel-comparison:nth-child(n + 4),
+  .duel-tactical-cards {
+    display: none;
+  }
+
+  .duel-comparison {
+    grid-template-columns: auto minmax(8px, 1fr) minmax(42px, auto) minmax(8px, 1fr) auto;
+    gap: 2px;
+  }
+
+  .duel-all-stats {
+    min-height: 23px;
+  }
+
+  .duel-start-panel {
+    grid-template-columns: minmax(0, 0.7fr) minmax(82px, 0.12fr) minmax(132px, 0.18fr);
+  }
+
+  .duel-mode-group button {
+    min-width: 0;
+  }
+
+  .duel-mode-group strong {
+    font-size: 0.58rem;
+  }
+
+  .duel-launch-action > button {
+    min-height: 38px;
+  }
+}
+
 @media (orientation: landscape) and (max-width: 820px) {
   .duel-header h1 {
     font-size: 1.2rem;

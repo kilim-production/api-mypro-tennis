@@ -1859,8 +1859,8 @@ function TeamChampionshipPanel({
                     {new Date(nextMeeting.startsAt).toLocaleString("fr-FR")}
                   </p>
                 ) : null}
-                <div className="mt-4 overflow-x-auto">
-                  <table className="w-full text-left text-sm">
+                <div className="club-standings-scroll mt-4 overflow-x-auto">
+                  <table className="club-standings-table w-full text-left text-sm">
                     <thead className="text-slate-400">
                       <tr>
                         <th className="py-2">#</th>
