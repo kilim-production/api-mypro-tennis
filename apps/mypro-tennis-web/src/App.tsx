@@ -79,6 +79,7 @@ const loadCollection = () => import("./components/collection/CollectionPage");
 const loadSkills = () => import("./components/skills/SkillsPage");
 const loadClub = () => import("./components/club/ClubPage");
 const loadDuel = () => import("./components/duel/DuelPage");
+const loadAutomaticMatch = () => import("./components/match/AutomaticMatchPage");
 
 const CoachDeckBuilderPage = lazy(() =>
   loadCoachDeckBuilder().then((module) => ({ default: module.CoachDeckBuilderPage }))
@@ -94,6 +95,9 @@ const SkillsCinematicPage = lazy(() =>
 );
 const ClubPage = lazy(() => loadClub().then((module) => ({ default: module.ClubPage })));
 const DuelPage = lazy(() => loadDuel().then((module) => ({ default: module.DuelPage })));
+const AutomaticMatchPage = lazy(() =>
+  loadAutomaticMatch().then((module) => ({ default: module.AutomaticMatchPage }))
+);
 
 const socketUrl = SOCKET_URL;
 const discordInviteUrl = import.meta.env.VITE_DISCORD_INVITE_URL ?? "";
@@ -1182,7 +1186,9 @@ function Shell({ children }: { children: React.ReactNode }) {
   const isSkills = location.pathname === "/skills";
   const isClub = location.pathname === "/club";
   const isDuel = location.pathname === "/duel";
-  const isFullScreenGamePage = isDashboard || isCollection || isSkills || isClub || isDuel;
+  const isAutomaticMatch = location.pathname.startsWith("/match/");
+  const isFullScreenGamePage =
+    isDashboard || isCollection || isSkills || isClub || isDuel || isAutomaticMatch;
   const navBadges = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const notification of notifications) {
@@ -5865,7 +5871,10 @@ export function App() {
             element={
               <NeedAuth>
                 <NeedPlayer>
-                  <MatchReplayPage />
+                  <AutomaticMatchPage
+                    resolveHeroSource={avatarHeroSource}
+                    resolvePictureSource={avatarPictureSource}
+                  />
                 </NeedPlayer>
               </NeedAuth>
             }
