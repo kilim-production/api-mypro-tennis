@@ -498,14 +498,13 @@ export function SkillsPage({
     setBusyStat(statKey);
     setMessage(null);
     try {
-      setData(
-        await api<SkillState>("/skills/spend", {
-          method: "POST",
-          body: JSON.stringify({ statKey })
-        })
-      );
-      await refreshPlayer();
+      const nextData = await api<SkillState>("/skills/spend", {
+        method: "POST",
+        body: JSON.stringify({ statKey })
+      });
+      setData(nextData);
       setMessage({ text: `${getStatLabel(statKey)} gagne +1.`, tone: "success" });
+      void refreshPlayer();
     } catch (error) {
       setMessage({
         text: error instanceof Error ? error.message : "Amélioration impossible.",

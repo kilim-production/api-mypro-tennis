@@ -62,6 +62,8 @@ type State = {
   login: (email: string, password: string) => Promise<void>;
   signup: (displayName: string, email: string, password: string) => Promise<void>;
   refresh: () => Promise<void>;
+  patchPlayer: (patch: Partial<Player> | ((player: Player) => Partial<Player>)) => void;
+  markNotificationsRead: (notificationIds?: string[]) => void;
   logout: () => void;
 };
 
@@ -161,6 +163,34 @@ export const useGameStore = create<State>((set) => ({
         booted: true
       });
     }
+  },
+  patchPlayer(patch) {
+    set((state) => {
+      if (!state.player) return state;
+      const player = {
+        ...state.player,
+        ...(typeof patch === "function" ? patch(state.player) : patch)
+      };
+      saveSessionCache({
+        user: state.user,
+        player,
+        notifications: state.notifications
+      });
+      return { player };
+    });
+  },
+  markNotificationsRead(notificationIds) {
+    set((state) => {
+      const selectedIds = notificationIds ? new Set(notificationIds) : null;
+      const readAt = new Date().toISOString();
+      const notifications = state.notifications.map((notification) =>
+        !notification.readAt && (!selectedIds || selectedIds.has(notification.id))
+          ? { ...notification, readAt }
+          : notification
+      );
+      saveSessionCache({ user: state.user, player: state.player, notifications });
+      return { notifications };
+    });
   },
   logout() {
     clearToken();

@@ -1495,13 +1495,17 @@ function TeamMeetingModal({
 function TeamChampionshipPanel({
   club,
   onDataChange,
+  onClubBudgetChanged,
   onClubUpdated
 }: {
   club: ClubDetails;
   onDataChange: (data: TeamChampionshipData) => void;
+  onClubBudgetChanged: (amount: number) => void;
   onClubUpdated: () => Promise<void>;
 }) {
+  const currentPlayer = useGameStore((state) => state.player)!;
   const refresh = useGameStore((state) => state.refresh);
+  const patchPlayer = useGameStore((state) => state.patchPlayer);
   const paymentLock = useRef(false);
   const teamActionLock = useRef(false);
   const [data, setData] = useState<TeamChampionshipData | null>(null);
@@ -1584,10 +1588,32 @@ function TeamChampionshipPanel({
     setBusy(true);
     try {
       await api("/clubs/dues/pay", { method: "POST" });
-      await refresh();
-      await loadTeamChampionship();
-      await onClubUpdated();
+      const currentDues = fallbackDuesState(club, data);
+      const amount = currentDues.amount;
+      if (data) {
+        const nextData: TeamChampionshipData = {
+          ...data,
+          club: data.club ? { ...data.club, budget: data.club.budget + amount } : data.club,
+          dues: {
+            ...currentDues,
+            currentPlayerPaid: true,
+            currentPlayerCanPay: false,
+            paidCount: Math.min(club.memberCount, currentDues.paidCount + 1),
+            eligibleCount: Math.min(club.memberCount, currentDues.eligibleCount + 1),
+            paidPlayerIds: currentDues.paidPlayerIds.includes(currentPlayer.id)
+              ? currentDues.paidPlayerIds
+              : [...currentDues.paidPlayerIds, currentPlayer.id]
+          }
+        };
+        setData(nextData);
+        onDataChange(nextData);
+      }
+      patchPlayer((player) => ({ budget: Math.max(0, player.budget - amount) }));
+      onClubBudgetChanged(amount);
       setMessage("Cotisation payée. Le budget du club a été crédité.");
+      void Promise.all([refresh(), loadTeamChampionship(), onClubUpdated()]).catch((error) =>
+        setMessage(error instanceof Error ? error.message : "Actualisation momentanément indisponible.")
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Paiement impossible.");
     } finally {
@@ -2173,6 +2199,7 @@ export function ClubPage() {
   const navigate = useNavigate();
   const player = useGameStore((state) => state.player)!;
   const refresh = useGameStore((state) => state.refresh);
+  const patchPlayer = useGameStore((state) => state.patchPlayer);
   const [data, setData] = useState<MyClubData | null>(null);
   const [clubs, setClubs] = useState<ClubListItem[]>([]);
   const [clubsLoaded, setClubsLoaded] = useState(false);
@@ -2329,7 +2356,8 @@ export function ClubPage() {
       setData({ club, pendingRequest: null });
       setForm({ name: "", tag: "", description: "", minimumRanking: "NC", duesAmount: 0 });
       setTeamChampionshipData(null);
-      await refresh();
+      patchPlayer((current) => ({ budget: Math.max(0, current.budget - clubCreationCost) }));
+      void refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Création impossible.");
     } finally {
@@ -2388,7 +2416,10 @@ export function ClubPage() {
       setData({ club: result.club, pendingRequest: result.pendingRequest });
       setTeamChampionshipData(null);
       setMessage(result.message);
-      await refresh();
+      if (result.refunded > 0) {
+        patchPlayer((current) => ({ budget: current.budget + result.refunded }));
+      }
+      void refresh();
       if (!result.club) {
         setClubsLoaded(false);
         void loadClubDirectory(true);
@@ -2528,6 +2559,13 @@ export function ClubPage() {
           <TeamChampionshipPanel
             club={club}
             key={club.id}
+            onClubBudgetChanged={(amount) =>
+              setData((current) =>
+                current?.club
+                  ? { ...current, club: { ...current.club, budget: current.club.budget + amount } }
+                  : current
+              )
+            }
             onClubUpdated={loadClubData}
             onDataChange={setTeamChampionshipData}
           />

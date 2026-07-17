@@ -19,7 +19,9 @@ const corsOptions = {
     if (!origin || config.clientUrls.includes(origin)) return callback(null, true);
     return callback(new Error("Origine non autorisée par MYPRO - TENNIS."));
   },
-  credentials: true
+  credentials: true,
+  maxAge: 86_400,
+  optionsSuccessStatus: 204
 };
 const io = new Server(server, { cors: { origin: config.clientUrls, credentials: true } });
 const presence = new PresenceRegistry();

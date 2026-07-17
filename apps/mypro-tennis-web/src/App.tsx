@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import type React from "react";
+import { lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
 import {
   Link,
@@ -17,7 +18,6 @@ import {
   Activity,
   BarChart3,
   Bell,
-  Building2,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
@@ -66,17 +66,32 @@ import {
   Zap
 } from "lucide-react";
 import { countries, countryLabel, normalizeCountryCode, type Country } from "@mypro/shared";
-import { API_URL, SOCKET_URL, api, saveToken } from "./api";
+import { API_URL, SOCKET_URL, api, saveToken, warmApi } from "./api";
 import { LobbyActionButton } from "./components/lobby/LobbyActionButton";
 import { LobbyPlayerHero } from "./components/lobby/LobbyPlayerHero";
 import { LobbySeasonTrack } from "./components/lobby/LobbySeasonTrack";
-import { CoachDeckBuilderPage } from "./components/coach-deck/CoachDeckBuilderPage";
-import { CoachDeckTutorialPage } from "./components/coach-deck/CoachDeckTutorialPage";
-import { CollectionPage as CollectionCinematicPage } from "./components/collection/CollectionPage";
-import { SkillsPage as SkillsCinematicPage } from "./components/skills/SkillsPage";
-import { ClubPage } from "./components/club/ClubPage";
 import { InteractiveMatchPage, playMatchSound } from "./components/match/InteractiveMatchPage";
 import { useGameStore, type GameNotification, type Player } from "./store";
+
+const loadCoachDeckBuilder = () => import("./components/coach-deck/CoachDeckBuilderPage");
+const loadCoachDeckTutorial = () => import("./components/coach-deck/CoachDeckTutorialPage");
+const loadCollection = () => import("./components/collection/CollectionPage");
+const loadSkills = () => import("./components/skills/SkillsPage");
+const loadClub = () => import("./components/club/ClubPage");
+
+const CoachDeckBuilderPage = lazy(() =>
+  loadCoachDeckBuilder().then((module) => ({ default: module.CoachDeckBuilderPage }))
+);
+const CoachDeckTutorialPage = lazy(() =>
+  loadCoachDeckTutorial().then((module) => ({ default: module.CoachDeckTutorialPage }))
+);
+const CollectionCinematicPage = lazy(() =>
+  loadCollection().then((module) => ({ default: module.CollectionPage }))
+);
+const SkillsCinematicPage = lazy(() =>
+  loadSkills().then((module) => ({ default: module.SkillsPage }))
+);
+const ClubPage = lazy(() => loadClub().then((module) => ({ default: module.ClubPage })));
 
 const socketUrl = SOCKET_URL;
 const discordInviteUrl = import.meta.env.VITE_DISCORD_INVITE_URL ?? "";
@@ -107,7 +122,7 @@ const routeDataPaths: Record<string, readonly string[]> = {
   "/player": ["/players/me/career"],
   "/skills": ["/skills"],
   "/collection": ["/chests"],
-  "/club": ["/clubs/me", "/clubs"],
+  "/club": ["/clubs/me"],
   "/season": ["/season"],
   "/tournaments": ["/tournaments"],
   "/duel": ["/matches/duel-pool"],
@@ -115,7 +130,16 @@ const routeDataPaths: Record<string, readonly string[]> = {
   "/rankings": ["/rankings"]
 };
 
+const routeModuleLoaders: Record<string, (() => Promise<unknown>) | undefined> = {
+  "/skills": loadSkills,
+  "/collection": loadCollection,
+  "/collection/coach-deck": loadCoachDeckBuilder,
+  "/coach-deck/tutorial": loadCoachDeckTutorial,
+  "/club": loadClub
+};
+
 function prefetchRouteData(path: string) {
+  void routeModuleLoaders[path]?.().catch(() => undefined);
   for (const dataPath of routeDataPaths[path] ?? []) {
     void api<unknown>(dataPath).catch(() => undefined);
   }
@@ -756,11 +780,6 @@ const fftPath = [
   "-15"
 ];
 
-function fftIndex(ranking: string) {
-  const index = fftPath.indexOf(ranking);
-  return index < 0 ? 0 : index;
-}
-
 const fftThresholds: Record<string, number> = {
   NC: 0,
   "40/2": 30,
@@ -1055,22 +1074,25 @@ function GoogleButton({
 function NotificationCenter({ compact = false }: { compact?: boolean }) {
   const notifications = useGameStore((state) => state.notifications);
   const refresh = useGameStore((state) => state.refresh);
+  const markNotificationsRead = useGameStore((state) => state.markNotificationsRead);
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const unread = notifications.filter((notification) => !notification.readAt);
 
-  async function openNotification(notification: GameNotification) {
+  function openNotification(notification: GameNotification) {
     if (!notification.readAt) {
-      await api(`/notifications/${notification.id}/read`, { method: "PATCH" });
-      await refresh();
+      markNotificationsRead([notification.id]);
+      void api(`/notifications/${notification.id}/read`, { method: "PATCH" }).catch(() =>
+        refresh()
+      );
     }
     setOpen(false);
     navigate(notificationTarget(notification));
   }
 
-  async function readAll() {
-    await api("/notifications/read-all", { method: "POST" });
-    await refresh();
+  function readAll() {
+    markNotificationsRead();
+    void api("/notifications/read-all", { method: "POST" }).catch(() => refresh());
   }
 
   return (
@@ -1147,6 +1169,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const notifications = useGameStore((state) => state.notifications);
   const logout = useGameStore((state) => state.logout);
   const refresh = useGameStore((state) => state.refresh);
+  const markNotificationsRead = useGameStore((state) => state.markNotificationsRead);
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
@@ -1199,19 +1222,19 @@ function Shell({ children }: { children: React.ReactNode }) {
     if (!pageNotifications.length) return;
 
     let cancelled = false;
-    void (async () => {
-      await Promise.all(
+    markNotificationsRead(pageNotifications.map((notification) => notification.id));
+    void Promise.all(
         pageNotifications.map((notification) =>
           api(`/notifications/${notification.id}/read`, { method: "PATCH" })
         )
-      );
-      if (!cancelled) await refresh();
-    })();
+      ).catch(() => {
+        if (!cancelled) void refresh();
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [location.pathname, notifications, refresh, showGameNav, user]);
+  }, [location.pathname, markNotificationsRead, notifications, refresh, showGameNav, user]);
 
   function openTutorial() {
     localStorage.setItem("mypro-tutorial-active", "1");
@@ -1383,6 +1406,8 @@ function MobileBottomNav({ badges }: { badges: Record<string, number> }) {
         <NavLink
           key={path}
           to={path}
+          onFocus={() => prefetchRouteData(path)}
+          onPointerEnter={() => prefetchRouteData(path)}
           className={({ isActive }) => `mobile-bottom-link ${isActive ? "is-active" : ""}`}
         >
           <span className="relative">
@@ -2299,6 +2324,7 @@ function LobbyBagsCard({
 function Dashboard() {
   const player = useGameStore((state) => state.player)!;
   const refreshPlayer = useGameStore((state) => state.refresh);
+  const patchPlayer = useGameStore((state) => state.patchPlayer);
   const navigate = useNavigate();
   const [chests, setChests] = useState<ChestState | null>(null);
   const [season, setSeason] = useState<SeasonData | null>(null);
@@ -2367,9 +2393,23 @@ function Dashboard() {
         `/chests/${chest.id}/open`,
         { method: "POST" }
       );
-      await reloadDashboard();
-      await refreshPlayer();
+      setChests((current) =>
+        current
+          ? {
+              ...current,
+              slots: current.slots.map((slot) =>
+                slot.chest?.id === chest.id ? { ...slot, chest: null } : slot
+              ),
+              gems: current.gems + result.rewards.gems
+            }
+          : current
+      );
+      patchPlayer((current) => ({
+        budget: current.budget + result.rewards.money,
+        gems: current.gems + result.rewards.gems
+      }));
       setRewardOpening({ rewards: result.rewards, rarity: chest.rarity });
+      void Promise.all([reloadDashboard(), refreshPlayer()]).catch(() => undefined);
     } catch (error) {
       setHubMessage(error instanceof Error ? error.message : "Ouverture du sac impossible.");
     } finally {
@@ -2389,9 +2429,22 @@ function Dashboard() {
     setBusyChest(chest.id);
     setHubMessage("");
     try {
-      await api<TennisBagChest>(`/chests/${chest.id}/speedup`, { method: "POST" });
-      await reloadDashboard();
-      await refreshPlayer();
+      const updatedChest = await api<TennisBagChest>(`/chests/${chest.id}/speedup`, {
+        method: "POST"
+      });
+      setChests((current) =>
+        current
+          ? {
+              ...current,
+              gems: Math.max(0, current.gems - speedUpCost),
+              slots: current.slots.map((slot) =>
+                slot.chest?.id === chest.id ? { ...slot, chest: updatedChest } : slot
+              )
+            }
+          : current
+      );
+      patchPlayer((current) => ({ gems: Math.max(0, current.gems - speedUpCost) }));
+      void refreshPlayer();
     } catch (error) {
       setHubMessage(error instanceof Error ? error.message : "Accélération impossible.");
     } finally {
@@ -2419,6 +2472,8 @@ function Dashboard() {
               <button
                 className="lobby-resource-pill lobby-energy"
                 onClick={() => navigate("/duel")}
+                onFocus={() => prefetchRouteData("/duel")}
+                onPointerEnter={() => prefetchRouteData("/duel")}
                 type="button"
               >
                 <Zap size={18} />
@@ -2432,6 +2487,8 @@ function Dashboard() {
               <button
                 className="lobby-resource-pill lobby-gems"
                 onClick={() => navigate("/collection")}
+                onFocus={() => prefetchRouteData("/collection")}
+                onPointerEnter={() => prefetchRouteData("/collection")}
                 type="button"
               >
                 <Gem size={18} />
@@ -3853,8 +3910,8 @@ function SeasonPage() {
       const result = await api<{ match: MatchListItem }>(`/season/entries/${entryId}/play`, {
         method: "POST"
       });
-      await Promise.all([load(), refresh()]);
       navigate(`/match/${result.match.id}`);
+      void refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Match impossible.");
     }
@@ -4207,12 +4264,12 @@ function MatchStartPage() {
         method: "POST",
         body: JSON.stringify({ opponentId, format: "Deux sets gagnants", coachDeckId })
       });
-      await refresh();
       if (selectedMode === "coach") {
         navigate(`/match-live/${match.id}`);
       } else {
         navigate(`/match/${match.id}${selectedMode === "quick" ? "?result=1" : ""}`);
       }
+      void refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Duel impossible.");
       setLoadingId(null);
@@ -5636,9 +5693,24 @@ function LoadingScreen() {
 
 export function App() {
   const booted = useGameStore((state) => state.booted);
+  const userId = useGameStore((state) => state.user?.id ?? null);
   const refresh = useGameStore((state) => state.refresh);
   useFitMobileModals();
   useEffect(() => void refresh(), [refresh]);
+  useEffect(() => {
+    if (!userId) return;
+    const warmIfVisible = () => {
+      if (!document.hidden) void warmApi().catch(() => undefined);
+    };
+    const timer = window.setInterval(warmIfVisible, 10 * 60_000);
+    window.addEventListener("focus", warmIfVisible);
+    document.addEventListener("visibilitychange", warmIfVisible);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", warmIfVisible);
+      document.removeEventListener("visibilitychange", warmIfVisible);
+    };
+  }, [userId]);
   if (!booted)
     return (
       <>
@@ -5650,7 +5722,8 @@ export function App() {
     <>
       <OrientationGuard />
       <Shell>
-        <Routes>
+        <Suspense fallback={<LoadingScreen />}>
+          <Routes>
           <Route path="/" element={<HomeRoute />} />
           <Route path="/login" element={<AuthPage mode="login" />} />
           <Route path="/signup" element={<AuthPage mode="signup" />} />
@@ -5820,7 +5893,8 @@ export function App() {
               </NeedAuth>
             }
           />
-        </Routes>
+          </Routes>
+        </Suspense>
       </Shell>
     </>
   );

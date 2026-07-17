@@ -30,6 +30,8 @@ export const SOCKET_URL = resolveServiceUrl(
   "http://localhost:4000"
 );
 
+const API_ORIGIN = API_URL.replace(/\/api\/?$/, "");
+
 export class ApiError extends Error {
   status: number;
 
@@ -55,15 +57,60 @@ const pendingRequests = new Map<string, Promise<unknown>>();
 const apiTimeoutMs = 45_000;
 
 function cacheDuration(path: string) {
-  if (path === "/rankings" || path === "/tournaments") return 30_000;
-  if (path === "/matches" || path === "/clubs") return 15_000;
-  if (path === "/clubs/me" || path === "/skills" || path === "/players/me/career") return 8_000;
-  if (path === "/season" || path === "/chests" || path === "/matches/duel-pool") return 5_000;
+  if (path === "/rankings") return 120_000;
+  if (path === "/tournaments") return 60_000;
+  if (path === "/matches" || path === "/clubs") return 30_000;
+  if (
+    path === "/clubs/me" ||
+    path === "/clubs/team-championship" ||
+    path === "/skills" ||
+    path === "/players/me/career" ||
+    path === "/coach-decks"
+  )
+    return 15_000;
+  if (path === "/season" || path === "/chests" || path === "/matches/duel-pool") return 10_000;
   return 0;
 }
 
 export function clearApiCache() {
   responseCache.clear();
+}
+
+function invalidateCachedPaths(paths: string[]) {
+  for (const key of responseCache.keys()) {
+    const separator = key.indexOf(":");
+    const cachedPath = separator >= 0 ? key.slice(separator + 1) : key;
+    if (
+      paths.some(
+        (path) => cachedPath === path || cachedPath.startsWith(path.endsWith("/") ? path : `${path}/`)
+      )
+    ) {
+      responseCache.delete(key);
+    }
+  }
+}
+
+function invalidateAfterMutation(path: string) {
+  if (path.startsWith("/notifications")) return invalidateCachedPaths(["/auth/me"]);
+  if (path.startsWith("/clubs"))
+    return invalidateCachedPaths(["/clubs", "/auth/me"]);
+  if (path.startsWith("/chests") || path.startsWith("/cards") || path.startsWith("/cosmetics"))
+    return invalidateCachedPaths(["/chests", "/players/me/career", "/skills", "/auth/me"]);
+  if (path.startsWith("/skills") || path.startsWith("/training"))
+    return invalidateCachedPaths(["/skills", "/players/me/career", "/auth/me"]);
+  if (path.startsWith("/season"))
+    return invalidateCachedPaths(["/season", "/matches", "/chests", "/auth/me"]);
+  if (path.startsWith("/matches"))
+    return invalidateCachedPaths([
+      "/matches",
+      "/matches/duel-pool",
+      "/season",
+      "/chests",
+      "/auth/me"
+    ]);
+  if (path.startsWith("/players"))
+    return invalidateCachedPaths(["/players", "/rankings", "/skills", "/auth/me"]);
+  clearApiCache();
 }
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -95,7 +142,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
         ...options,
         signal: controller.signal,
         headers: {
-          "Content-Type": "application/json",
+          ...(options.body ? { "Content-Type": "application/json" } : {}),
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
           ...options.headers
         }
@@ -107,7 +154,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
       if (method === "GET" && duration) {
         responseCache.set(requestKey, { expiresAt: Date.now() + duration, value: payload });
       } else if (method !== "GET") {
-        clearApiCache();
+        invalidateAfterMutation(path);
       }
       return payload as T;
     } catch (error) {
@@ -142,4 +189,11 @@ export function saveToken(token: string) {
 export function clearToken() {
   clearApiCache();
   localStorage.removeItem("mypro-token");
+}
+
+export function warmApi() {
+  return fetch(`${API_ORIGIN}/health`, {
+    cache: "no-store",
+    headers: { Accept: "application/json" }
+  }).then(() => undefined);
 }

@@ -839,6 +839,7 @@ export function CollectionPage() {
   const navigate = useNavigate();
   const player = useGameStore((state) => state.player);
   const refreshPlayer = useGameStore((state) => state.refresh);
+  const patchPlayer = useGameStore((state) => state.patchPlayer);
   const [data, setData] = useState<CollectionState | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -900,15 +901,27 @@ export function CollectionPage() {
   async function equip(item: PlayerCosmeticItem, slot: number) {
     setBusyItem(item.id);
     try {
-      await api(`/cosmetics/${item.id}/equip`, {
+      const updatedItem = await api<PlayerCosmeticItem>(`/cosmetics/${item.id}/equip`, {
         method: "POST",
         body: JSON.stringify({ slotIndex: slot })
       });
-      await loadCollection();
-      await refreshPlayer();
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              cosmetics: current.cosmetics.map((cosmetic) => {
+                if (cosmetic.id === updatedItem.id) return updatedItem;
+                return cosmetic.equippedSlot === slot
+                  ? { ...cosmetic, equippedSlot: null }
+                  : cosmetic;
+              })
+            }
+          : current
+      );
       setSelectedItemId(item.id);
       setSlotPicker(null);
       setMessage({ text: `${item.name} équipé dans le slot ${slot + 1}.`, tone: "success" });
+      void refreshPlayer();
     } catch (error) {
       setMessage({
         text: error instanceof Error ? error.message : "Équipement impossible.",
@@ -922,10 +935,21 @@ export function CollectionPage() {
   async function unequip(item: PlayerCosmeticItem) {
     setBusyItem(item.id);
     try {
-      await api(`/cosmetics/${item.id}/unequip`, { method: "POST" });
-      await loadCollection();
-      await refreshPlayer();
+      const updatedItem = await api<PlayerCosmeticItem>(`/cosmetics/${item.id}/unequip`, {
+        method: "POST"
+      });
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              cosmetics: current.cosmetics.map((cosmetic) =>
+                cosmetic.id === updatedItem.id ? updatedItem : cosmetic
+              )
+            }
+          : current
+      );
       setMessage({ text: `${item.name} retiré de l'équipement.`, tone: "success" });
+      void refreshPlayer();
     } catch (error) {
       setMessage({
         text: error instanceof Error ? error.message : "Retrait impossible.",
@@ -939,13 +963,30 @@ export function CollectionPage() {
   async function upgrade(item: PlayerCosmeticItem) {
     setBusyUpgrade(item.id);
     try {
-      await api(`/cosmetics/${item.id}/upgrade`, { method: "POST" });
-      await loadCollection();
-      await refreshPlayer();
+      const updatedItem = await api<PlayerCosmeticItem>(`/cosmetics/${item.id}/upgrade`, {
+        method: "POST"
+      });
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              cosmetics: current.cosmetics.map((cosmetic) =>
+                cosmetic.id === updatedItem.id ? updatedItem : cosmetic
+              )
+            }
+          : current
+      );
+      const upgradeCost = item.nextUpgradeCost;
+      if (upgradeCost) {
+        patchPlayer((current) => ({
+          budget: Math.max(0, current.budget - upgradeCost)
+        }));
+      }
       setMessage({
         text: `${item.name} amélioré · bonus appliqué au joueur.`,
         tone: "success"
       });
+      void refreshPlayer();
     } catch (error) {
       setMessage({
         text: error instanceof Error ? error.message : "Amélioration impossible.",
@@ -960,8 +1001,9 @@ export function CollectionPage() {
     setBusyCard(card.statKey);
     try {
       setData(await api<CollectionState>(`/cards/${card.statKey}/unlock`, { method: "POST" }));
-      await refreshPlayer();
+      patchPlayer((current) => ({ budget: Math.max(0, current.budget - card.unlockCost) }));
       setMessage({ text: `${card.label} amélioré de +1.`, tone: "success" });
+      void refreshPlayer();
     } catch (error) {
       setMessage({
         text: error instanceof Error ? error.message : "Déblocage impossible.",
@@ -979,13 +1021,15 @@ export function CollectionPage() {
         method: "POST",
         body: JSON.stringify({ rarity })
       });
-      await loadCollection();
-      await refreshPlayer();
       const reward = result.resultRarity
         ? `nouvel objet ${result.resultRarity}`
         : formatCredits(result.totalMoney);
       const refund = result.refund > 0 ? ` · remboursement ${formatCredits(result.refund)}` : "";
       setMessage({ text: `Marché validé · ${reward}${refund}.`, tone: "success" });
+      if (result.totalMoney > 0) {
+        patchPlayer((current) => ({ budget: current.budget + result.totalMoney }));
+      }
+      await Promise.all([loadCollection(), refreshPlayer()]);
     } catch (error) {
       setMessage({
         text: error instanceof Error ? error.message : "Échange impossible.",

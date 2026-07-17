@@ -54,6 +54,18 @@ export default defineConfig({
                 maxAgeSeconds: 30 * 24 * 60 * 60
               }
             }
+          },
+          {
+            urlPattern: /\/(?:visuals\/club|profile-pictures)\/.*\.(?:jpg|jpeg|png|webp)$/,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "mypro-static-visuals-v1",
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: {
+                maxEntries: 80,
+                maxAgeSeconds: 30 * 24 * 60 * 60
+              }
+            }
           }
         ],
         navigateFallback: "/index.html"
