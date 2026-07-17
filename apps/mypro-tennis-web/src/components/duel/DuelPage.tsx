@@ -55,12 +55,12 @@ import {
 import "./duel.css";
 
 type DuelPool = {
-  allowedRankings: string[];
+  overallRange: { min: number; max: number; delta: number };
   opponents: Player[];
 };
 
 type DuelSearch = {
-  allowedRankings: string[];
+  overallRange: { min: number; max: number; delta: number };
   results: Player[];
 };
 
@@ -210,9 +210,7 @@ function OpponentCard({
           ))}
         </span>
       </span>
-      <span className="duel-opponent-select">
-        {selected ? "Sélectionné" : "Choisir"}
-      </span>
+      <span className="duel-opponent-select">{selected ? "Sélectionné" : "Choisir"}</span>
     </button>
   );
 }
@@ -351,10 +349,7 @@ export function DuelPage({ resolveHeroSource, resolvePictureSource }: DuelPagePr
       setMessage("Votre Coach Deck doit contenir 12 cartes avant de lancer ce mode.");
       return;
     }
-    if (
-      matchMode === "coach" &&
-      localStorage.getItem("mypro-coach-deck-tutorial-done") !== "1"
-    ) {
+    if (matchMode === "coach" && localStorage.getItem("mypro-coach-deck-tutorial-done") !== "1") {
       navigate("/coach-deck/tutorial");
       return;
     }
@@ -385,7 +380,7 @@ export function DuelPage({ resolveHeroSource, resolvePictureSource }: DuelPagePr
 
   const heroSource = resolveHeroSource(player.avatar);
   const playerTopStats = duelTopStats(player, 3);
-  const rankings = pool?.allowedRankings.join(" · ") ?? "...";
+  const overallRange = pool ? `${pool.overallRange.min} à ${pool.overallRange.max}` : "...";
 
   return (
     <div className="duel-cinematic">
@@ -423,7 +418,10 @@ export function DuelPage({ resolveHeroSource, resolvePictureSource }: DuelPagePr
                 <strong>{formatDuelCredits(player.budget)}</strong>
               </span>
             </span>
-            <Link className={`duel-deck-resource${deckReady ? " is-ready" : ""}`} to="/collection/coach-deck">
+            <Link
+              className={`duel-deck-resource${deckReady ? " is-ready" : ""}`}
+              to="/collection/coach-deck"
+            >
               <Layers3 />
               <span>
                 <small>Coach Deck</small>
@@ -472,9 +470,14 @@ export function DuelPage({ resolveHeroSource, resolvePictureSource }: DuelPagePr
               <small>Recherche</small>
             </span>
           </button>
-          <button className="duel-refresh" disabled={loading} onClick={() => void refreshPool()} type="button">
+          <button
+            className="duel-refresh"
+            disabled={loading}
+            onClick={() => void refreshPool()}
+            type="button"
+          >
             <RefreshCw className={loading ? "is-spinning" : ""} />
-            <span>Rafraîchir</span>
+            <span>Actualiser</span>
           </button>
         </nav>
 
@@ -530,12 +533,16 @@ export function DuelPage({ resolveHeroSource, resolvePictureSource }: DuelPagePr
                 </div>
               </div>
             </div>
-            <Link className={`duel-deck-status${deckReady ? " is-ready" : ""}`} to="/collection/coach-deck">
+            <Link
+              className={`duel-deck-status${deckReady ? " is-ready" : ""}`}
+              to="/collection/coach-deck"
+            >
               <Layers3 />
               <span>
                 <strong>{deckReady ? "Coach Deck actif" : "Coach Deck incomplet"}</strong>
                 <small>
-                  {deckCardCount} cartes · {deckReady ? "prêt" : `${deckSize - deckCardCount} à ajouter`}
+                  {deckCardCount} cartes ·{" "}
+                  {deckReady ? "prêt" : `${deckSize - deckCardCount} à ajouter`}
                 </small>
               </span>
             </Link>
@@ -545,7 +552,9 @@ export function DuelPage({ resolveHeroSource, resolvePictureSource }: DuelPagePr
             <header>
               <div>
                 <h2>{duelTab === "pool" ? "Choisissez votre adversaire" : "Match entre amis"}</h2>
-                <p>Votre zone de classement : <strong>{rankings}</strong></p>
+                <p>
+                  Votre zone de note globale : <strong>{overallRange}</strong>
+                </p>
               </div>
               {duelTab === "friends" ? (
                 <form className="duel-friend-search" onSubmit={searchOpponents}>
@@ -580,11 +589,14 @@ export function DuelPage({ resolveHeroSource, resolvePictureSource }: DuelPagePr
               <div className="duel-friend-empty">
                 <UserRoundSearch />
                 <strong>Recherchez un joueur réel</strong>
-                <small>Entrez au moins deux caractères pour afficher jusqu’à trois adversaires.</small>
+                <small>
+                  Entrez au moins deux caractères pour afficher jusqu’à trois adversaires.
+                </small>
               </div>
             ) : null}
             <div className="duel-pool-note">
-              <HelpCircle /> Un joueur réel peut être affronté <strong>2 fois</strong> par jour.
+              <HelpCircle /> Un adversaire reste dans ce pool jusqu’à ce que vous l’affrontiez. Un
+              joueur réel peut être affronté <strong>2 fois</strong> par jour.
             </div>
           </section>
 
@@ -600,7 +612,10 @@ export function DuelPage({ resolveHeroSource, resolvePictureSource }: DuelPagePr
                   </span>
                   <b>VS</b>
                   <span>
-                    <PlayerPortrait player={selectedOpponent} resolvePictureSource={resolvePictureSource} />
+                    <PlayerPortrait
+                      player={selectedOpponent}
+                      resolvePictureSource={resolvePictureSource}
+                    />
                     <small>{selectedOpponent.firstName}</small>
                     <strong>{selectedOpponent.overall}</strong>
                   </span>
@@ -627,7 +642,8 @@ export function DuelPage({ resolveHeroSource, resolvePictureSource }: DuelPagePr
                   <span>
                     <small>Votre avantage</small>
                     <strong>
-                      {duelStatLabels[tacticalRead.advantage.key]} +{Math.max(0, tacticalRead.advantage.difference)}
+                      {duelStatLabels[tacticalRead.advantage.key]} +
+                      {Math.max(0, tacticalRead.advantage.difference)}
                     </strong>
                   </span>
                   <span>
@@ -637,7 +653,11 @@ export function DuelPage({ resolveHeroSource, resolvePictureSource }: DuelPagePr
                     </strong>
                   </span>
                 </div>
-                <button className="duel-all-stats" onClick={() => setShowAllStats(true)} type="button">
+                <button
+                  className="duel-all-stats"
+                  onClick={() => setShowAllStats(true)}
+                  type="button"
+                >
                   Voir les 12 statistiques
                 </button>
               </>
@@ -675,8 +695,12 @@ export function DuelPage({ resolveHeroSource, resolvePictureSource }: DuelPagePr
             </div>
           </div>
           <div className="duel-match-summary">
-            <span>Format · <strong>2 sets gagnants</strong></span>
-            <span><Zap /> Coût · <strong>1 énergie</strong></span>
+            <span>
+              Format · <strong>2 sets gagnants</strong>
+            </span>
+            <span>
+              <Zap /> Coût · <strong>1 énergie</strong>
+            </span>
           </div>
           <div className="duel-launch-action">
             <button

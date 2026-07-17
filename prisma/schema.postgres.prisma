@@ -84,6 +84,8 @@ model Player {
   matchesAsA               Match[]                    @relation("MatchA")
   matchesAsB               Match[]                    @relation("MatchB")
   matchesWon               Match[]                    @relation("MatchWinner")
+  duelPoolSlotsOwned       DuelPoolSlot[]             @relation("DuelPoolOwner")
+  duelPoolSlotsAsOpponent  DuelPoolSlot[]             @relation("DuelPoolOpponent")
   interactiveMatchesAsA    InteractiveMatchSession[]  @relation("InteractiveMatchPlayerA")
   interactiveMatchesAsB    InteractiveMatchSession[]  @relation("InteractiveMatchPlayerB")
   interactiveMatchFeedback InteractiveMatchFeedback[]
@@ -382,6 +384,20 @@ model Match {
 
   @@index([playerAId, playedAt])
   @@index([playerBId, playedAt])
+}
+
+model DuelPoolSlot {
+  id         String   @id @default(cuid())
+  playerId   String
+  player     Player   @relation("DuelPoolOwner", fields: [playerId], references: [id], onDelete: Cascade)
+  opponentId String
+  opponent   Player   @relation("DuelPoolOpponent", fields: [opponentId], references: [id], onDelete: Cascade)
+  slotIndex  Int
+  assignedAt DateTime @default(now())
+
+  @@unique([playerId, slotIndex])
+  @@unique([playerId, opponentId])
+  @@index([opponentId])
 }
 
 model InteractiveMatchSession {

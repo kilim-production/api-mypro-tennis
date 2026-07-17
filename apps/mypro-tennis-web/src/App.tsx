@@ -587,11 +587,11 @@ type MatchListItem = {
   playerB: MatchSummaryPlayer;
 };
 type DuelPool = {
-  allowedRankings: string[];
+  overallRange: { min: number; max: number; delta: number };
   opponents: Player[];
 };
 type DuelSearch = {
-  allowedRankings: string[];
+  overallRange: { min: number; max: number; delta: number };
   results: Player[];
 };
 type ReplayEvent = {
@@ -1233,12 +1233,12 @@ function Shell({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     markNotificationsRead(pageNotifications.map((notification) => notification.id));
     void Promise.all(
-        pageNotifications.map((notification) =>
-          api(`/notifications/${notification.id}/read`, { method: "PATCH" })
-        )
-      ).catch(() => {
-        if (!cancelled) void refresh();
-      });
+      pageNotifications.map((notification) =>
+        api(`/notifications/${notification.id}/read`, { method: "PATCH" })
+      )
+    ).catch(() => {
+      if (!cancelled) void refresh();
+    });
 
     return () => {
       cancelled = true;
@@ -4300,9 +4300,7 @@ function MatchStartPage() {
       setSearchResults(data.results);
       if (data.results.length === 0) {
         setMessage(
-          `Aucun joueur réel trouvé dans votre zone de classement : ${data.allowedRankings.join(
-            " / "
-          )}.`
+          `Aucun joueur réel trouvé avec une note globale comprise entre ${data.overallRange.min} et ${data.overallRange.max}.`
         );
       }
     } catch (error) {
@@ -4373,9 +4371,9 @@ function MatchStartPage() {
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-300">Duel</p>
             <h1 className="text-2xl font-black">Choisissez votre adversaire</h1>
             <p className="mt-2 text-sm text-slate-300">
-              Trois profils réels ou IA sont proposés dans votre zone de classement :{" "}
-              {pool?.allowedRankings.join(" / ") ?? "..."}. Après chaque duel, un nouveau pool de
-              trois profils sera généré.
+              Trois profils réels ou IA sont proposés avec une note globale comprise entre{" "}
+              {pool ? `${pool.overallRange.min} et ${pool.overallRange.max}` : "..."}. Un profil
+              reste visible jusqu’à ce que vous l’affrontiez.
             </p>
             <p className="mt-2 text-sm text-slate-400">
               Un joueur réel ne peut pas être affronté plus de 2 fois par jour en duel.
@@ -4428,8 +4426,8 @@ function MatchStartPage() {
               </p>
               <h2 className="text-2xl font-black">Chercher un joueur réel</h2>
               <p className="mt-2 text-sm text-slate-300">
-                Recherchez un ami par prénom ou nom. Seuls les joueurs dans votre zone de classement
-                peuvent être défiés.
+                Recherchez un ami par prénom ou nom. Seuls les joueurs dans votre fourchette de note
+                globale peuvent être défiés.
               </p>
             </div>
             <form className="mt-4 flex flex-col gap-3 sm:flex-row" onSubmit={searchOpponents}>
@@ -5733,181 +5731,181 @@ export function App() {
       <Shell>
         <Suspense fallback={<LoadingScreen />}>
           <Routes>
-          <Route path="/" element={<HomeRoute />} />
-          <Route path="/login" element={<AuthPage mode="login" />} />
-          <Route path="/signup" element={<AuthPage mode="signup" />} />
-          <Route path="/oauth/google" element={<GoogleOAuthCallback />} />
-          <Route
-            path="/create-player"
-            element={
-              <NeedAuth>
-                <CreatePlayer />
-              </NeedAuth>
-            }
-          />
-          <Route
-            path="/dashboard"
-            element={
-              <NeedAuth>
-                <NeedPlayer>
-                  <Dashboard />
-                </NeedPlayer>
-              </NeedAuth>
-            }
-          />
-          <Route
-            path="/player"
-            element={
-              <NeedAuth>
-                <NeedPlayer>
-                  <PlayerPage />
-                </NeedPlayer>
-              </NeedAuth>
-            }
-          />
-          <Route
-            path="/skills"
-            element={
-              <NeedAuth>
-                <NeedPlayer>
-                  <SkillsCinematicPage
-                    getStatLabel={(key) => statLabels[key] ?? key}
-                    getStatVisual={statVisual}
-                    resolveHeroSource={avatarHeroSource}
-                    statKeys={profileStatKeys}
-                  />
-                </NeedPlayer>
-              </NeedAuth>
-            }
-          />
-          <Route
-            path="/collection"
-            element={
-              <NeedAuth>
-                <NeedPlayer>
-                  <CollectionCinematicPage />
-                </NeedPlayer>
-              </NeedAuth>
-            }
-          />
-          <Route
-            path="/collection/coach-deck"
-            element={
-              <NeedAuth>
-                <NeedPlayer>
-                  <CoachDeckBuilderPage />
-                </NeedPlayer>
-              </NeedAuth>
-            }
-          />
-          <Route
-            path="/coach-deck/tutorial"
-            element={
-              <CoachDeckTutorialPage
-                resolveHeroSource={avatarHeroSource}
-                resolvePictureSource={avatarPictureSource}
-              />
-            }
-          />
-          <Route
-            path="/club"
-            element={
-              <NeedAuth>
-                <NeedPlayer>
-                  <ClubPage />
-                </NeedPlayer>
-              </NeedAuth>
-            }
-          />
-          <Route
-            path="/season"
-            element={
-              <NeedAuth>
-                <NeedPlayer>
-                  <SeasonPage />
-                </NeedPlayer>
-              </NeedAuth>
-            }
-          />
-          <Route
-            path="/tournaments"
-            element={
-              <NeedAuth>
-                <NeedPlayer>
-                  <SeasonPage />
-                </NeedPlayer>
-              </NeedAuth>
-            }
-          />
-          <Route
-            path="/duel"
-            element={
-              <NeedAuth>
-                <NeedPlayer>
-                  <DuelPage
-                    resolveHeroSource={avatarHeroSource}
-                    resolvePictureSource={avatarPictureSource}
-                  />
-                </NeedPlayer>
-              </NeedAuth>
-            }
-          />
-          <Route path="/match" element={<Navigate to="/duel" replace />} />
-          <Route
-            path="/match-live/:id"
-            element={
-              <NeedAuth>
-                <NeedPlayer>
-                  <InteractiveMatchPage
-                    resolveHeroSource={avatarHeroSource}
-                    resolvePictureSource={avatarPictureSource}
-                  />
-                </NeedPlayer>
-              </NeedAuth>
-            }
-          />
-          <Route
-            path="/match/:id"
-            element={
-              <NeedAuth>
-                <NeedPlayer>
-                  <AutomaticMatchPage
-                    resolveHeroSource={avatarHeroSource}
-                    resolvePictureSource={avatarPictureSource}
-                  />
-                </NeedPlayer>
-              </NeedAuth>
-            }
-          />
-          <Route
-            path="/matches"
-            element={
-              <NeedAuth>
-                <NeedPlayer>
-                  <MatchesPage />
-                </NeedPlayer>
-              </NeedAuth>
-            }
-          />
-          <Route path="/rankings" element={<RankingsPage />} />
-          <Route
-            path="/online"
-            element={
-              <NeedAuth>
-                <OnlinePage />
-              </NeedAuth>
-            }
-          />
-          <Route path="/community" element={<CommunityPage />} />
-          <Route path="/profile/:id" element={<ProfilePage />} />
-          <Route
-            path="/settings"
-            element={
-              <NeedAuth>
-                <SettingsPage />
-              </NeedAuth>
-            }
-          />
+            <Route path="/" element={<HomeRoute />} />
+            <Route path="/login" element={<AuthPage mode="login" />} />
+            <Route path="/signup" element={<AuthPage mode="signup" />} />
+            <Route path="/oauth/google" element={<GoogleOAuthCallback />} />
+            <Route
+              path="/create-player"
+              element={
+                <NeedAuth>
+                  <CreatePlayer />
+                </NeedAuth>
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <NeedAuth>
+                  <NeedPlayer>
+                    <Dashboard />
+                  </NeedPlayer>
+                </NeedAuth>
+              }
+            />
+            <Route
+              path="/player"
+              element={
+                <NeedAuth>
+                  <NeedPlayer>
+                    <PlayerPage />
+                  </NeedPlayer>
+                </NeedAuth>
+              }
+            />
+            <Route
+              path="/skills"
+              element={
+                <NeedAuth>
+                  <NeedPlayer>
+                    <SkillsCinematicPage
+                      getStatLabel={(key) => statLabels[key] ?? key}
+                      getStatVisual={statVisual}
+                      resolveHeroSource={avatarHeroSource}
+                      statKeys={profileStatKeys}
+                    />
+                  </NeedPlayer>
+                </NeedAuth>
+              }
+            />
+            <Route
+              path="/collection"
+              element={
+                <NeedAuth>
+                  <NeedPlayer>
+                    <CollectionCinematicPage />
+                  </NeedPlayer>
+                </NeedAuth>
+              }
+            />
+            <Route
+              path="/collection/coach-deck"
+              element={
+                <NeedAuth>
+                  <NeedPlayer>
+                    <CoachDeckBuilderPage />
+                  </NeedPlayer>
+                </NeedAuth>
+              }
+            />
+            <Route
+              path="/coach-deck/tutorial"
+              element={
+                <CoachDeckTutorialPage
+                  resolveHeroSource={avatarHeroSource}
+                  resolvePictureSource={avatarPictureSource}
+                />
+              }
+            />
+            <Route
+              path="/club"
+              element={
+                <NeedAuth>
+                  <NeedPlayer>
+                    <ClubPage />
+                  </NeedPlayer>
+                </NeedAuth>
+              }
+            />
+            <Route
+              path="/season"
+              element={
+                <NeedAuth>
+                  <NeedPlayer>
+                    <SeasonPage />
+                  </NeedPlayer>
+                </NeedAuth>
+              }
+            />
+            <Route
+              path="/tournaments"
+              element={
+                <NeedAuth>
+                  <NeedPlayer>
+                    <SeasonPage />
+                  </NeedPlayer>
+                </NeedAuth>
+              }
+            />
+            <Route
+              path="/duel"
+              element={
+                <NeedAuth>
+                  <NeedPlayer>
+                    <DuelPage
+                      resolveHeroSource={avatarHeroSource}
+                      resolvePictureSource={avatarPictureSource}
+                    />
+                  </NeedPlayer>
+                </NeedAuth>
+              }
+            />
+            <Route path="/match" element={<Navigate to="/duel" replace />} />
+            <Route
+              path="/match-live/:id"
+              element={
+                <NeedAuth>
+                  <NeedPlayer>
+                    <InteractiveMatchPage
+                      resolveHeroSource={avatarHeroSource}
+                      resolvePictureSource={avatarPictureSource}
+                    />
+                  </NeedPlayer>
+                </NeedAuth>
+              }
+            />
+            <Route
+              path="/match/:id"
+              element={
+                <NeedAuth>
+                  <NeedPlayer>
+                    <AutomaticMatchPage
+                      resolveHeroSource={avatarHeroSource}
+                      resolvePictureSource={avatarPictureSource}
+                    />
+                  </NeedPlayer>
+                </NeedAuth>
+              }
+            />
+            <Route
+              path="/matches"
+              element={
+                <NeedAuth>
+                  <NeedPlayer>
+                    <MatchesPage />
+                  </NeedPlayer>
+                </NeedAuth>
+              }
+            />
+            <Route path="/rankings" element={<RankingsPage />} />
+            <Route
+              path="/online"
+              element={
+                <NeedAuth>
+                  <OnlinePage />
+                </NeedAuth>
+              }
+            />
+            <Route path="/community" element={<CommunityPage />} />
+            <Route path="/profile/:id" element={<ProfilePage />} />
+            <Route
+              path="/settings"
+              element={
+                <NeedAuth>
+                  <SettingsPage />
+                </NeedAuth>
+              }
+            />
           </Routes>
         </Suspense>
       </Shell>

@@ -47,6 +47,14 @@ import {
 } from "../services/equipment";
 import { createServerMatch } from "../services/matches";
 import {
+  DUEL_POOL_SIZE,
+  duelOverallRange,
+  duelPoolSlotIsValid,
+  isWithinDuelOverallRange,
+  orderDuelPoolCandidates,
+  type DuelCandidateHistory
+} from "../services/duelPool";
+import {
   InteractiveMatchSessionError,
   abandonInteractiveMatchSession,
   coachInteractiveMatchSession,
@@ -318,42 +326,31 @@ async function getOrCreateSeasonOpponent(
   });
 }
 
-function duelRankingPool(playerRanking: string) {
-  const currentIndex = Math.max(0, fftRankingPath.indexOf(playerRanking as FftRanking));
-  return [currentIndex - 1, currentIndex, currentIndex + 1]
-    .map(clampRankingIndex)
-    .filter((index, position, all) => all.indexOf(index) === position)
-    .map((index) => fftRankingPath[index] ?? "NC");
-}
-
 function duelPoolSeed(player: { id: string; wins: number; losses: number; fftRanking: string }) {
   return `${player.id}-${player.fftRanking}-${player.wins}-${player.losses}`;
 }
 
 async function getOrCreateDuelAiOpponent(params: {
   player: { id: string; fftRanking: string; overall: number };
-  ranking: FftRanking;
   seed: string;
   slot: number;
+  excludedIds: string[];
 }) {
   const seedNumber = Math.floor(seededRatio(`${params.seed}-${params.slot}`) * 100_000);
-  const targetOverall = targetOverallForRanking(
-    params.player.overall,
-    params.player.fftRanking,
-    params.ranking
-  );
+  const range = duelOverallRange(params.player.overall);
+  const targetOverall = range.min + (seedNumber % Math.max(1, range.max - range.min + 1));
   const identity = aiIdentity(seedNumber + params.slot);
   const existing = await prisma.player.findFirst({
     where: {
+      id: { notIn: [params.player.id, ...params.excludedIds] },
       isAi: true,
       firstName: identity.firstName,
       lastName: identity.lastName,
-      fftRanking: params.ranking,
-      overall: { gte: targetOverall - 3, lte: targetOverall + 3 }
+      overall: { gte: range.min, lte: range.max }
     }
   });
   if (existing) return existing;
-  const stats = tunedStatsForOverall(targetOverall + (params.slot % 3) - 1, seedNumber);
+  const stats = tunedStatsForOverall(targetOverall, seedNumber);
   return prisma.player.create({
     data: {
       firstName: identity.firstName,
@@ -367,12 +364,37 @@ async function getOrCreateDuelAiOpponent(params: {
       isAi: true,
       stats: encodeJson(stats),
       overall: calculateOverall(stats),
-      fftRanking: params.ranking,
+      fftRanking: params.player.fftRanking,
       amateurPoints: targetOverall * 18,
       rankingPoints: targetOverall * 22,
       worldRank: 600 + seedNumber
     }
   });
+}
+
+async function duelCandidateHistory(playerId: string, opponentIds: string[]) {
+  const history = new Map<string, DuelCandidateHistory>();
+  if (!opponentIds.length) return history;
+  const matches = await prisma.match.findMany({
+    where: {
+      type: { startsWith: "Duel" },
+      OR: [
+        { playerAId: playerId, playerBId: { in: opponentIds } },
+        { playerBId: playerId, playerAId: { in: opponentIds } }
+      ]
+    },
+    select: { playerAId: true, playerBId: true, playedAt: true },
+    orderBy: { playedAt: "desc" }
+  });
+  for (const match of matches) {
+    const opponentId = match.playerAId === playerId ? match.playerBId : match.playerAId;
+    const current = history.get(opponentId);
+    history.set(opponentId, {
+      count: (current?.count ?? 0) + 1,
+      lastPlayedAt: current?.lastPlayedAt ?? match.playedAt
+    });
+  }
+  return history;
 }
 
 async function buildDuelPool(player: {
@@ -382,32 +404,114 @@ async function buildDuelPool(player: {
   wins: number;
   losses: number;
 }) {
-  const allowedRankings = duelRankingPool(player.fftRanking);
+  const range = duelOverallRange(player.overall);
   const dailyLimitedRealOpponentIds = await realOpponentIdsAtDailyLimit(player.id);
   const seed = duelPoolSeed(player);
-  const realCandidates = await prisma.player.findMany({
+  const existingSlots = await prisma.duelPoolSlot.findMany({
+    where: { playerId: player.id },
+    include: { opponent: true },
+    orderBy: { slotIndex: "asc" }
+  });
+  const earliestAssignment = existingSlots.reduce<Date | null>(
+    (earliest, slot) => (!earliest || slot.assignedAt < earliest ? slot.assignedAt : earliest),
+    null
+  );
+  const matchesSinceAssignment = earliestAssignment
+    ? await prisma.match.findMany({
+        where: {
+          type: { startsWith: "Duel" },
+          playedAt: { gte: earliestAssignment },
+          OR: [{ playerAId: player.id }, { playerBId: player.id }]
+        },
+        select: { playerAId: true, playerBId: true, playedAt: true },
+        orderBy: { playedAt: "desc" }
+      })
+    : [];
+  const lastDuelByOpponent = new Map<string, Date>();
+  for (const match of matchesSinceAssignment) {
+    const opponentId = match.playerAId === player.id ? match.playerBId : match.playerAId;
+    if (!lastDuelByOpponent.has(opponentId)) lastDuelByOpponent.set(opponentId, match.playedAt);
+  }
+
+  const slotsByIndex = new Map<number, (typeof existingSlots)[number]["opponent"]>();
+  const occupiedOpponentIds = new Set<string>();
+  const blockedForThisRefresh = new Set<string>();
+  const invalidSlotIds: string[] = [];
+  for (const slot of existingSlots) {
+    const lastDuel = lastDuelByOpponent.get(slot.opponentId);
+    const duplicate =
+      slot.slotIndex < 0 ||
+      slot.slotIndex >= DUEL_POOL_SIZE ||
+      slotsByIndex.has(slot.slotIndex) ||
+      occupiedOpponentIds.has(slot.opponentId);
+    const valid =
+      !duplicate &&
+      slot.opponentId !== player.id &&
+      duelPoolSlotIsValid({
+        playerOverall: player.overall,
+        opponentOverall: slot.opponent.overall,
+        dailyLimitReached: !slot.opponent.isAi && dailyLimitedRealOpponentIds.has(slot.opponentId),
+        playedSinceAssigned: Boolean(lastDuel && lastDuel >= slot.assignedAt)
+      });
+    if (!valid) {
+      invalidSlotIds.push(slot.id);
+      blockedForThisRefresh.add(slot.opponentId);
+      continue;
+    }
+    slotsByIndex.set(slot.slotIndex, slot.opponent);
+    occupiedOpponentIds.add(slot.opponentId);
+  }
+  if (invalidSlotIds.length) {
+    await prisma.duelPoolSlot.deleteMany({ where: { id: { in: invalidSlotIds } } });
+  }
+
+  const excludedIds = [
+    player.id,
+    ...dailyLimitedRealOpponentIds,
+    ...occupiedOpponentIds,
+    ...blockedForThisRefresh
+  ];
+  const candidates = await prisma.player.findMany({
     where: {
-      id: { notIn: [player.id, ...dailyLimitedRealOpponentIds] },
-      isAi: false,
-      fftRanking: { in: allowedRankings }
+      id: { notIn: excludedIds },
+      overall: { gte: range.min, lte: range.max }
     }
   });
-  const sortedRealCandidates = [...realCandidates].sort(
-    (left, right) => seededRatio(`${seed}-${right.id}`) - seededRatio(`${seed}-${left.id}`)
+  const candidateHistory = await duelCandidateHistory(
+    player.id,
+    candidates.map((candidate) => candidate.id)
   );
-  const aiRanking = allowedRankings.includes(player.fftRanking as FftRanking)
-    ? (player.fftRanking as FftRanking)
-    : (allowedRankings[0] ?? "NC");
-  const pool = [
-    await getOrCreateDuelAiOpponent({ player, ranking: aiRanking, seed, slot: 0 }),
-    ...sortedRealCandidates.slice(0, 2)
-  ];
-  while (pool.length < 3) {
-    const ranking =
-      allowedRankings[pool.length % allowedRankings.length] ?? (player.fftRanking as FftRanking);
-    pool.push(await getOrCreateDuelAiOpponent({ player, ranking, seed, slot: pool.length }));
+  const orderedCandidates = orderDuelPoolCandidates(candidates, candidateHistory, seed);
+
+  for (let slotIndex = 0; slotIndex < DUEL_POOL_SIZE; slotIndex += 1) {
+    if (slotsByIndex.has(slotIndex)) continue;
+    let opponent = orderedCandidates.shift();
+    let attempt = 0;
+    while (!opponent && attempt < 12) {
+      opponent = await getOrCreateDuelAiOpponent({
+        player,
+        seed: `${seed}-${attempt}`,
+        slot: slotIndex,
+        excludedIds: [...occupiedOpponentIds, ...blockedForThisRefresh]
+      });
+      if (occupiedOpponentIds.has(opponent.id) || blockedForThisRefresh.has(opponent.id)) {
+        opponent = undefined;
+        attempt += 1;
+      }
+    }
+    if (!opponent) continue;
+    const assignedAt = new Date();
+    await prisma.duelPoolSlot.upsert({
+      where: { playerId_slotIndex: { playerId: player.id, slotIndex } },
+      update: { opponentId: opponent.id, assignedAt },
+      create: { playerId: player.id, opponentId: opponent.id, slotIndex, assignedAt }
+    });
+    slotsByIndex.set(slotIndex, opponent);
+    occupiedOpponentIds.add(opponent.id);
   }
-  return pool.slice(0, 3);
+  return Array.from({ length: DUEL_POOL_SIZE }, (_, slotIndex) =>
+    slotsByIndex.get(slotIndex)
+  ).filter((opponent): opponent is NonNullable<typeof opponent> => Boolean(opponent));
 }
 
 function todayBounds(now = new Date()) {
@@ -422,6 +526,7 @@ async function realOpponentMatchCountToday(playerId: string, opponentId: string)
   const { start, end } = todayBounds();
   return prisma.match.count({
     where: {
+      type: { startsWith: "Duel" },
       playedAt: { gte: start, lt: end },
       OR: [
         { playerAId: playerId, playerBId: opponentId },
@@ -435,6 +540,7 @@ async function realOpponentIdsAtDailyLimit(playerId: string) {
   const { start, end } = todayBounds();
   const matches = await prisma.match.findMany({
     where: {
+      type: { startsWith: "Duel" },
       playedAt: { gte: start, lt: end },
       OR: [{ playerAId: playerId }, { playerBId: playerId }]
     },
@@ -1452,7 +1558,7 @@ gameRouter.get("/matches/duel-pool", requireAuth, async (request, response) => {
   if (!player) return response.status(404).json({ message: "Joueur introuvable." });
   const pool = await buildDuelPool(player);
   return response.json({
-    allowedRankings: duelRankingPool(player.fftRanking),
+    overallRange: duelOverallRange(player.overall),
     opponents: pool.map(publicPlayer)
   });
 });
@@ -1466,26 +1572,31 @@ gameRouter.get("/matches/duel-search", requireAuth, async (request, response) =>
   if (query.length < 2) {
     return response.status(400).json({ message: "Saisissez au moins 2 caractères." });
   }
-  const allowedRankings = duelRankingPool(player.fftRanking);
+  const overallRange = duelOverallRange(player.overall);
   const dailyLimitedRealOpponentIds = await realOpponentIdsAtDailyLimit(player.id);
   const candidates = await prisma.player.findMany({
     where: {
       id: { notIn: [player.id, ...dailyLimitedRealOpponentIds] },
       isAi: false,
-      fftRanking: { in: allowedRankings }
+      overall: { gte: overallRange.min, lte: overallRange.max }
     },
-    orderBy: [{ overall: "desc" }, { updatedAt: "desc" }],
+    orderBy: { updatedAt: "desc" },
     take: 100
   });
   const results = candidates
     .filter((candidate) =>
-      `${candidate.firstName} ${candidate.lastName} ${candidate.fftRanking}`
+      `${candidate.firstName} ${candidate.lastName} ${candidate.fftRanking} ${candidate.overall}`
         .toLowerCase()
         .includes(query)
     )
+    .sort(
+      (left, right) =>
+        Math.abs(left.overall - player.overall) - Math.abs(right.overall - player.overall) ||
+        right.updatedAt.getTime() - left.updatedAt.getTime()
+    )
     .slice(0, 10);
   return response.json({
-    allowedRankings,
+    overallRange,
     results: results.map(publicPlayer)
   });
 });
@@ -1521,10 +1632,11 @@ gameRouter.post(
         })) ?? undefined;
     }
     if (!opponent) return response.status(404).json({ message: "Adversaire introuvable." });
-    if (!duelRankingPool(player.fftRanking).includes(opponent.fftRanking as FftRanking)) {
-      return response
-        .status(403)
-        .json({ message: "Cet adversaire doit être dans votre zone de classement de duel." });
+    if (!isWithinDuelOverallRange(player.overall, opponent.overall)) {
+      const range = duelOverallRange(player.overall);
+      return response.status(403).json({
+        message: `La note globale de cet adversaire doit être comprise entre ${range.min} et ${range.max}.`
+      });
     }
     if (!opponent.isAi) {
       const matchCount = await realOpponentMatchCountToday(player.id, opponent.id);
@@ -1734,10 +1846,11 @@ gameRouter.post(
         })) ?? undefined;
     }
     if (!opponent) return response.status(404).json({ message: "Adversaire introuvable." });
-    if (!duelRankingPool(player.fftRanking).includes(opponent.fftRanking as FftRanking)) {
-      return response
-        .status(403)
-        .json({ message: "Cet adversaire doit être dans votre zone de classement de duel." });
+    if (!isWithinDuelOverallRange(player.overall, opponent.overall)) {
+      const range = duelOverallRange(player.overall);
+      return response.status(403).json({
+        message: `La note globale de cet adversaire doit être comprise entre ${range.min} et ${range.max}.`
+      });
     }
     if (!opponent.isAi) {
       const matchCount = await realOpponentMatchCountToday(player.id, opponent.id);
