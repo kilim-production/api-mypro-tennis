@@ -1,4 +1,4 @@
-import type { Player, Prisma } from "@prisma/client";
+import type { Player, PlayerCoachCard, Prisma } from "@prisma/client";
 import { prisma } from "@mypro/database";
 import {
   COACH_CARD_MASTERY_VARIANTS,
@@ -19,6 +19,8 @@ const coachDeckInclude = {
   cards: { orderBy: { position: "asc" as const } }
 };
 
+type CoachDeckWithCards = Prisma.CoachDeckGetPayload<{ include: { cards: true } }>;
+
 export class CoachDeckError extends Error {
   constructor(
     message: string,
@@ -38,8 +40,16 @@ function unlockedCardIdsForLevel(playerLevel: number) {
 
 async function unlockEligibleCards(player: Player) {
   const cardIds = unlockedCardIdsForLevel(player.playerLevel);
+  const ownedCards = await prisma.playerCoachCard.findMany({
+    where: { playerId: player.id, cardId: { in: cardIds } },
+    select: { cardId: true }
+  });
+  const ownedCardIds = new Set(ownedCards.map((card) => card.cardId));
+  const missingCardIds = cardIds.filter((cardId) => !ownedCardIds.has(cardId));
+  if (missingCardIds.length === 0) return;
+
   await prisma.$transaction(
-    cardIds.map((cardId) =>
+    missingCardIds.map((cardId) =>
       prisma.playerCoachCard.upsert({
         where: { playerId_cardId: { playerId: player.id, cardId } },
         create: { playerId: player.id, cardId },
@@ -113,18 +123,7 @@ export async function ensureCoachDeckReady(player: Player) {
   return ensureStarterDeck(player);
 }
 
-async function statePayload(player: Player) {
-  const [ownedCards, decks] = await Promise.all([
-    prisma.playerCoachCard.findMany({
-      where: { playerId: player.id },
-      orderBy: [{ masteryLevel: "desc" }, { unlockedAt: "asc" }]
-    }),
-    prisma.coachDeck.findMany({
-      where: { playerId: player.id },
-      include: coachDeckInclude,
-      orderBy: [{ isActive: "desc" }, { updatedAt: "desc" }]
-    })
-  ]);
+function buildStatePayload(ownedCards: PlayerCoachCard[], decks: CoachDeckWithCards[]) {
   const ownedById = new Map(ownedCards.map((card) => [card.cardId, card]));
   return {
     rules: {
@@ -166,9 +165,53 @@ async function statePayload(player: Player) {
   };
 }
 
+async function statePayload(player: Player) {
+  const [ownedCards, decks] = await Promise.all([
+    prisma.playerCoachCard.findMany({
+      where: { playerId: player.id },
+      orderBy: [{ masteryLevel: "desc" }, { unlockedAt: "asc" }]
+    }),
+    prisma.coachDeck.findMany({
+      where: { playerId: player.id },
+      include: coachDeckInclude,
+      orderBy: [{ isActive: "desc" }, { updatedAt: "desc" }]
+    })
+  ]);
+  return buildStatePayload(ownedCards, decks);
+}
+
 export async function getCoachDeckState(player: Player) {
-  await ensureCoachDeckReady(player);
-  return statePayload(player);
+  const [ownedCards, decks] = await Promise.all([
+    prisma.playerCoachCard.findMany({
+      where: { playerId: player.id },
+      orderBy: [{ masteryLevel: "desc" }, { unlockedAt: "asc" }]
+    }),
+    prisma.coachDeck.findMany({
+      where: { playerId: player.id },
+      include: coachDeckInclude,
+      orderBy: [{ isActive: "desc" }, { updatedAt: "desc" }]
+    })
+  ]);
+  const eligibleCardIds = unlockedCardIdsForLevel(player.playerLevel);
+  const ownedCardIds = new Set(ownedCards.map((card) => card.cardId));
+  const validDecks = decks.filter((deck) =>
+    validateCoachDeck(deck.cards.map((card) => card.cardId)).valid
+  );
+  const activeDecks = decks.filter((deck) => deck.isActive);
+  const selectedDeck =
+    validDecks.find((deck) => deck.isActive) ?? validDecks[0] ?? activeDecks[0] ?? decks[0];
+  const needsRepair =
+    eligibleCardIds.some((cardId) => !ownedCardIds.has(cardId)) ||
+    decks.length === 0 ||
+    validDecks.length !== decks.length ||
+    !selectedDeck?.isActive ||
+    activeDecks.length !== 1;
+
+  if (needsRepair) {
+    await ensureCoachDeckReady(player);
+    return statePayload(player);
+  }
+  return buildStatePayload(ownedCards, decks);
 }
 
 export async function getCoachDeckSnapshot(player: Player, requestedDeckId?: string) {

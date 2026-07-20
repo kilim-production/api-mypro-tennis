@@ -405,13 +405,15 @@ async function buildDuelPool(player: {
   losses: number;
 }) {
   const range = duelOverallRange(player.overall);
-  const dailyLimitedRealOpponentIds = await realOpponentIdsAtDailyLimit(player.id);
   const seed = duelPoolSeed(player);
-  const existingSlots = await prisma.duelPoolSlot.findMany({
-    where: { playerId: player.id },
-    include: { opponent: true },
-    orderBy: { slotIndex: "asc" }
-  });
+  const [dailyLimitedRealOpponentIds, existingSlots] = await Promise.all([
+    realOpponentIdsAtDailyLimit(player.id),
+    prisma.duelPoolSlot.findMany({
+      where: { playerId: player.id },
+      include: { opponent: true },
+      orderBy: { slotIndex: "asc" }
+    })
+  ]);
   const earliestAssignment = existingSlots.reduce<Date | null>(
     (earliest, slot) => (!earliest || slot.assignedAt < earliest ? slot.assignedAt : earliest),
     null
@@ -463,6 +465,12 @@ async function buildDuelPool(player: {
   }
   if (invalidSlotIds.length) {
     await prisma.duelPoolSlot.deleteMany({ where: { id: { in: invalidSlotIds } } });
+  }
+
+  if (slotsByIndex.size === DUEL_POOL_SIZE) {
+    return Array.from({ length: DUEL_POOL_SIZE }, (_, slotIndex) =>
+      slotsByIndex.get(slotIndex)
+    ).filter((opponent): opponent is NonNullable<typeof opponent> => Boolean(opponent));
   }
 
   const excludedIds = [
@@ -1074,7 +1082,10 @@ gameRouter.post("/coach-decks/:id/activate", requireAuth, async (request, respon
 gameRouter.get("/chests", requireAuth, async (request, response) => {
   const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
   if (!player) return response.status(404).json({ message: "Joueur introuvable." });
-  return response.json({ catalog: chestPublicCatalog(), ...(await getChestState(player.id)) });
+  return response.json({
+    catalog: chestPublicCatalog(),
+    ...(await getChestState(player.id, player.gems))
+  });
 });
 
 gameRouter.post("/chests/:id/open", requireAuth, async (request, response) => {
@@ -1114,7 +1125,7 @@ gameRouter.post("/cards/:statKey/unlock", requireAuth, async (request, response)
   if (!player) return response.status(404).json({ message: "Joueur introuvable." });
   try {
     await unlockStatCardBonus(player.id, statKey);
-    return response.json(await getChestState(player.id));
+    return response.json(await getChestState(player.id, player.gems));
   } catch (error) {
     return response
       .status(409)

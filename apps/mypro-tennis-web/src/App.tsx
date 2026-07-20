@@ -131,7 +131,7 @@ const routeDataPaths: Record<string, readonly string[]> = {
   "/club": ["/clubs/me"],
   "/season": ["/season"],
   "/tournaments": ["/tournaments"],
-  "/duel": ["/matches/duel-pool"],
+  "/duel": ["/matches/duel-pool", "/matches/interactive/active", "/coach-decks"],
   "/matches": ["/matches"],
   "/rankings": ["/rankings"]
 };

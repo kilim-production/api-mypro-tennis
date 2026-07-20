@@ -217,7 +217,7 @@ export function chestPublicCatalog() {
   }));
 }
 
-export async function getChestState(playerId: string) {
+export async function getChestState(playerId: string, knownGems?: number) {
   const [chests, cards, cosmeticsOwned, player] = await Promise.all([
     prisma.tennisBagChest.findMany({
       where: { playerId, openedAt: null },
@@ -225,7 +225,9 @@ export async function getChestState(playerId: string) {
     }),
     prisma.playerStatCard.findMany({ where: { playerId }, orderBy: { statKey: "asc" } }),
     prisma.playerCosmetic.findMany({ where: { playerId }, orderBy: { ownedAt: "desc" } }),
-    prisma.player.findUnique({ where: { id: playerId } })
+    knownGems === undefined
+      ? prisma.player.findUnique({ where: { id: playerId }, select: { gems: true } })
+      : Promise.resolve(null)
   ]);
   const slots = Array.from({ length: 4 }, (_, slotIndex) => ({
     slotIndex,
@@ -251,7 +253,7 @@ export async function getChestState(playerId: string) {
       };
     }),
     cosmetics: cosmeticsOwned.map(cosmeticPublicPayload),
-    gems: player?.gems ?? 0
+    gems: knownGems ?? player?.gems ?? 0
   };
 }
 

@@ -64,11 +64,12 @@ function cacheDuration(path: string) {
     path === "/clubs/me" ||
     path === "/clubs/team-championship" ||
     path === "/skills" ||
-    path === "/players/me/career" ||
-    path === "/coach-decks"
+    path === "/players/me/career"
   )
     return 15_000;
-  if (path === "/season" || path === "/chests" || path === "/matches/duel-pool") return 10_000;
+  if (path === "/chests" || path === "/coach-decks" || path === "/matches/duel-pool")
+    return 60_000;
+  if (path === "/season") return 10_000;
   return 0;
 }
 
