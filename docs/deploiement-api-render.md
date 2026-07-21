@@ -57,9 +57,20 @@ CLIENT_URL=https://votre-site-netlify.netlify.app
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_REDIRECT_URI=https://votre-api-render.onrender.com/api/auth/google/callback
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_LIVE_PAYMENTS_ENABLED=0
 ```
 
 Render fournit automatiquement `PORT`, donc il n'est pas necessaire de le renseigner.
+
+Pour tester la Boutique, utilisez d'abord les cles Stripe de test. Dans Stripe, creez un endpoint webhook vers :
+
+```text
+https://votre-api-render.onrender.com/api/shop/stripe/webhook
+```
+
+Activez les evenements `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`, `charge.refunded`, `refund.created` et `refund.updated`, puis copiez le secret `whsec_...` dans Render. Le passage en production demande une cle `sk_live_...` et `STRIPE_LIVE_PAYMENTS_ENABLED=1` ; cette confirmation separee evite d'activer les paiements reels par erreur.
 
 `CLIENT_URL` accepte plusieurs URLs separees par des virgules :
 
@@ -87,11 +98,17 @@ Quand le deploy est termine, ouvrez :
 https://votre-api-render.onrender.com/health
 ```
 
-La reponse attendue est :
+Avant la configuration de Stripe, la reponse attendue est :
 
 ```json
-{ "ok": true, "service": "MYPRO - TENNIS" }
+{
+  "ok": true,
+  "service": "MYPRO - TENNIS",
+  "payments": { "stripe": { "ready": false, "mode": "UNCONFIGURED" } }
+}
 ```
+
+Apres l'ajout de la cle de test et du secret du webhook, `ready` doit passer a `true` et `mode` a `TEST`. La procedure de recette complete se trouve dans `docs/stripe-boutique.md`.
 
 ## 7. Reconnecter Netlify a l'API
 

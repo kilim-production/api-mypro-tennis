@@ -27,6 +27,9 @@ export const config = {
   clientUrls,
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY?.trim() ?? "",
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET?.trim() ?? "",
+  stripeLivePaymentsEnabled: process.env.STRIPE_LIVE_PAYMENTS_ENABLED === "1",
   googleRedirectUri:
     process.env.GOOGLE_REDIRECT_URI ??
     `http://localhost:${Number(process.env.SERVER_PORT ?? 4000)}/api/auth/google/callback`

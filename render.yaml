@@ -23,3 +23,9 @@ services:
         sync: false
       - key: GOOGLE_REDIRECT_URI
         sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_LIVE_PAYMENTS_ENABLED
+        value: "0"

@@ -11,6 +11,8 @@ import { playersRouter } from "./routes/players";
 import { trainingRouter } from "./routes/training";
 import { clubsRouter } from "./routes/clubs";
 import { gameRouter } from "./routes/game";
+import { stripeShopWebhook } from "./routes/stripeWebhook";
+import { stripeShopConfiguration } from "./services/stripeShop";
 
 const app = express();
 const server = http.createServer(app);
@@ -27,9 +29,26 @@ const io = new Server(server, { cors: { origin: config.clientUrls, credentials: 
 const presence = new PresenceRegistry();
 
 app.use(cors(corsOptions));
+app.post(
+  "/api/shop/stripe/webhook",
+  express.raw({ type: "application/json", limit: "256kb" }),
+  stripeShopWebhook
+);
 app.use(express.json({ limit: "2mb" }));
 
-app.get("/health", (_request, response) => response.json({ ok: true, service: "MYPRO - TENNIS" }));
+app.get("/health", (_request, response) => {
+  const stripe = stripeShopConfiguration();
+  response.json({
+    ok: true,
+    service: "MYPRO - TENNIS",
+    payments: {
+      stripe: {
+        ready: stripe.enabled,
+        mode: stripe.mode
+      }
+    }
+  });
+});
 app.use("/api/auth", authRouter);
 app.use("/api/players", playersRouter);
 app.use("/api/training", trainingRouter);
@@ -66,5 +85,9 @@ io.on("connection", (socket) => {
 });
 
 server.listen(config.port, () => {
+  const stripe = stripeShopConfiguration();
   console.log(`MYPRO - TENNIS serveur prêt sur http://localhost:${config.port}`);
+  console.log(
+    `Boutique Stripe : ${stripe.enabled ? `prete (${stripe.mode})` : `inactive (${stripe.mode})`}`
+  );
 });

@@ -61,6 +61,7 @@ model Player {
   reputation               Float                      @default(15)
   budget                   Int                        @default(5000)
   gems                     Int                        @default(0)
+  gemDebt                  Int                        @default(0)
   careerCashPrizeWon       Int                        @default(0)
   playerLevel              Int                        @default(0)
   playerXp                 Int                        @default(0)
@@ -93,6 +94,8 @@ model Player {
   tournamentEntries        TournamentEntry[]
   seasonCompetitionEntries SeasonCompetitionEntry[]
   seasonDailyRewardClaims  SeasonDailyRewardClaim[]
+  shopPurchases            ShopPurchase[]
+  seasonPasses             PlayerSeasonPass[]
   tennisBagChests          TennisBagChest[]
   statCards                PlayerStatCard[]
   coachCards               PlayerCoachCard[]
@@ -506,6 +509,47 @@ model SeasonDailyRewardClaim {
 
   @@unique([playerId, seasonKey, day])
   @@index([playerId, seasonKey])
+}
+
+model ShopPurchase {
+  id                String            @id @default(cuid())
+  playerId          String
+  player            Player            @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  productId         String
+  productType       String
+  currency          String
+  amount            Int
+  quantity          Int               @default(1)
+  status            String            @default("COMPLETED")
+  idempotencyKey    String
+  paymentProvider   String            @default("IN_GAME")
+  externalReference String?           @unique
+  providerPaymentId String?           @unique
+  receiptUrl        String?
+  refundedAmount    Int               @default(0)
+  reversedGems      Int               @default(0)
+  refundedAt        DateTime?
+  rewards           String            @default("{}")
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  seasonPass        PlayerSeasonPass?
+
+  @@unique([playerId, idempotencyKey])
+  @@index([playerId, createdAt])
+  @@index([status, createdAt])
+}
+
+model PlayerSeasonPass {
+  id         String       @id @default(cuid())
+  playerId   String
+  player     Player       @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  purchaseId String       @unique
+  purchase   ShopPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  startsAt   DateTime     @default(now())
+  expiresAt  DateTime
+  createdAt  DateTime     @default(now())
+
+  @@index([playerId, expiresAt])
 }
 
 model FftResult {

@@ -12,6 +12,8 @@ import {
   interactiveMatchAbandonSchema,
   interactiveMatchFeedbackSchema,
   matchRequestSchema,
+  shopPurchaseSchema,
+  shopStripeCheckoutSchema,
   skillUpgradeSchema
 } from "@mypro/shared";
 import {
@@ -69,6 +71,13 @@ import { getPlayerSkillState, spendSkillPoint } from "../services/playerProgress
 import { decodeJson, encodeJson } from "../services/json";
 import { DAY_MS, seasonWindow } from "../services/seasons";
 import { claimTodaySeasonReward, getSeasonDailyRewardState } from "../services/seasonRewards";
+import { ShopError, purchaseShopProduct, shopCatalogForPlayer } from "../services/shop";
+import {
+  createStripeShopCheckout,
+  shopPurchaseHistory,
+  stripeCheckoutStateForPlayer,
+  stripeShopConfiguration
+} from "../services/stripeShop";
 
 export const gameRouter = Router();
 
@@ -1087,6 +1096,83 @@ gameRouter.post("/coach-decks/:id/activate", requireAuth, async (request, respon
   }
 });
 
+gameRouter.get("/shop/catalog", requireAuth, async (request, response) => {
+  const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
+  if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+  return response.json({
+    ...(await shopCatalogForPlayer(player.id)),
+    payments: stripeShopConfiguration()
+  });
+});
+
+gameRouter.post(
+  "/shop/purchases",
+  requireAuth,
+  validateBody(shopPurchaseSchema),
+  async (request, response) => {
+    const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
+    if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+    try {
+      return response.json(await purchaseShopProduct(player.id, request.body));
+    } catch (error) {
+      if (error instanceof ShopError) {
+        return response.status(error.statusCode).json({ message: error.message });
+      }
+      return response.status(409).json({
+        message: error instanceof Error ? error.message : "Achat impossible."
+      });
+    }
+  }
+);
+
+gameRouter.post(
+  "/shop/stripe/checkout",
+  requireAuth,
+  validateBody(shopStripeCheckoutSchema),
+  async (request, response) => {
+    const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
+    if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+    try {
+      return response.json(await createStripeShopCheckout(player.id, request.body));
+    } catch (error) {
+      if (error instanceof ShopError) {
+        return response.status(error.statusCode).json({ message: error.message });
+      }
+      return response
+        .status(502)
+        .json({ message: "Stripe ne répond pas. Réessayez dans un instant." });
+    }
+  }
+);
+
+gameRouter.get("/shop/stripe/sessions/:id", requireAuth, async (request, response) => {
+  const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
+  if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+  const sessionId = request.params.id;
+  if (!sessionId) return response.status(400).json({ message: "Session Stripe requise." });
+  try {
+    return response.json(await stripeCheckoutStateForPlayer(player.id, sessionId));
+  } catch (error) {
+    if (error instanceof ShopError) {
+      return response.status(error.statusCode).json({ message: error.message });
+    }
+    return response.status(502).json({ message: "Vérification Stripe indisponible." });
+  }
+});
+
+gameRouter.get("/shop/purchases/history", requireAuth, async (request, response) => {
+  const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
+  if (!player) return response.status(404).json({ message: "Joueur introuvable." });
+  try {
+    return response.json(await shopPurchaseHistory(player.id));
+  } catch (error) {
+    if (error instanceof ShopError) {
+      return response.status(error.statusCode).json({ message: error.message });
+    }
+    throw error;
+  }
+});
+
 gameRouter.get("/chests", requireAuth, async (request, response) => {
   const player = await prisma.player.findUnique({ where: { userId: request.session!.userId } });
   if (!player) return response.status(404).json({ message: "Joueur introuvable." });
@@ -1283,9 +1369,7 @@ gameRouter.get("/season", requireAuth, async (request, response) => {
           seasonOpponentSeed(entry.id, entry.currentRound),
           player.id,
           {
-            excludeDailyLimitedRealOpponents: ["daily", "weekly"].includes(
-              entry.competitionType
-            )
+            excludeDailyLimitedRealOpponents: ["daily", "weekly"].includes(entry.competitionType)
           }
         )
       : null;

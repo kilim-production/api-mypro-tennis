@@ -70,6 +70,7 @@ function cacheDuration(path: string) {
   if (path === "/chests" || path === "/coach-decks" || path === "/matches/duel-pool")
     return 60_000;
   if (path === "/season") return 10_000;
+  if (path === "/shop/catalog") return 10_000;
   return 0;
 }
 
@@ -101,6 +102,15 @@ function invalidateAfterMutation(path: string) {
     return invalidateCachedPaths(["/skills", "/players/me/career", "/auth/me"]);
   if (path.startsWith("/season"))
     return invalidateCachedPaths(["/season", "/matches", "/chests", "/auth/me"]);
+  if (path.startsWith("/shop"))
+    return invalidateCachedPaths([
+      "/shop/catalog",
+      "/season",
+      "/chests",
+      "/players/me/career",
+      "/skills",
+      "/auth/me"
+    ]);
   if (path.startsWith("/matches"))
     return invalidateCachedPaths([
       "/matches",

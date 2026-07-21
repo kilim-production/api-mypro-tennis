@@ -57,6 +57,7 @@ import {
   Search,
   Settings,
   Shield,
+  ShoppingBag,
   SkipForward,
   Sparkles,
   Swords,
@@ -90,6 +91,7 @@ const loadClub = () => import("./components/club/ClubPage");
 const loadDuel = () => import("./components/duel/DuelPage");
 const loadAutomaticMatch = () => import("./components/match/AutomaticMatchPage");
 const loadSeason = () => import("./components/season/SeasonPage");
+const loadShop = () => import("./components/shop/ShopPage");
 
 const CoachDeckBuilderPage = lazy(() =>
   loadCoachDeckBuilder().then((module) => ({ default: module.CoachDeckBuilderPage }))
@@ -111,12 +113,14 @@ const AutomaticMatchPage = lazy(() =>
 const SeasonCinematicPage = lazy(() =>
   loadSeason().then((module) => ({ default: module.SeasonPage }))
 );
+const ShopPage = lazy(() => loadShop().then((module) => ({ default: module.ShopPage })));
 
 const socketUrl = SOCKET_URL;
 const discordInviteUrl = import.meta.env.VITE_DISCORD_INVITE_URL ?? "";
 
 const nav = [
   ["Tableau de bord", "/dashboard", Activity],
+  ["Boutique", "/shop", ShoppingBag],
   ["Mon joueur", "/player", Shield],
   ["Compétences", "/skills", Target],
   ["Collection", "/collection", PackageOpen],
@@ -141,6 +145,7 @@ const routeDataPaths: Record<string, readonly string[]> = {
   "/player": ["/players/me/career"],
   "/skills": ["/skills"],
   "/collection": ["/chests"],
+  "/shop": ["/shop/catalog"],
   "/club": ["/clubs/me"],
   "/season": ["/season"],
   "/tournaments": ["/season"],
@@ -152,6 +157,7 @@ const routeDataPaths: Record<string, readonly string[]> = {
 const routeModuleLoaders: Record<string, (() => Promise<unknown>) | undefined> = {
   "/skills": loadSkills,
   "/collection": loadCollection,
+  "/shop": loadShop,
   "/collection/coach-deck": loadCoachDeckBuilder,
   "/coach-deck/tutorial": loadCoachDeckTutorial,
   "/club": loadClub,
@@ -1652,6 +1658,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const isClub = location.pathname === "/club";
   const isDuel = location.pathname === "/duel";
   const isSeason = location.pathname === "/season" || location.pathname === "/tournaments";
+  const isShop = location.pathname === "/shop";
   const isAutomaticMatch = location.pathname.startsWith("/match/");
   const isFullScreenGamePage =
     isDashboard ||
@@ -1661,6 +1668,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     isClub ||
     isDuel ||
     isSeason ||
+    isShop ||
     isAutomaticMatch;
   const navBadges = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -2972,9 +2980,9 @@ function Dashboard() {
               </button>
               <button
                 className="lobby-resource-pill lobby-gems"
-                onClick={() => navigate("/collection")}
-                onFocus={() => prefetchRouteData("/collection")}
-                onPointerEnter={() => prefetchRouteData("/collection")}
+                onClick={() => navigate("/shop")}
+                onFocus={() => prefetchRouteData("/shop")}
+                onPointerEnter={() => prefetchRouteData("/shop")}
                 type="button"
               >
                 <Gem size={18} />
@@ -2985,7 +2993,9 @@ function Dashboard() {
               </button>
               <button
                 className="lobby-resource-pill lobby-money"
-                onClick={() => navigate("/player")}
+                onClick={() => navigate("/shop")}
+                onFocus={() => prefetchRouteData("/shop")}
+                onPointerEnter={() => prefetchRouteData("/shop")}
                 type="button"
               >
                 <Coins aria-hidden="true" size={18} />
@@ -3390,11 +3400,11 @@ function PlayerPage() {
               <Zap />
               <span><small>Énergie</small><strong>{player.actionEnergy}/{player.actionEnergyMax}</strong></span>
             </button>
-            <button className="is-gems" onClick={() => navigate("/collection")} type="button">
+            <button className="is-gems" onClick={() => navigate("/shop")} type="button">
               <Gem />
               <span><small>Gemmes</small><strong>{player.gems}</strong></span>
             </button>
-            <button className="is-credits" onClick={() => navigate("/collection")} type="button">
+            <button className="is-credits" onClick={() => navigate("/shop")} type="button">
               <Coins />
               <span><small>Crédits</small><strong>{formatCredits(player.budget)}</strong></span>
             </button>
@@ -6569,6 +6579,16 @@ export function App() {
                 <NeedAuth>
                   <NeedPlayer>
                     <CollectionCinematicPage />
+                  </NeedPlayer>
+                </NeedAuth>
+              }
+            />
+            <Route
+              path="/shop"
+              element={
+                <NeedAuth>
+                  <NeedPlayer>
+                    <ShopPage />
                   </NeedPlayer>
                 </NeedAuth>
               }

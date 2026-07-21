@@ -264,23 +264,32 @@ export async function awardChestForWin(
   forcedRarity?: ChestRarity
 ) {
   if (player.isAi) return null;
+  const random = randomFromSeed(`${player.id}-${source}-${Date.now()}`);
+  const rareChestBonus = forcedRarity ? 0 : await rareChestBonusForPlayer(player.id, tx);
+  const rarity = forcedRarity ?? rollRarity(random, rareChestBonus);
+  return createChestInFreeSlot(player.id, tx, source, rarity);
+}
+
+export async function createChestInFreeSlot(
+  playerId: string,
+  tx: Prisma.TransactionClient,
+  source: string,
+  rarity: ChestRarity
+) {
   const active = await tx.tennisBagChest.findMany({
-    where: { playerId: player.id, openedAt: null },
+    where: { playerId, openedAt: null },
     select: { slotIndex: true }
   });
   if (active.length >= 4) return null;
   const used = new Set(active.map((chest) => chest.slotIndex));
   const slotIndex = [0, 1, 2, 3].find((slot) => !used.has(slot));
   if (slotIndex === undefined) return null;
-  const random = randomFromSeed(`${player.id}-${source}-${Date.now()}-${slotIndex}`);
-  const rareChestBonus = forcedRarity ? 0 : await rareChestBonusForPlayer(player.id, tx);
-  const rarity = forcedRarity ?? rollRarity(random, rareChestBonus);
   const definition = chestDefinitions[rarity];
   const now = new Date();
   const unlocksAt = new Date(now.getTime() + definition.durationMinutes * 60_000);
   return tx.tennisBagChest.create({
     data: {
-      playerId: player.id,
+      playerId,
       rarity,
       slotIndex,
       source,

@@ -9,6 +9,8 @@ import {
   loginSchema,
   playerCreationSchema,
   playerProfileUpdateSchema,
+  shopPurchaseSchema,
+  shopStripeCheckoutSchema,
   trainingStartSchema
 } from "./index";
 
@@ -169,6 +171,39 @@ describe("validations partagees", () => {
     ).toBe(true);
     expect(
       interactiveMatchFeedbackSchema.safeParse({ balance: "TOO_HARD", enjoyment: 6 }).success
+    ).toBe(false);
+  });
+
+  it("sécurise les achats en gemmes de la boutique", () => {
+    expect(
+      shopPurchaseSchema.safeParse({
+        productId: "bag-elite",
+        idempotencyKey: "shop-test-1234"
+      }).success
+    ).toBe(true);
+    expect(
+      shopPurchaseSchema.safeParse({
+        productId: "gems-100",
+        idempotencyKey: "shop-test-1234"
+      }).success
+    ).toBe(false);
+    expect(
+      shopPurchaseSchema.safeParse({
+        productId: "credits-2500",
+        idempotencyKey: "court"
+      }).success
+    ).toBe(false);
+    expect(
+      shopStripeCheckoutSchema.safeParse({
+        productId: "gems-100",
+        idempotencyKey: "stripe-test-1234"
+      }).success
+    ).toBe(true);
+    expect(
+      shopStripeCheckoutSchema.safeParse({
+        productId: "bag-elite",
+        idempotencyKey: "stripe-test-1234"
+      }).success
     ).toBe(false);
   });
 });

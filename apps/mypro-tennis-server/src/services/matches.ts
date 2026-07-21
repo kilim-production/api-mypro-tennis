@@ -20,6 +20,7 @@ import { awardChestForWin } from "./chests";
 import { encodeJson } from "./json";
 import { applyArchetypeMatchBonuses, careerXpForMatch, grantCareerXp } from "./playerProgression";
 import { clampVital, normalizedPlayerVitals, playerVitalsAfterMatch } from "./playerVitals";
+import { seasonPassXpMultiplier } from "./shop";
 
 function matchEnergyForPlayer(player: Player, seed: string, aiRange: [number, number]) {
   if (!player.isAi) {
@@ -141,20 +142,26 @@ export async function persistServerMatchOutcome(
     };
   };
 
-  const winnerXp = careerXpForMatch({
+  const winnerBaseXp = careerXpForMatch({
     won: true,
     official: officialAmateur,
     opponentRanking: loser.fftRanking,
     playerRanking: winner.fftRanking,
     type: input.type
   });
-  const loserXp = careerXpForMatch({
+  const loserBaseXp = careerXpForMatch({
     won: false,
     official: officialAmateur,
     opponentRanking: winner.fftRanking,
     playerRanking: loser.fftRanking,
     type: input.type
   });
+  const [winnerXpMultiplier, loserXpMultiplier] = await Promise.all([
+    seasonPassXpMultiplier(winner.id, tx),
+    seasonPassXpMultiplier(loser.id, tx)
+  ]);
+  const winnerXp = Math.round(winnerBaseXp * winnerXpMultiplier);
+  const loserXp = Math.round(loserBaseXp * loserXpMultiplier);
   const winnerVitals = playerVitalsAfterMatch(winner, true);
   const loserVitals = playerVitalsAfterMatch(loser, false);
 

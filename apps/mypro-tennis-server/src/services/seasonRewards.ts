@@ -3,6 +3,7 @@ import { prisma } from "@mypro/database";
 import { encodeJson } from "./json";
 import { type ChestRarity, type ChestRewards, grantChestRewards, openInstantChestReward } from "./chests";
 import { type seasonWindow } from "./seasons";
+import { activeSeasonPassForPlayer } from "./shop";
 
 type SeasonWindow = ReturnType<typeof seasonWindow>;
 
@@ -18,6 +19,19 @@ const emptyRewards = (): ChestRewards => ({
   cosmetics: [],
   statBonuses: {}
 });
+
+function mergeRewards(items: ChestRewards[]) {
+  return items.reduce<ChestRewards>((merged, item) => {
+    merged.cards.push(...item.cards);
+    merged.money += item.money;
+    merged.gems += item.gems;
+    merged.cosmetics.push(...item.cosmetics);
+    for (const [statKey, bonus] of Object.entries(item.statBonuses)) {
+      merged.statBonuses[statKey] = (merged.statBonuses[statKey] ?? 0) + bonus;
+    }
+    return merged;
+  }, emptyRewards());
+}
 
 export const seasonDailyRewards: SeasonRewardDefinition[] = [
   { day: 1, type: "money", money: 250 },
@@ -154,7 +168,13 @@ export async function claimTodaySeasonReward(userId: string, playerId: string, w
     });
     if (existing) throw new Error("Récompense déjà récupérée aujourd'hui.");
 
-    const rewards = await grantDirectReward(tx, playerId, reward);
+    const seasonPassActive = Boolean(await activeSeasonPassForPlayer(playerId, tx));
+    const rewardMultiplier = seasonPassActive ? 2 : 1;
+    const grantedRewards: ChestRewards[] = [];
+    for (let index = 0; index < rewardMultiplier; index += 1) {
+      grantedRewards.push(await grantDirectReward(tx, playerId, reward));
+    }
+    const rewards = mergeRewards(grantedRewards);
     const claim = await tx.seasonDailyRewardClaim.create({
       data: {
         playerId,
@@ -181,6 +201,8 @@ export async function claimTodaySeasonReward(userId: string, playerId: string, w
         currentDay: window.day,
         claimedAt: claim.claimedAt
       }),
+      rewardMultiplier,
+      seasonPassActive,
       rewards
     };
   });

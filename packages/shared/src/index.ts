@@ -239,6 +239,38 @@ export const coachCardVariantSelectionSchema = z.object({
   variantId: z.enum(["IMPACT", "FLOW"]).nullable()
 });
 
+export const shopGemProductIdSchema = z.enum([
+  "bag-discovery",
+  "bag-competition",
+  "bag-elite",
+  "credits-2500",
+  "credits-5000",
+  "credits-10000",
+  "season-pass"
+]);
+
+export const shopPurchaseSchema = z.object({
+  productId: shopGemProductIdSchema,
+  idempotencyKey: z
+    .string()
+    .trim()
+    .min(8)
+    .max(100)
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/)
+});
+
+export const shopStripeProductIdSchema = z.enum(["gems-100", "gems-225", "gems-500", "gems-1100"]);
+
+export const shopStripeCheckoutSchema = z.object({
+  productId: shopStripeProductIdSchema,
+  idempotencyKey: z
+    .string()
+    .trim()
+    .min(8)
+    .max(100)
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/)
+});
+
 export const challengeSchema = z.object({
   targetPlayerId: z.string().min(1),
   surface: matchRequestSchema.shape.surface,
@@ -253,6 +285,8 @@ export type PlayerProfileUpdateInput = z.infer<typeof playerProfileUpdateSchema>
 export type AvatarUpdateInput = z.infer<typeof avatarUpdateSchema>;
 export type CosmeticEquipInput = z.infer<typeof cosmeticEquipSchema>;
 export type SkillUpgradeInput = z.infer<typeof skillUpgradeSchema>;
+export type ShopPurchaseInput = z.infer<typeof shopPurchaseSchema>;
+export type ShopStripeCheckoutInput = z.infer<typeof shopStripeCheckoutSchema>;
 export type ClubCreateInput = z.infer<typeof clubCreateSchema>;
 export type ClubUpdateInput = z.infer<typeof clubUpdateSchema>;
 export type ClubJoinRequestInput = z.infer<typeof clubJoinRequestSchema>;
