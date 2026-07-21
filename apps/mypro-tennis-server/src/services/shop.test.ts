@@ -205,5 +205,62 @@ describe("boutique MYPRO", () => {
     expect(partialRefund.purchase.reversedGems).toBe(112);
     expect(partialRefund.wallet).toMatchObject({ gems: 33, gemDebt: 0 });
     expect(repeatedPartialRefund.wallet).toMatchObject({ gems: 33, gemDebt: 0 });
+
+    const concurrentPurchase = await prisma.shopPurchase.create({
+      data: {
+        playerId: player.id,
+        productId: "gems-100",
+        productType: "GEM_PACK",
+        currency: "EUR",
+        amount: 299,
+        status: "PENDING",
+        idempotencyKey: `stripe-concurrent-${suffix}`,
+        paymentProvider: "STRIPE",
+        externalReference: `cs_concurrent_${suffix}`
+      }
+    });
+    await fulfillVerifiedStripeSession({
+      id: concurrentPurchase.externalReference,
+      amount_total: 299,
+      currency: "eur",
+      payment_status: "paid",
+      client_reference_id: concurrentPurchase.id,
+      metadata: {
+        purchaseId: concurrentPurchase.id,
+        playerId: player.id,
+        productId: "gems-100"
+      },
+      payment_intent: {
+        id: `pi_concurrent_${suffix}`,
+        latest_charge: { receipt_url: "https://pay.stripe.com/receipts/concurrent" }
+      }
+    } as unknown as Parameters<typeof fulfillVerifiedStripeSession>[0]);
+    await prisma.player.update({
+      where: { id: player.id },
+      data: { gems: 108, gemDebt: 0 }
+    });
+    const notificationsBefore = await prisma.notification.count({
+      where: { userId: user.id, type: "SHOP", title: "Achat remboursé" }
+    });
+    const concurrentCharge = {
+      id: `ch_concurrent_${suffix}`,
+      payment_intent: `pi_concurrent_${suffix}`,
+      amount_refunded: 299,
+      receipt_url: "https://pay.stripe.com/receipts/concurrent-refund"
+    } as unknown as Parameters<typeof reconcileStripeRefundedCharge>[0];
+    await Promise.all([
+      reconcileStripeRefundedCharge(concurrentCharge),
+      reconcileStripeRefundedCharge(concurrentCharge),
+      reconcileStripeRefundedCharge(concurrentCharge)
+    ]);
+    const walletAfterConcurrentRefund = await prisma.player.findUniqueOrThrow({
+      where: { id: player.id },
+      select: { gems: true, gemDebt: true }
+    });
+    const notificationsAfter = await prisma.notification.count({
+      where: { userId: user.id, type: "SHOP", title: "Achat remboursé" }
+    });
+    expect(walletAfterConcurrentRefund).toEqual({ gems: 8, gemDebt: 0 });
+    expect(notificationsAfter - notificationsBefore).toBe(1);
   });
 });

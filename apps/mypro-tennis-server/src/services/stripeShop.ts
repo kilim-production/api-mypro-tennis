@@ -405,66 +405,109 @@ export async function reconcileStripeRefundedCharge(charge: Stripe.Charge) {
   }
   const product = gemProduct(initial.productId);
 
-  return prisma.$transaction(async (tx) => {
-    const current = await tx.shopPurchase.findUniqueOrThrow({ where: { id: initial.id } });
-    const refundedAmount = Math.max(
-      current.refundedAmount,
-      Math.min(current.amount, charge.amount_refunded)
-    );
-    const targetReversedGems =
-      refundedAmount >= current.amount
-        ? product.gems
-        : Math.floor((product.gems * refundedAmount) / current.amount);
-    const gemsToReverse = Math.max(0, targetReversedGems - current.reversedGems);
-    const player = await tx.player.findUniqueOrThrow({
-      where: { id: current.playerId },
-      select: { gems: true, userId: true }
-    });
-    const removedGems = Math.min(player.gems, gemsToReverse);
-    const gemDebtAdded = gemsToReverse - removedGems;
+  // Stripe peut envoyer charge.refunded, refund.created et refund.updated presque
+  // simultanément. La mise à jour conditionnelle ci-dessous réserve le nouveau
+  // montant remboursé à une seule transaction avant de toucher au portefeuille.
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const outcome = await prisma.$transaction(async (tx) => {
+      const current = await tx.shopPurchase.findUniqueOrThrow({ where: { id: initial.id } });
+      const refundedAmount = Math.max(
+        current.refundedAmount,
+        Math.min(current.amount, charge.amount_refunded)
+      );
+      const targetReversedGems =
+        refundedAmount >= current.amount
+          ? product.gems
+          : Math.floor((product.gems * refundedAmount) / current.amount);
 
-    if (gemsToReverse > 0) {
-      await tx.player.update({
-        where: { id: current.playerId },
-        data: {
-          gems: { decrement: removedGems },
-          gemDebt: { increment: gemDebtAdded }
-        }
-      });
-    }
-    const status = refundedAmount >= current.amount ? "REFUNDED" : "PARTIALLY_REFUNDED";
-    const purchase = await tx.shopPurchase.update({
-      where: { id: current.id },
-      data: {
-        status,
-        refundedAmount,
-        reversedGems: targetReversedGems,
-        refundedAt: new Date(),
-        receiptUrl: charge.receipt_url ?? current.receiptUrl
+      if (refundedAmount <= current.refundedAmount && targetReversedGems <= current.reversedGems) {
+        const purchase =
+          charge.receipt_url && charge.receipt_url !== current.receiptUrl
+            ? await tx.shopPurchase.update({
+                where: { id: current.id },
+                data: { receiptUrl: charge.receipt_url }
+              })
+            : current;
+        const wallet = await tx.player.findUniqueOrThrow({
+          where: { id: current.playerId },
+          select: { gems: true, gemDebt: true, budget: true }
+        });
+        return {
+          retry: false as const,
+          result: {
+            purchase: publicStripePurchase(purchase),
+            wallet: { gems: wallet.gems, gemDebt: wallet.gemDebt, credits: wallet.budget }
+          }
+        };
       }
-    });
-    if (gemsToReverse > 0 && player.userId) {
-      await tx.notification.create({
+
+      const status = refundedAmount >= current.amount ? "REFUNDED" : "PARTIALLY_REFUNDED";
+      const claimed = await tx.shopPurchase.updateMany({
+        where: {
+          id: current.id,
+          refundedAmount: current.refundedAmount,
+          reversedGems: current.reversedGems
+        },
         data: {
-          userId: player.userId,
-          title: status === "REFUNDED" ? "Achat remboursé" : "Achat partiellement remboursé",
-          body:
-            gemDebtAdded > 0
-              ? `${removedGems} gemmes retirées et ${gemDebtAdded} à régulariser sur vos prochains achats.`
-              : `${removedGems} gemmes ont été retirées de votre compte.`,
-          type: "SHOP"
+          status,
+          refundedAmount,
+          reversedGems: targetReversedGems,
+          refundedAt: new Date(),
+          receiptUrl: charge.receipt_url ?? current.receiptUrl
         }
       });
-    }
-    const wallet = await tx.player.findUniqueOrThrow({
-      where: { id: current.playerId },
-      select: { gems: true, gemDebt: true, budget: true }
+      if (claimed.count === 0) return { retry: true as const };
+
+      const gemsToReverse = Math.max(0, targetReversedGems - current.reversedGems);
+      const player = await tx.player.findUniqueOrThrow({
+        where: { id: current.playerId },
+        select: { gems: true, userId: true }
+      });
+      const removedGems = Math.min(Math.max(0, player.gems), gemsToReverse);
+      const gemDebtAdded = gemsToReverse - removedGems;
+
+      if (gemsToReverse > 0) {
+        await tx.player.update({
+          where: { id: current.playerId },
+          data: {
+            gems: { decrement: removedGems },
+            gemDebt: { increment: gemDebtAdded }
+          }
+        });
+      }
+      if (gemsToReverse > 0 && player.userId) {
+        await tx.notification.create({
+          data: {
+            userId: player.userId,
+            title: status === "REFUNDED" ? "Achat remboursé" : "Achat partiellement remboursé",
+            body:
+              gemDebtAdded > 0
+                ? `${removedGems} gemmes retirées et ${gemDebtAdded} à régulariser sur vos prochains achats.`
+                : `${removedGems} gemmes ont été retirées de votre compte.`,
+            type: "SHOP"
+          }
+        });
+      }
+      const [purchase, wallet] = await Promise.all([
+        tx.shopPurchase.findUniqueOrThrow({ where: { id: current.id } }),
+        tx.player.findUniqueOrThrow({
+          where: { id: current.playerId },
+          select: { gems: true, gemDebt: true, budget: true }
+        })
+      ]);
+      return {
+        retry: false as const,
+        result: {
+          purchase: publicStripePurchase(purchase),
+          wallet: { gems: wallet.gems, gemDebt: wallet.gemDebt, credits: wallet.budget }
+        }
+      };
     });
-    return {
-      purchase: publicStripePurchase(purchase),
-      wallet: { gems: wallet.gems, gemDebt: wallet.gemDebt, credits: wallet.budget }
-    };
-  });
+
+    if (!outcome.retry) return outcome.result;
+  }
+
+  throw new ShopError("Le remboursement est déjà en cours de traitement. Réessayez.", 409);
 }
 
 async function reconcileStripeRefund(refund: Stripe.Refund) {
