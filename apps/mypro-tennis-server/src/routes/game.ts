@@ -284,27 +284,31 @@ async function getOrCreateSeasonOpponent(
       ? Array.from(await realOpponentIdsAtDailyLimit(excludePlayerId))
       : [])
   ];
-  const realPlayer = await prisma.player.findFirst({
+  const realPlayers = await prisma.player.findMany({
     where: {
       id: { notIn: excludedIds },
       isAi: false,
       fftRanking: targetRanking,
       overall: { gte: targetOverall - 8, lte: targetOverall + 8 }
     },
-    orderBy: [{ overall: "asc" }, { updatedAt: "desc" }]
+    orderBy: { id: "asc" },
+    take: 24
   });
+  const realPlayer = realPlayers[Math.abs(seed) % Math.max(1, realPlayers.length)];
   if (realPlayer) return realPlayer;
+  const identity = aiIdentity(seed);
   const existing = await prisma.player.findFirst({
     where: {
       isAi: true,
+      firstName: identity.firstName,
+      lastName: identity.lastName,
       fftRanking: targetRanking,
       overall: { gte: targetOverall - 3, lte: targetOverall + 3 }
     },
-    orderBy: { overall: "asc" }
+    orderBy: { id: "asc" }
   });
   if (existing) return existing;
   const stats = tunedStatsForOverall(targetOverall, seed);
-  const identity = aiIdentity(seed);
   return prisma.player.create({
     data: {
       firstName: identity.firstName,
@@ -324,6 +328,10 @@ async function getOrCreateSeasonOpponent(
       worldRank: 500 + seed
     }
   });
+}
+
+function seasonOpponentSeed(entryId: string, currentRound: number) {
+  return Math.floor(seededRatio(`${entryId}-${currentRound}`) * 1_000_000);
 }
 
 function duelPoolSeed(player: { id: string; wins: number; losses: number; fftRanking: string }) {
@@ -1250,7 +1258,7 @@ gameRouter.get("/season", requireAuth, async (request, response) => {
       })
     : [];
   const matchById = new Map(playedMatches.map((match) => [match.id, match]));
-  const serializeEntry = (entry: (typeof entries)[number]) => {
+  const serializeEntry = async (entry: (typeof entries)[number]) => {
     const rawMatches = decodeJson<Array<{ matchId: string; ranking: string; won: boolean }>>(
       entry.matches
     );
@@ -1265,9 +1273,26 @@ gameRouter.get("/season", requireAuth, async (request, response) => {
             entryId: entry.id,
             matches: rawMatches
           });
+    const next = ["ELIMINE", "VAINQUEUR", "CHAMPION_NATIONAL"].includes(entry.status)
+      ? null
+      : nextSeasonOpponent(entry);
+    const nextOpponent = next
+      ? await getOrCreateSeasonOpponent(
+          next.ranking,
+          next.targetOverall,
+          seasonOpponentSeed(entry.id, entry.currentRound),
+          player.id,
+          {
+            excludeDailyLimitedRealOpponents: ["daily", "weekly"].includes(
+              entry.competitionType
+            )
+          }
+        )
+      : null;
     return {
       ...entry,
       bracket,
+      nextOpponent: nextOpponent ? publicPlayer(nextOpponent) : null,
       matches: rawMatches.map((item) => {
         const match = matchById.get(item.matchId);
         const opponent = match
@@ -1285,8 +1310,8 @@ gameRouter.get("/season", requireAuth, async (request, response) => {
       })
     };
   };
-  const competitions = (Object.values(seasonDefinitions) as SeasonDefinition[]).map(
-    (definition) => {
+  const competitions = await Promise.all(
+    (Object.values(seasonDefinitions) as SeasonDefinition[]).map(async (definition) => {
       const key = periodKey(definition.type, seasonKey, window);
       const entry = entries.find(
         (item) => item.competitionType === definition.type && item.periodKey === key
@@ -1307,9 +1332,9 @@ gameRouter.get("/season", requireAuth, async (request, response) => {
           definition.type === "individual"
             ? { best: "-15", worst: player.fftRanking }
             : (bracket as { range: { best: FftRanking; worst: FftRanking } }).range,
-        entry: entry ? serializeEntry(entry) : null
+        entry: entry ? await serializeEntry(entry) : null
       };
-    }
+    })
   );
   return response.json({
     season: {
@@ -1417,7 +1442,7 @@ gameRouter.post("/season/entries/:id/play", requireAuth, async (request, respons
   const opponent = await getOrCreateSeasonOpponent(
     next.ranking,
     next.targetOverall,
-    entry.currentRound + entry.id.length,
+    seasonOpponentSeed(entry.id, entry.currentRound),
     player.id,
     {
       excludeDailyLimitedRealOpponents: ["daily", "weekly"].includes(entry.competitionType)

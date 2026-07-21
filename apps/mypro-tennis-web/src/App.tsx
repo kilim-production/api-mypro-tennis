@@ -71,6 +71,7 @@ import { LobbyActionButton } from "./components/lobby/LobbyActionButton";
 import { LobbyPlayerHero } from "./components/lobby/LobbyPlayerHero";
 import { LobbySeasonTrack } from "./components/lobby/LobbySeasonTrack";
 import { InteractiveMatchPage, playMatchSound } from "./components/match/InteractiveMatchPage";
+import { primeSeasonDataCache } from "./components/season/seasonDataCache";
 import { useGameStore, type GameNotification, type Player } from "./store";
 
 const loadCoachDeckBuilder = () => import("./components/coach-deck/CoachDeckBuilderPage");
@@ -80,6 +81,7 @@ const loadSkills = () => import("./components/skills/SkillsPage");
 const loadClub = () => import("./components/club/ClubPage");
 const loadDuel = () => import("./components/duel/DuelPage");
 const loadAutomaticMatch = () => import("./components/match/AutomaticMatchPage");
+const loadSeason = () => import("./components/season/SeasonPage");
 
 const CoachDeckBuilderPage = lazy(() =>
   loadCoachDeckBuilder().then((module) => ({ default: module.CoachDeckBuilderPage }))
@@ -97,6 +99,9 @@ const ClubPage = lazy(() => loadClub().then((module) => ({ default: module.ClubP
 const DuelPage = lazy(() => loadDuel().then((module) => ({ default: module.DuelPage })));
 const AutomaticMatchPage = lazy(() =>
   loadAutomaticMatch().then((module) => ({ default: module.AutomaticMatchPage }))
+);
+const SeasonCinematicPage = lazy(() =>
+  loadSeason().then((module) => ({ default: module.SeasonPage }))
 );
 
 const socketUrl = SOCKET_URL;
@@ -130,7 +135,7 @@ const routeDataPaths: Record<string, readonly string[]> = {
   "/collection": ["/chests"],
   "/club": ["/clubs/me"],
   "/season": ["/season"],
-  "/tournaments": ["/tournaments"],
+  "/tournaments": ["/season"],
   "/duel": ["/matches/duel-pool", "/matches/interactive/active", "/coach-decks"],
   "/matches": ["/matches"],
   "/rankings": ["/rankings"]
@@ -141,7 +146,9 @@ const routeModuleLoaders: Record<string, (() => Promise<unknown>) | undefined> =
   "/collection": loadCollection,
   "/collection/coach-deck": loadCoachDeckBuilder,
   "/coach-deck/tutorial": loadCoachDeckTutorial,
-  "/club": loadClub
+  "/club": loadClub,
+  "/season": loadSeason,
+  "/tournaments": loadSeason
 };
 
 function prefetchRouteData(path: string) {
@@ -1186,9 +1193,16 @@ function Shell({ children }: { children: React.ReactNode }) {
   const isSkills = location.pathname === "/skills";
   const isClub = location.pathname === "/club";
   const isDuel = location.pathname === "/duel";
+  const isSeason = location.pathname === "/season" || location.pathname === "/tournaments";
   const isAutomaticMatch = location.pathname.startsWith("/match/");
   const isFullScreenGamePage =
-    isDashboard || isCollection || isSkills || isClub || isDuel || isAutomaticMatch;
+    isDashboard ||
+    isCollection ||
+    isSkills ||
+    isClub ||
+    isDuel ||
+    isSeason ||
+    isAutomaticMatch;
   const navBadges = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const notification of notifications) {
@@ -2372,7 +2386,10 @@ function Dashboard() {
       ]);
       if (cancelled) return;
       if (chestResult.status === "fulfilled") setChests(chestResult.value);
-      if (seasonResult.status === "fulfilled") setSeason(seasonResult.value);
+      if (seasonResult.status === "fulfilled") {
+        primeSeasonDataCache(seasonResult.value);
+        setSeason(seasonResult.value);
+      }
     }
   }, []);
 
@@ -2381,6 +2398,7 @@ function Dashboard() {
       api<ChestState>("/chests"),
       api<SeasonData>("/season")
     ]);
+    primeSeasonDataCache(seasonState);
     setChests(chestState);
     setSeason(seasonState);
   }
@@ -5822,7 +5840,10 @@ export function App() {
               element={
                 <NeedAuth>
                   <NeedPlayer>
-                    <SeasonPage />
+                    <SeasonCinematicPage
+                      resolveHeroSource={avatarHeroSource}
+                      resolvePictureSource={avatarPictureSource}
+                    />
                   </NeedPlayer>
                 </NeedAuth>
               }
@@ -5832,7 +5853,10 @@ export function App() {
               element={
                 <NeedAuth>
                   <NeedPlayer>
-                    <SeasonPage />
+                    <SeasonCinematicPage
+                      resolveHeroSource={avatarHeroSource}
+                      resolvePictureSource={avatarPictureSource}
+                    />
                   </NeedPlayer>
                 </NeedAuth>
               }
