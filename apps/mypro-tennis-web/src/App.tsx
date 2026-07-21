@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import type React from "react";
+import { useCallback } from "react";
 import { lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -16,11 +17,14 @@ import {
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
+  ArrowLeft,
   BarChart3,
   Bell,
   CalendarDays,
+  Camera,
   CheckCircle2,
   ChevronRight,
+  CircleAlert,
   Clock3,
   Coins,
   Crosshair,
@@ -37,6 +41,7 @@ import {
   History,
   Image,
   Lock,
+  LoaderCircle,
   LogOut,
   LogIn,
   Menu,
@@ -45,8 +50,10 @@ import {
   MessageCircle,
   PackageOpen,
   Pause,
+  Pencil,
   Play,
   Repeat2,
+  RefreshCw,
   Search,
   Settings,
   Shield,
@@ -56,6 +63,7 @@ import {
   Target,
   Trophy,
   Upload,
+  UserRound,
   UserPlus,
   Users,
   Volume2,
@@ -262,6 +270,14 @@ function formatCredits(value: number) {
 
 function nationalityLabel(value: string) {
   return countryLabel(value);
+}
+
+function nationalityFlag(value: string) {
+  const countryCode = normalizeCountryCode(value)?.toUpperCase();
+  if (!countryCode || countryCode.length !== 2) return "🌐";
+  return String.fromCodePoint(
+    ...countryCode.split("").map((letter) => 127397 + letter.charCodeAt(0))
+  );
 }
 
 const landingFacts: Array<[string, string]> = [
@@ -875,6 +891,447 @@ function CareerPathCard({ player }: { player: Player }) {
   );
 }
 
+function playerCareerTrack(player: Player) {
+  const currentIndex = Math.max(0, fftPath.indexOf(player.fftRanking));
+  const indexes = new Set<number>();
+  [0, currentIndex - 2, currentIndex - 1, currentIndex, currentIndex + 1].forEach((index) => {
+    if (index >= 0 && index < fftPath.length) indexes.add(index);
+  });
+  for (let offset = 2; indexes.size < 5 && offset < fftPath.length; offset += 1) {
+    const nextIndex = currentIndex + offset;
+    const previousIndex = currentIndex - offset;
+    if (nextIndex < fftPath.length) indexes.add(nextIndex);
+    if (indexes.size < 5 && previousIndex >= 0) indexes.add(previousIndex);
+  }
+  return [...indexes]
+    .sort((first, second) => first - second)
+    .slice(0, 5)
+    .map((index) => ({ ranking: fftPath[index]!, index }));
+}
+
+function PlayerCareerPathPanel({ player }: { player: Player }) {
+  const currentIndex = Math.max(0, fftPath.indexOf(player.fftRanking));
+  const nextRanking = fftPath[currentIndex + 1] ?? null;
+  const previousThreshold = fftThresholds[player.fftRanking] ?? 0;
+  const nextThreshold = nextRanking ? (fftThresholds[nextRanking] ?? proValidationThreshold) : proValidationThreshold;
+  const tierProgress = player.proUnlocked
+    ? 100
+    : Math.max(
+        0,
+        Math.min(
+          100,
+          ((player.amateurPoints - previousThreshold) /
+            Math.max(1, nextThreshold - previousThreshold)) *
+            100
+        )
+      );
+  const pointsToNext = Math.max(0, nextThreshold - player.amateurPoints);
+  const nodes = playerCareerTrack(player);
+
+  return (
+    <article className="player-career-path-panel">
+      <header>
+        <div>
+          <h2>Parcours FFT</h2>
+          <strong>{player.careerStage}</strong>
+        </div>
+        <span>{player.proUnlocked ? "Circuit pro" : "Progression amateur"}</span>
+      </header>
+      <ol className="player-career-track" aria-label="Progression dans le classement FFT">
+        {nodes.map((node) => (
+          <li
+            className={
+              node.index === currentIndex
+                ? "is-current"
+                : node.index < currentIndex
+                  ? "is-complete"
+                  : "is-next"
+            }
+            key={node.ranking}
+          >
+            <span>{node.ranking}</span>
+          </li>
+        ))}
+        <li className="is-ellipsis" aria-hidden="true"><span>•••</span></li>
+        <li className={player.proUnlocked ? "is-complete is-pro" : "is-locked is-pro"}>
+          <span>{player.proUnlocked ? <CheckCircle2 /> : <Lock />}</span>
+          <small>{player.proUnlocked ? "PRO" : "-15"}</small>
+        </li>
+      </ol>
+      <div className="player-career-points">
+        <span><strong>{player.amateurPoints.toLocaleString("fr-FR")}</strong> points amateur</span>
+        <span>
+          <strong>{nextRanking ? `Objectif ${nextRanking}` : "Dernier palier amateur"}</strong>
+          <small>{nextRanking ? `${pointsToNext} pts à gagner` : "Validation en cours"}</small>
+        </span>
+      </div>
+      <div
+        aria-label={`Progression vers ${nextRanking ?? "le circuit professionnel"} : ${Math.round(tierProgress)} %`}
+        className="player-career-progress"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(tierProgress)}
+      >
+        <span style={{ width: `${tierProgress}%` }} />
+      </div>
+      <footer className={player.proUnlocked ? "is-unlocked" : ""}>
+        {player.proUnlocked ? <CheckCircle2 /> : <Lock />}
+        <span>
+          {player.proUnlocked
+            ? "Circuit professionnel débloqué"
+            : "Circuit pro à débloquer au classement -15"}
+        </span>
+      </footer>
+    </article>
+  );
+}
+
+function PlayerRankingProjectionPanel({
+  career,
+  player,
+  onDetails
+}: {
+  career: CareerProfile | null;
+  player: Player;
+  onDetails: () => void;
+}) {
+  const simulation = career?.rankingSimulation;
+  const currentRanking = simulation?.currentRanking ?? player.fftRanking;
+  const simulatedRanking = simulation?.simulatedRanking ?? player.fftRanking;
+  const progressTarget = simulation?.nextMinimum ?? proValidationThreshold;
+  const progress = simulation
+    ? Math.max(0, Math.min(100, (simulation.points / Math.max(1, progressTarget)) * 100))
+    : 0;
+
+  return (
+    <article className="player-ranking-projection-panel">
+      <header>
+        <div>
+          <h2>Projection FFT de la saison</h2>
+          <small>Simulation officielle</small>
+        </div>
+        <span className={simulation && simulation.delta < 0 ? "is-down" : ""}>
+          {simulation ? `${simulation.delta >= 0 ? "+" : ""}${simulation.delta}` : "…"}
+        </span>
+      </header>
+      <div className="player-ranking-movement" aria-label={`Projection ${currentRanking} vers ${simulatedRanking}`}>
+        <strong>{currentRanking}</strong><ChevronRight /><strong>{simulatedRanking}</strong>
+      </div>
+      <div className="player-ranking-metrics">
+        <span><small>Points retenus</small><strong>{simulation?.points ?? "…"}</strong></span>
+        <span><small>Victoires retenues</small><strong>{simulation ? `${simulation.takenWins}/${simulation.winsToKeep}` : "…"}</strong></span>
+        <span><small>Bilan officiel</small><strong>{simulation ? `${simulation.wins}V / ${simulation.losses}D` : "…"}</strong></span>
+        <span><small>Matchs</small><strong>{simulation?.matchCount ?? "…"}</strong></span>
+      </div>
+      <div className="player-ranking-update">
+        <span><small>Progression vers le prochain classement</small><strong>{Math.round(progress)} %</strong></span>
+        <div><i style={{ width: `${progress}%` }} /></div>
+      </div>
+      <button onClick={onDetails} type="button">Voir le détail de la simulation</button>
+    </article>
+  );
+}
+
+function handleModalKeyboard(
+  event: React.KeyboardEvent<HTMLElement>,
+  onClose: () => void,
+  closeBlocked = false
+) {
+  if (event.key === "Escape" && !closeBlocked) {
+    event.preventDefault();
+    onClose();
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const focusable = [...event.currentTarget.querySelectorAll<HTMLElement>(
+    'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+  )].filter((element) => element.getClientRects().length > 0);
+  if (!focusable.length) {
+    event.preventDefault();
+    return;
+  }
+  const first = focusable[0]!;
+  const last = focusable[focusable.length - 1]!;
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function PlayerRankingDetailsModal({
+  career,
+  player,
+  onClose
+}: {
+  career: CareerProfile | null;
+  player: Player;
+  onClose: () => void;
+}) {
+  const simulation = career?.rankingSimulation;
+  return (
+    <div className="game-modal-overlay player-ranking-details-overlay" onClick={onClose}>
+      <section
+        aria-modal="true"
+        aria-labelledby="player-ranking-details-title"
+        className="game-modal-panel player-ranking-details-panel"
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => handleModalKeyboard(event, onClose)}
+        role="dialog"
+      >
+        <header>
+          <div>
+            <small>Projection FFT de la saison</small>
+            <h2 id="player-ranking-details-title">{simulation?.currentRanking ?? player.fftRanking} vers {simulation?.simulatedRanking ?? player.fftRanking}</h2>
+          </div>
+          <button autoFocus aria-label="Fermer le détail" onClick={onClose} type="button"><X /></button>
+        </header>
+        <div className="player-ranking-details-summary">
+          <span><small>Points retenus</small><strong>{simulation?.points ?? 0}</strong></span>
+          <span><small>Victoires retenues</small><strong>{simulation ? `${simulation.takenWins}/${simulation.winsToKeep}` : "0/0"}</strong></span>
+          <span><small>Bilan officiel</small><strong>{simulation ? `${simulation.wins}V / ${simulation.losses}D` : "0V / 0D"}</strong></span>
+          <span><small>Prochain palier</small><strong>{simulation?.nextRanking ?? "-15"}</strong></span>
+        </div>
+        <div className="player-ranking-details-columns">
+          <article>
+            <h3>Victoires prises en compte</h3>
+            <div>
+              {(simulation?.victories ?? []).length ? simulation!.victories.map((victory) => (
+                <span className={victory.retained ? "is-retained" : ""} key={victory.id}>
+                  <b>{competitionLabel(victory.competitionType)} · {victory.opponentRanking}</b>
+                  <strong>{victory.points} pts</strong>
+                  <small>{victory.retained ? "Retenue" : "Non retenue"}</small>
+                </span>
+              )) : <p>Aucune victoire officielle enregistrée.</p>}
+            </div>
+          </article>
+          <article>
+            <h3>Derniers résultats</h3>
+            <div>
+              {(simulation?.results ?? []).length ? simulation!.results.map((result) => (
+                <span className={result.won ? "is-win" : "is-loss"} key={result.id}>
+                  <b>{result.won ? "Victoire" : "Défaite"} vs {result.opponentRanking}</b>
+                  <strong>{competitionLabel(result.competitionType)}</strong>
+                </span>
+              )) : <p>Les matchs officiels joués cette saison apparaîtront ici.</p>}
+            </div>
+          </article>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function PlayerStatsRadar({ player, compact = false }: { player: Player; compact?: boolean }) {
+  const center = 60;
+  const radius = compact ? 42 : 45;
+  const stats = profileStatKeys.map((key, index) => {
+    const angle = (Math.PI * 2 * index) / profileStatKeys.length - Math.PI / 2;
+    const value = Math.max(0, Math.min(100, stat(player, key)));
+    const valueRadius = radius * (value / 100);
+    return {
+      key,
+      label: statLabels[key],
+      value,
+      angle,
+      x: center + Math.cos(angle) * valueRadius,
+      y: center + Math.sin(angle) * valueRadius,
+      axisX: center + Math.cos(angle) * radius,
+      axisY: center + Math.sin(angle) * radius
+    };
+  });
+  const polygonForRadius = (ringRadius: number) =>
+    stats
+      .map(
+        (item) =>
+          `${center + Math.cos(item.angle) * ringRadius},${center + Math.sin(item.angle) * ringRadius}`
+      )
+      .join(" ");
+  const valuePolygon = stats.map((item) => `${item.x},${item.y}`).join(" ");
+
+  return (
+    <div
+      aria-label={`Graphique des 12 statistiques. ${stats.map((item) => `${item.label} ${Math.round(item.value)}`).join(", ")}`}
+      className={`player-stats-radar ${compact ? "is-compact" : ""}`}
+      role="img"
+    >
+      <svg aria-hidden="true" viewBox="0 0 120 120">
+        {[0.25, 0.5, 0.75, 1].map((ring) => (
+          <polygon className="player-radar-ring" key={ring} points={polygonForRadius(radius * ring)} />
+        ))}
+        {stats.map((item) => (
+          <line
+            className="player-radar-axis"
+            key={item.key}
+            x1={center}
+            x2={item.axisX}
+            y1={center}
+            y2={item.axisY}
+          />
+        ))}
+        <polygon className="player-radar-shape" points={valuePolygon} />
+        {stats.map((item) => (
+          <circle className="player-radar-point" cx={item.x} cy={item.y} key={item.key} r="1.7" />
+        ))}
+      </svg>
+      {!compact ? (
+        <div className="player-radar-legend">
+          {stats.map((item) => (
+            <span key={item.key}><small>{item.label}</small><strong>{Math.round(item.value)}</strong></span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PlayerStatsPanel({ player }: { player: Player }) {
+  const stats = profileStatKeys.map((key) => ({
+    key,
+    label: statLabels[key],
+    value: Math.round(stat(player, key)),
+    visual: statVisual(key)
+  }));
+  const topStats = [...stats].sort((first, second) => second.value - first.value).slice(0, 3);
+  const overall = Math.round(
+    stats.reduce((total, item) => total + item.value, 0) / Math.max(1, stats.length)
+  );
+
+  return (
+    <div className="player-stats-panel">
+      <section className="player-stats-catalog">
+        <header>
+          <div><small>Profil du joueur</small><h2>12 statistiques</h2></div>
+          <span>Valeurs permanentes</span>
+        </header>
+        <div className="player-stats-grid">
+          {stats.map((item) => (
+            <article key={item.key} style={{ borderColor: `${item.visual.color}66` }}>
+              <div className="player-stat-card-heading">
+                <span style={{ color: item.visual.color }}><StatIcon statKey={item.key} size="sm" /></span>
+                <strong>{item.label}</strong>
+                <b style={{ color: item.visual.color }}>{item.value}</b>
+              </div>
+              <div className="player-stat-card-progress">
+                <span style={{ background: item.visual.color, width: `${Math.max(0, Math.min(100, item.value))}%` }} />
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+      <aside className="player-stats-analysis">
+        <header>
+          <div><Sparkles /><span><small>Note globale</small><strong>{overall}</strong></span></div>
+          <p>Moyenne exacte des 12 statistiques</p>
+        </header>
+        <PlayerStatsRadar player={player} />
+        <div className="player-stats-strengths">
+          <h3>Points forts</h3>
+          <div>
+            {topStats.map((item, index) => (
+              <span key={item.key}>
+                <i>{index + 1}</i>
+                <StatIcon statKey={item.key} size="sm" />
+                <small>{item.label}</small>
+                <strong>{item.value}</strong>
+              </span>
+            ))}
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function PlayerPalmaresPanel({
+  career,
+  player
+}: {
+  career: CareerProfile | null;
+  player: Player;
+}) {
+  const palmares = career?.palmares;
+  const wins = palmares?.wins ?? player.wins;
+  const losses = palmares?.losses ?? player.losses;
+  const playedMatches = wins + losses;
+  const winRate = playedMatches ? Math.round((wins / playedMatches) * 100) : 0;
+  const recentTitles = palmares?.recentTitles ?? [];
+  const competitions = palmares?.competitions ?? [];
+
+  return (
+    <div className="player-palmares-panel">
+      <section className="player-palmares-overview">
+        <header>
+          <div><small>Carrière du joueur</small><h2>Bilan officiel</h2></div>
+          <span><Trophy /><strong>{palmares?.titles ?? 0}</strong><small>Titres</small></span>
+        </header>
+        <div className="player-palmares-metrics">
+          <span><Trophy /><small>Titres</small><strong>{palmares?.titles ?? 0}</strong></span>
+          <span><Sparkles /><small>Tournois</small><strong>{palmares?.tournamentTitles ?? 0}</strong></span>
+          <span><Shield /><small>Nationaux</small><strong>{palmares?.nationalTitles ?? 0}</strong></span>
+          <span><Swords /><small>Finales</small><strong>{palmares?.finals ?? 0}</strong></span>
+          <span><CheckCircle2 /><small>Victoires</small><strong>{wins}</strong></span>
+          <span><X /><small>Défaites</small><strong>{losses}</strong></span>
+        </div>
+        <div className="player-palmares-win-rate">
+          <span><small>Ratio de victoires</small><strong>{winRate} %</strong></span>
+          <div role="progressbar" aria-label={`Ratio de victoires ${winRate} %`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={winRate}>
+            <i style={{ width: `${winRate}%` }} />
+          </div>
+        </div>
+        <div className="player-palmares-competitions">
+          <h3><Swords /> Compétitions disputées</h3>
+          <div>
+            {competitions.length ? competitions.map((competition) => (
+              <article key={competition.type}>
+                <span><strong>{competitionLabel(competition.type)}</strong><small>{competition.played} participation(s)</small></span>
+                <span><small>Titres</small><strong>{competition.titles}</strong></span>
+                <span><small>Meilleur tour</small><strong>{competition.bestRound || "—"}</strong></span>
+              </article>
+            )) : (
+              <p><Trophy /> Les compétitions terminées apparaîtront dans cette section.</p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <aside className="player-palmares-history">
+        <header>
+          <div><History /><span><small>Historique</small><h2>Derniers titres</h2></span></div>
+          <strong>{recentTitles.length}</strong>
+        </header>
+        <div className="player-palmares-title-list">
+          {recentTitles.length ? recentTitles.map((title, index) => (
+            <article className={index === 0 ? "is-latest" : ""} key={title.id}>
+              <span className="player-palmares-title-icon"><Trophy /></span>
+              <div>
+                <small>{index === 0 ? "Dernier titre" : competitionLabel(title.type)}</small>
+                <strong>{title.label}</strong>
+                <span><CalendarDays /> {new Date(title.date).toLocaleDateString("fr-FR")}</span>
+              </div>
+              <i>{competitionLabel(title.type)}</i>
+            </article>
+          )) : (
+            <div className="player-palmares-empty">
+              <Trophy />
+              <strong>Votre premier trophée vous attend</strong>
+              <p>Remportez un tournoi ou le championnat individuel pour inaugurer votre palmarès.</p>
+            </div>
+          )}
+        </div>
+        <footer>
+          <span><strong>{playedMatches}</strong><small>Matchs officiels</small></span>
+          <span><strong>{palmares?.finals ?? 0}</strong><small>Finales jouées</small></span>
+          <span><strong>{palmares?.nationalTitles ?? 0}</strong><small>Titres nationaux</small></span>
+        </footer>
+      </aside>
+    </div>
+  );
+}
+
 function rarityClass(rarity: ChestRarity) {
   return `rarity-${rarity
     .toLowerCase()
@@ -1190,6 +1647,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     user && !["/", "/login", "/signup", "/oauth/google"].includes(location.pathname);
   const isDashboard = location.pathname === "/dashboard";
   const isCollection = location.pathname === "/collection";
+  const isPlayer = location.pathname === "/player";
   const isSkills = location.pathname === "/skills";
   const isClub = location.pathname === "/club";
   const isDuel = location.pathname === "/duel";
@@ -1197,6 +1655,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const isAutomaticMatch = location.pathname.startsWith("/match/");
   const isFullScreenGamePage =
     isDashboard ||
+    isPlayer ||
     isCollection ||
     isSkills ||
     isClub ||
@@ -2779,13 +3238,74 @@ function Metric({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+type PlayerCareerStatus = "loading" | "ready" | "empty" | "error";
+type PlayerSaveStatus = "idle" | "saving" | "saved" | "error";
+
+function PlayerCareerDataState({
+  status,
+  message,
+  compact = false,
+  onRetry
+}: {
+  status: Exclude<PlayerCareerStatus, "ready">;
+  message?: string;
+  compact?: boolean;
+  onRetry: () => void;
+}) {
+  const isLoading = status === "loading";
+  const isError = status === "error";
+  return (
+    <div
+      aria-live="polite"
+      aria-busy={isLoading}
+      className={`player-career-data-state is-${status} ${compact ? "is-compact" : ""}`}
+      role={isError ? "alert" : "status"}
+    >
+      <span className="player-career-data-state-icon">
+        {isLoading ? <LoaderCircle /> : isError ? <CircleAlert /> : <Trophy />}
+      </span>
+      <div>
+        <small>
+          {isLoading ? "Synchronisation" : isError ? "Connexion interrompue" : "Nouvelle carrière"}
+        </small>
+        <strong>
+          {isLoading
+            ? "Chargement du parcours…"
+            : isError
+              ? "Données de carrière indisponibles"
+              : "Aucun résultat officiel"}
+        </strong>
+        <p>
+          {message ??
+            (status === "empty"
+              ? "Jouez votre premier match officiel pour lancer votre historique."
+              : "Vos statistiques permanentes restent accessibles pendant cette opération.")}
+        </p>
+      </div>
+      {!isLoading ? (
+        <button onClick={onRetry} type="button"><RefreshCw /> Réessayer</button>
+      ) : (
+        <div className="player-career-data-skeleton" aria-hidden="true">
+          <i /><i /><i />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PlayerPage() {
   const player = useGameStore((state) => state.player)!;
   const refresh = useGameStore((state) => state.refresh);
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [career, setCareer] = useState<CareerProfile | null>(null);
+  const [careerStatus, setCareerStatus] = useState<PlayerCareerStatus>("loading");
+  const [careerError, setCareerError] = useState("");
+  const [saveStatus, setSaveStatus] = useState<PlayerSaveStatus>("idle");
   const [avatarEditorOpen, setAvatarEditorOpen] = useState(false);
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
+  const [rankingDetailsOpen, setRankingDetailsOpen] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
   const requestedTab = searchParams.get("tab");
   const initialTab: "overview" | "stats" | "palmares" =
     requestedTab === "stats" || requestedTab === "palmares" ? requestedTab : "overview";
@@ -2794,7 +3314,42 @@ function PlayerPage() {
     .map((key) => ({ key, value: stat(player, key) }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 3);
-  useEffect(() => void api<CareerProfile>("/players/me/career").then(setCareer), []);
+  const calculatedOverall = Math.round(
+    profileStatKeys.reduce((total, key) => total + stat(player, key), 0) /
+      Math.max(1, profileStatKeys.length)
+  );
+  const dominantHandLabel = player.dominantHand.toLowerCase().startsWith("g")
+    ? "Gaucher"
+    : "Droitier";
+  const backhandLabel = player.backhand.toLowerCase().includes("deux")
+    ? "Revers à deux mains"
+    : "Revers à une main";
+  const currentRankingIndex = Math.max(0, fftPath.indexOf(player.fftRanking));
+  const nextRanking = fftPath[currentRankingIndex + 1] ?? "-15";
+  const loadCareer = useCallback(async () => {
+    setCareerStatus("loading");
+    setCareerError("");
+    try {
+      const nextCareer = await api<CareerProfile | null>("/players/me/career");
+      if (!nextCareer?.palmares || !nextCareer.rankingSimulation) {
+        setCareer(null);
+        setCareerStatus("empty");
+        return;
+      }
+      setCareer(nextCareer);
+      setCareerStatus("ready");
+    } catch {
+      setCareer(null);
+      setCareerError("Le serveur ne répond pas. Vérifiez votre connexion puis relancez la synchronisation.");
+      setCareerStatus("error");
+    }
+  }, []);
+  useEffect(() => void loadCareer(), [loadCareer]);
+  useEffect(() => {
+    if (saveStatus !== "saved") return;
+    const timeout = window.setTimeout(() => setSaveStatus("idle"), 2600);
+    return () => window.clearTimeout(timeout);
+  }, [saveStatus]);
   useEffect(() => {
     const nextTab = searchParams.get("tab");
     if ((nextTab === "stats" || nextTab === "palmares") && nextTab !== tab) {
@@ -2809,112 +3364,276 @@ function PlayerPage() {
   }
 
   return (
-    <div className="grid gap-4">
-      <section className="panel p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-4">
-            <ProfilePicture avatar={player.avatar} size="md" />
-            <div className="min-w-0">
-              <h1 className="truncate text-2xl font-black">{player.name}</h1>
-              <p className="text-sm text-slate-300">
-                {nationalityLabel(player.nationality)} · {player.fftRanking} · Niveau{" "}
-                {player.overall}
-              </p>
-            </div>
-          </div>
-          <div className="grid gap-2">
-            <button
-              className="rounded-md border border-emerald-300/35 bg-emerald-300/10 px-3 py-2 text-sm font-bold text-emerald-100 transition hover:bg-emerald-300/18"
-              onClick={() => setProfileEditorOpen(true)}
-              type="button"
-            >
-              Profil
+    <div className="player-cinematic">
+      <section className="player-cinematic-stage">
+        <header className="player-cinematic-header">
+          <button
+            aria-label="Retour au hub"
+            className="player-cinematic-back"
+            onClick={() => navigate("/dashboard")}
+            type="button"
+          >
+            <ArrowLeft />
+          </button>
+          <button
+            aria-label="Retour au hub MyPro Tennis"
+            className="player-cinematic-brand"
+            onClick={() => navigate("/dashboard")}
+            type="button"
+          >
+            <strong>MYPRO</strong>
+            <span>TENNIS</span>
+          </button>
+          <h1>Mon joueur</h1>
+          <div className="player-cinematic-resources" aria-label="Ressources du joueur">
+            <button onClick={() => navigate("/duel")} type="button">
+              <Zap />
+              <span><small>Énergie</small><strong>{player.actionEnergy}/{player.actionEnergyMax}</strong></span>
             </button>
-            <button
-              className="rounded-md border border-white/10 bg-white/[0.06] px-3 py-2 text-sm font-bold text-slate-100 transition hover:bg-white/[0.1]"
-              onClick={() => setAvatarEditorOpen(true)}
-              type="button"
-            >
-              Photo
+            <button className="is-gems" onClick={() => navigate("/collection")} type="button">
+              <Gem />
+              <span><small>Gemmes</small><strong>{player.gems}</strong></span>
+            </button>
+            <button className="is-credits" onClick={() => navigate("/collection")} type="button">
+              <Coins />
+              <span><small>Crédits</small><strong>{formatCredits(player.budget)}</strong></span>
             </button>
           </div>
-        </div>
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <GameMiniMetric label="Victoires" value={player.wins} />
-          <GameMiniMetric label="Défaites" value={player.losses} />
-          <GameMiniMetric label="Titres" value={career?.palmares.titles ?? "..."} />
-          <GameMiniMetric
-            label="Simulation"
-            value={career?.rankingSimulation.simulatedRanking ?? "..."}
-          />
-        </div>
-        <div className="segmented-tabs mt-4">
+          <div className="player-cinematic-system-actions">
+            <button aria-label="Ouvrir le tutoriel" onClick={() => setTutorialOpen(true)} type="button">
+              <HelpCircle />
+            </button>
+            <button aria-label="Ouvrir les réglages" onClick={() => navigate("/settings")} type="button">
+              <Settings />
+            </button>
+            <button aria-label="Fermer la page" onClick={() => navigate("/dashboard")} type="button">
+              <X />
+            </button>
+          </div>
+        </header>
+
+        <nav className="player-cinematic-tabs" aria-label="Sections de la page Mon joueur">
           {[
-            ["overview", "Parcours", player.fftRanking],
-            ["stats", "Stats", `${player.overall}`],
-            ["palmares", "Palmarès", `${career?.palmares.titles ?? 0} titre(s)`]
-          ].map(([value, label, meta]) => (
-            <button
-              key={value}
-              className={tab === value ? "is-active" : ""}
-              onClick={() => selectPlayerTab(value as typeof tab)}
-              type="button"
-            >
-              <span>{label}</span>
-              <small>{meta}</small>
-            </button>
-          ))}
-        </div>
+            ["overview", "Parcours", player.fftRanking, UserRound],
+            ["stats", "Statistiques", `Note ${calculatedOverall}`, Target],
+            [
+              "palmares",
+              "Palmarès",
+              careerStatus === "loading"
+                ? "Chargement"
+                : careerStatus === "error"
+                  ? "Indisponible"
+                  : `${career?.palmares.titles ?? 0} titres`,
+              Trophy
+            ]
+          ].map(([value, label, meta, Icon]) => {
+            const TabIcon = Icon as LucideIcon;
+            return (
+              <button
+                aria-current={tab === value ? "page" : undefined}
+                className={tab === value ? "is-active" : ""}
+                key={value as string}
+                onClick={() => selectPlayerTab(value as typeof tab)}
+                type="button"
+              >
+                <TabIcon />
+                <span><strong>{label as string}</strong><small>{meta as string}</small></span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <main className={`player-cinematic-grid is-${tab}`}>
+          <aside className="player-cinematic-identity">
+            <h2>Identité du joueur</h2>
+            <div className="player-cinematic-profile-copy">
+              <strong><span>{player.firstName}</span><span>{player.lastName}</span></strong>
+              <span className="player-cinematic-nationality">
+                <i aria-hidden="true">{nationalityFlag(player.nationality)}</i>
+                {nationalityLabel(player.nationality)}
+              </span>
+              <div>
+                <b>{player.fftRanking}</b>
+                <b>Niv. {player.playerLevel}</b>
+              </div>
+            </div>
+            <div className="player-cinematic-portrait">
+              {avatarHeroSource(player.avatar) ? (
+                <img alt={player.name} decoding="async" draggable={false} src={avatarHeroSource(player.avatar)} />
+              ) : (
+                <ProfilePicture avatar={player.avatar} size="lg" />
+              )}
+            </div>
+            <div className="player-cinematic-overall" aria-label={`Note globale ${calculatedOverall}`}>
+              <small>Note</small>
+              <strong>{calculatedOverall}</strong>
+            </div>
+            <div className="player-cinematic-style">
+              <span><Hand aria-hidden="true" /><strong>{dominantHandLabel}</strong></span>
+              <span><Repeat2 aria-hidden="true" /><strong>{backhandLabel}</strong></span>
+            </div>
+            <div className="player-cinematic-record">
+              <span><strong>{player.wins}</strong><small>Victoires</small></span>
+              <span><strong>{player.losses}</strong><small>Défaites</small></span>
+              <span><strong>{career?.palmares.titles ?? "…"}</strong><small>Titres</small></span>
+            </div>
+            <div className="player-cinematic-profile-actions">
+              <button onClick={() => { setSaveStatus("idle"); setProfileEditorOpen(true); }} type="button"><Pencil />Modifier le profil</button>
+              <button onClick={() => { setSaveStatus("idle"); setAvatarEditorOpen(true); }} type="button"><Camera />Changer la photo</button>
+            </div>
+          </aside>
+
+          {tab === "overview" ? (
+            <>
+              <section className="player-cinematic-primary player-career-column">
+                <PlayerCareerPathPanel player={player} />
+                {careerStatus === "ready" && career ? (
+                  <PlayerRankingProjectionPanel
+                    career={career}
+                    onDetails={() => setRankingDetailsOpen(true)}
+                    player={player}
+                  />
+                ) : (
+                  <PlayerCareerDataState
+                    compact
+                    message={careerError}
+                    onRetry={() => void loadCareer()}
+                    status={careerStatus === "ready" ? "empty" : careerStatus}
+                  />
+                )}
+              </section>
+              <section className="player-cinematic-secondary player-overview-side-preview">
+                <article>
+                  <header><div><Sparkles /><h2>Profil de performance</h2></div></header>
+                  <div className="player-overview-performance-content">
+                    <div className="player-overview-best-stats">
+                      {topStats.map((item) => (
+                        <span key={item.key}>
+                          <StatIcon statKey={item.key} size="sm" />
+                          <small>{statLabels[item.key]}</small>
+                          <strong>{Math.round(item.value)}</strong>
+                        </span>
+                      ))}
+                    </div>
+                    <PlayerStatsRadar compact player={player} />
+                  </div>
+                  <button onClick={() => selectPlayerTab("stats")} type="button">Voir les 12 statistiques</button>
+                </article>
+                <article>
+                  <header><div><Trophy /><h2>Palmarès</h2></div></header>
+                  {careerStatus === "ready" && career ? (
+                    <>
+                      <div className="player-overview-palmares-content">
+                        <div className="player-overview-trophies">
+                          <span><strong>{career.palmares.titles}</strong><small>Titres</small></span>
+                          <span><strong>{career.palmares.nationalTitles}</strong><small>National</small></span>
+                          <span><strong>{career.palmares.finals}</strong><small>Finales</small></span>
+                          <span><strong>{career.palmares.wins}</strong><small>Victoires</small></span>
+                        </div>
+                        <div className="player-overview-recent-titles">
+                          {career.palmares.recentTitles.slice(0, 2).map((title) => (
+                            <span key={title.id}><Trophy /><strong>{title.label}</strong></span>
+                          ))}
+                          {!career.palmares.recentTitles.length ? (
+                            <span className="is-empty"><Trophy /><strong>Premier titre à conquérir</strong></span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <button onClick={() => selectPlayerTab("palmares")} type="button">Voir le palmarès</button>
+                    </>
+                  ) : (
+                    <PlayerCareerDataState
+                      compact
+                      message={careerError}
+                      onRetry={() => void loadCareer()}
+                      status={careerStatus === "ready" ? "empty" : careerStatus}
+                    />
+                  )}
+                </article>
+              </section>
+            </>
+          ) : null}
+          {tab === "stats" ? (
+            <section className="player-cinematic-wide-content">
+              <PlayerStatsPanel player={player} />
+            </section>
+          ) : null}
+          {tab === "palmares" ? (
+            <section className="player-cinematic-wide-content">
+              {careerStatus === "ready" && career ? (
+                <PlayerPalmaresPanel career={career} player={player} />
+              ) : (
+                <PlayerCareerDataState
+                  message={careerError}
+                  onRetry={() => void loadCareer()}
+                  status={careerStatus === "ready" ? "empty" : careerStatus}
+                />
+              )}
+            </section>
+          ) : null}
+        </main>
+
+        <footer
+          aria-live="polite"
+          className={`player-cinematic-status is-${saveStatus !== "idle" ? saveStatus : careerStatus}`}
+        >
+          {saveStatus === "saving" || careerStatus === "loading" ? <LoaderCircle /> :
+            saveStatus === "error" || careerStatus === "error" ? <CircleAlert /> : <CheckCircle2 />}
+          <strong>
+            {saveStatus === "saving"
+              ? "Enregistrement du profil"
+              : saveStatus === "saved"
+                ? "Modifications enregistrées"
+                : saveStatus === "error"
+                  ? "Enregistrement interrompu"
+                  : careerStatus === "loading"
+                    ? "Synchronisation de la carrière"
+                    : careerStatus === "error"
+                      ? "Parcours temporairement indisponible"
+                      : careerStatus === "empty"
+                        ? "Carrière prête à démarrer"
+                        : "Profil à jour"}
+          </strong>
+          <span aria-hidden="true">•</span>
+          <span>
+            {saveStatus === "saving"
+              ? "Ne fermez pas cette fenêtre"
+              : saveStatus === "error"
+                ? "Corrigez le problème puis réessayez"
+                : `Prochaine progression : classement ${nextRanking}`}
+          </span>
+        </footer>
       </section>
-      {tab === "stats" ? (
-        <section className="panel p-4 sm:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-sm text-emerald-300">Profil joueur</p>
-              <h2 className="font-bold">Statistiques</h2>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {topStats.map((item) => (
-                <span key={item.key} className="stat-bonus-pill">
-                  <StatIcon statKey={item.key} size="sm" />
-                  <span>{statLabels[item.key]}</span>
-                  <strong>{Math.round(item.value)}</strong>
-                </span>
-              ))}
-            </div>
-          </div>
-          <div className="mt-4">
-            <StatBars player={player} />
-          </div>
-        </section>
-      ) : null}
-      {tab === "overview" ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <CareerPathCard player={player} />
-          <RankingSimulationCard career={career} player={player} />
-        </div>
-      ) : null}
-      {tab === "palmares" ? <PlayerPalmaresCard career={career} /> : null}
       {avatarEditorOpen ? (
         <AvatarEditorModal
           player={player}
-          onClose={() => setAvatarEditorOpen(false)}
+          onClose={() => { setAvatarEditorOpen(false); setSaveStatus("idle"); }}
           onSaved={async () => {
             await refresh();
             setAvatarEditorOpen(false);
           }}
+          onStatusChange={setSaveStatus}
         />
       ) : null}
       {profileEditorOpen ? (
         <ProfileEditorModal
           player={player}
-          onClose={() => setProfileEditorOpen(false)}
+          onClose={() => { setProfileEditorOpen(false); setSaveStatus("idle"); }}
           onSaved={async () => {
             await refresh();
             setProfileEditorOpen(false);
           }}
+          onStatusChange={setSaveStatus}
         />
       ) : null}
+      {rankingDetailsOpen ? (
+        <PlayerRankingDetailsModal
+          career={career}
+          onClose={() => setRankingDetailsOpen(false)}
+          player={player}
+        />
+      ) : null}
+      {tutorialOpen ? <TutorialModal onClose={() => setTutorialOpen(false)} /> : null}
     </div>
   );
 }
@@ -2922,11 +3641,13 @@ function PlayerPage() {
 function ProfileEditorModal({
   player,
   onClose,
-  onSaved
+  onSaved,
+  onStatusChange
 }: {
   player: Player;
   onClose: () => void;
   onSaved: () => Promise<void>;
+  onStatusChange: (status: PlayerSaveStatus) => void;
 }) {
   const [form, setForm] = useState<{
     firstName: string;
@@ -2950,14 +3671,17 @@ function ProfileEditorModal({
     event.preventDefault();
     setSaving(true);
     setError("");
+    onStatusChange("saving");
     try {
       await api<Player>("/players/me/profile", {
         method: "PATCH",
         body: JSON.stringify(form)
       });
       await onSaved();
+      onStatusChange("saved");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Profil impossible à enregistrer.");
+      onStatusChange("error");
     } finally {
       setSaving(false);
     }
@@ -2965,19 +3689,29 @@ function ProfileEditorModal({
 
   return (
     <div className="game-modal-overlay">
-      <form className="game-modal-panel panel max-w-2xl" onSubmit={save}>
+      <form
+        aria-busy={saving}
+        aria-describedby="player-profile-editor-description"
+        aria-labelledby="player-profile-editor-title"
+        aria-modal="true"
+        className="game-modal-panel panel max-w-2xl player-profile-editor"
+        onKeyDown={(event) => handleModalKeyboard(event, onClose, saving)}
+        onSubmit={save}
+        role="dialog"
+      >
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.24em] text-emerald-300">
               Identité joueur
             </p>
-            <h2 className="mt-1 text-2xl font-black">Modifier le profil</h2>
-            <p className="mt-1 text-sm text-slate-300">
+            <h2 className="mt-1 text-2xl font-black" id="player-profile-editor-title">Modifier le profil</h2>
+            <p className="mt-1 text-sm text-slate-300" id="player-profile-editor-description">
               Ces informations sont visibles dans les duels, le classement et votre profil public.
             </p>
           </div>
           <button
             className="rounded-md bg-white/10 p-2 text-slate-200 hover:bg-white/15"
+            disabled={saving}
             onClick={onClose}
             aria-label="Fermer"
             type="button"
@@ -2990,7 +3724,9 @@ function ProfileEditorModal({
           <label className="grid gap-2 text-sm font-semibold text-slate-200">
             <span>Prénom</span>
             <Field
+              autoFocus
               value={form.firstName}
+              disabled={saving}
               onChange={(event) => setForm({ ...form, firstName: event.target.value })}
             />
           </label>
@@ -2998,6 +3734,7 @@ function ProfileEditorModal({
             <span>Nom</span>
             <Field
               value={form.lastName}
+              disabled={saving}
               onChange={(event) => setForm({ ...form, lastName: event.target.value })}
             />
           </label>
@@ -3005,6 +3742,7 @@ function ProfileEditorModal({
             <span>Nationalité</span>
             <select
               className="rounded-md border border-white/10 bg-slate-950 px-3 py-2"
+              disabled={saving}
               value={form.nationality}
               onChange={(event) => setForm({ ...form, nationality: event.target.value })}
             >
@@ -3024,6 +3762,7 @@ function ProfileEditorModal({
               <span>{label as string}</span>
               <select
                 className="rounded-md border border-white/10 bg-slate-950 px-3 py-2"
+                disabled={saving}
                 value={form[key as keyof typeof form]}
                 onChange={(event) => setForm({ ...form, [key as string]: event.target.value })}
               >
@@ -3035,8 +3774,13 @@ function ProfileEditorModal({
           ))}
         </div>
 
-        {error ? (
-          <p className="mt-4 rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+        {saving ? (
+          <div aria-live="polite" className="player-profile-save-state" role="status">
+            <LoaderCircle />
+            <span><strong>Enregistrement en cours</strong><small>Synchronisation du profil avec votre compte…</small></span>
+          </div>
+        ) : error ? (
+          <p aria-live="assertive" className="mt-4 rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100" role="alert">
             {error}
           </p>
         ) : null}
@@ -3044,6 +3788,7 @@ function ProfileEditorModal({
         <div className="mt-6 flex flex-wrap justify-end gap-3">
           <Button
             className="bg-white/10 text-white hover:bg-white/15"
+            disabled={saving}
             onClick={onClose}
             type="button"
           >
@@ -3061,11 +3806,13 @@ function ProfileEditorModal({
 function AvatarEditorModal({
   player,
   onClose,
-  onSaved
+  onSaved,
+  onStatusChange
 }: {
   player: Player;
   onClose: () => void;
   onSaved: () => Promise<void>;
+  onStatusChange: (status: PlayerSaveStatus) => void;
 }) {
   const current = parseAvatar(player.avatar);
   const [picture, setPicture] = useState<AvatarPicture>(
@@ -3083,7 +3830,7 @@ function AvatarEditorModal({
   function importPicture(file?: File) {
     if (!file) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setError("Format refuse. Utilisez une image JPG, PNG ou WebP.");
+      setError("Format refusé. Utilisez une image JPG, PNG ou WebP.");
       return;
     }
     if (file.size > maxProfilePictureBytes) {
@@ -3103,14 +3850,17 @@ function AvatarEditorModal({
   async function save() {
     setSaving(true);
     setError("");
+    onStatusChange("saving");
     try {
       await api<Player>("/players/me/avatar", {
         method: "PATCH",
         body: JSON.stringify({ avatarPicture: picture })
       });
       await onSaved();
+      onStatusChange("saved");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Photo impossible a enregistrer.");
+      setError(err instanceof Error ? err.message : "Photo impossible à enregistrer.");
+      onStatusChange("error");
     } finally {
       setSaving(false);
     }
@@ -3118,16 +3868,25 @@ function AvatarEditorModal({
 
   return (
     <div className="game-modal-overlay">
-      <section className="game-modal-panel panel max-w-2xl">
+      <section
+        aria-busy={saving}
+        aria-labelledby="player-avatar-editor-title"
+        aria-modal="true"
+        className="game-modal-panel panel max-w-2xl player-profile-editor"
+        onKeyDown={(event) => handleModalKeyboard(event, onClose, saving)}
+        role="dialog"
+      >
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.24em] text-emerald-300">
               Photo de profil
             </p>
-            <h2 className="mt-1 text-2xl font-black">Modifier l'image du joueur</h2>
+            <h2 className="mt-1 text-2xl font-black" id="player-avatar-editor-title">Modifier l'image du joueur</h2>
           </div>
           <button
             className="rounded-md bg-white/10 p-2 text-slate-200 hover:bg-white/15"
+            disabled={saving}
+            autoFocus
             onClick={onClose}
             aria-label="Fermer"
             type="button"
@@ -3141,19 +3900,21 @@ function AvatarEditorModal({
             <div className="mx-auto w-fit">
               <ProfilePicture picture={picture} initials={initials} size="lg" />
             </div>
-            <p className="mt-3 text-sm text-slate-300">Apercu public</p>
+            <p className="mt-3 text-sm text-slate-300">Aperçu public</p>
           </div>
 
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
               <Image size={16} />
-              Personal Pictures
+              Portraits disponibles
             </div>
             <div className="mt-3 grid grid-cols-5 gap-2">
               {personalPictures.map((item) => (
                 <button
                   key={item.id}
                   type="button"
+                  disabled={saving}
+                  aria-pressed={picture.kind === "preset" && picture.id === item.id}
                   onClick={() => usePresetPicture(item.id)}
                   className={`rounded-md border p-1 transition ${
                     picture.kind === "preset" && picture.id === item.id
@@ -3177,6 +3938,7 @@ function AvatarEditorModal({
               <input
                 className="hidden"
                 type="file"
+                disabled={saving}
                 accept="image/jpeg,image/png,image/webp"
                 onChange={(event) => importPicture(event.target.files?.[0])}
               />
@@ -3184,8 +3946,13 @@ function AvatarEditorModal({
             <p className="mt-2 text-xs text-slate-400">
               Formats acceptes : JPG, PNG, WebP. Taille maximale : 120 Ko.
             </p>
-            {error ? (
-              <p className="mt-3 rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+            {saving ? (
+              <div aria-live="polite" className="player-profile-save-state" role="status">
+                <LoaderCircle />
+                <span><strong>Enregistrement en cours</strong><small>Optimisation et synchronisation de la photo…</small></span>
+              </div>
+            ) : error ? (
+              <p aria-live="assertive" className="mt-3 rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100" role="alert">
                 {error}
               </p>
             ) : null}
@@ -3193,7 +3960,7 @@ function AvatarEditorModal({
         </div>
 
         <div className="mt-6 flex flex-wrap justify-end gap-3">
-          <Button className="bg-white/10 text-white hover:bg-white/15" onClick={onClose}>
+          <Button className="bg-white/10 text-white hover:bg-white/15" disabled={saving} onClick={onClose}>
             Annuler
           </Button>
           <Button onClick={save} disabled={saving}>

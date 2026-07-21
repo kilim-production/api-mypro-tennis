@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
 
 const token = process.env.DISCORD_BOT_TOKEN;
 const guildId = process.env.DISCORD_GUILD_ID;
@@ -12,11 +13,12 @@ if (!token || !guildId) {
 }
 
 async function discord(path, options = {}) {
+  const multipart = typeof FormData !== "undefined" && options.body instanceof FormData;
   const response = await fetch(`${apiBase}${path}`, {
     ...options,
     headers: {
       Authorization: `Bot ${token}`,
-      "Content-Type": "application/json; charset=utf-8",
+      ...(multipart ? {} : { "Content-Type": "application/json; charset=utf-8" }),
       ...(options.headers ?? {})
     }
   });
@@ -63,7 +65,7 @@ async function showLatest() {
   }
 }
 
-async function publish(filePath) {
+async function publish(filePath, imagePaths = []) {
   if (!filePath) throw new Error("Chemin du patch note manquant.");
   const raw = (await readFile(filePath, "utf8")).replace(/^\uFEFF/, "").trim();
   assertValidUnicode(raw);
@@ -79,25 +81,33 @@ async function publish(filePath) {
   const channel = channels.get("journal-des-mises-à-jour") ?? channels.get("annonces");
   if (!channel) throw new Error("Aucun salon de publication trouvé.");
 
-  const message = await discord(`/channels/${channel.id}/messages`, {
-    method: "POST",
-    body: JSON.stringify({
-      allowed_mentions: { parse: [] },
-      embeds: [
-        {
-          title,
-          description,
-          color: 0x43e5b0,
-          footer: { text: "MYPRO - TENNIS • Kilim Games Production" },
-          timestamp: new Date().toISOString()
-        }
-      ]
-    })
-  });
+  const embed = {
+    title,
+    description,
+    color: 0x43e5b0,
+    footer: { text: "MYPRO - TENNIS • Kilim Games Production" },
+    timestamp: new Date().toISOString(),
+    ...(imagePaths[0] ? { image: { url: `attachment://${basename(imagePaths[0])}` } } : {})
+  };
+  const payload = { allowed_mentions: { parse: [] }, embeds: [embed] };
+  const options = imagePaths.length
+    ? (() => {
+        const body = new FormData();
+        body.append("payload_json", JSON.stringify(payload));
+        return Promise.all(
+          imagePaths.map(async (imagePath, index) => {
+            const file = await readFile(imagePath);
+            body.append(`files[${index}]`, new Blob([file]), basename(imagePath));
+          })
+        ).then(() => ({ method: "POST", body }));
+      })()
+    : Promise.resolve({ method: "POST", body: JSON.stringify(payload) });
+
+  const message = await discord(`/channels/${channel.id}/messages`, await options);
   console.log(`Patch note publié dans #${channel.name} (message ${message.id}).`);
 }
 
-const [command = "latest", argument] = process.argv.slice(2);
+const [command = "latest", argument, ...images] = process.argv.slice(2);
 if (command === "latest") await showLatest();
-else if (command === "publish") await publish(argument);
+else if (command === "publish") await publish(argument, images);
 else throw new Error(`Commande inconnue : ${command}`);
