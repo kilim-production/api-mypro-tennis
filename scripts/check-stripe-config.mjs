@@ -14,16 +14,18 @@ function check(label, valid, detail) {
   results.push({ label, valid, detail });
 }
 
-const keyMode = secretKey.startsWith("sk_live_")
+const keyMode = /^(sk|rk)_live_/.test(secretKey)
   ? "LIVE"
-  : secretKey.startsWith("sk_test_")
+  : /^(sk|rk)_test_/.test(secretKey)
     ? "TEST"
     : "UNCONFIGURED";
 
 check(
   "Cle secrete Stripe",
   keyMode !== "UNCONFIGURED",
-  keyMode === "UNCONFIGURED" ? "Ajoutez une cle sk_test_... pour commencer." : `Mode ${keyMode}.`
+  keyMode === "UNCONFIGURED"
+    ? "Ajoutez une cle Stripe sk_... ou rk_... valide."
+    : `Mode ${keyMode}.`
 );
 check(
   "Secret du webhook",

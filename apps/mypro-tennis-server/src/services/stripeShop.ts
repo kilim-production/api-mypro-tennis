@@ -19,10 +19,11 @@ const productLabels = new Map(
 );
 
 function configuredStripe() {
-  if (!config.stripeSecretKey || !config.stripeWebhookSecret) {
+  const mode = stripeMode();
+  if (mode === "UNCONFIGURED" || !config.stripeWebhookSecret.startsWith("whsec_")) {
     throw new ShopError("Le paiement Stripe n'est pas encore configuré.", 503);
   }
-  if (config.stripeSecretKey.startsWith("sk_live_") && !config.stripeLivePaymentsEnabled) {
+  if (mode === "LIVE" && !config.stripeLivePaymentsEnabled) {
     throw new ShopError("Les paiements Stripe réels sont désactivés par sécurité.", 503);
   }
   return new Stripe(config.stripeSecretKey);
@@ -30,18 +31,22 @@ function configuredStripe() {
 
 function stripeMode() {
   if (!config.stripeSecretKey) return "UNCONFIGURED" as const;
-  return config.stripeSecretKey.startsWith("sk_live_") ? ("LIVE" as const) : ("TEST" as const);
+  if (/^(sk|rk)_live_/.test(config.stripeSecretKey)) return "LIVE" as const;
+  if (/^(sk|rk)_test_/.test(config.stripeSecretKey)) return "TEST" as const;
+  return "UNCONFIGURED" as const;
 }
 
 export function stripeShopConfiguration() {
   const mode = stripeMode();
+  const webhookConfigured = config.stripeWebhookSecret.startsWith("whsec_");
   return {
     provider: STRIPE_PROVIDER,
     enabled:
-      Boolean(config.stripeSecretKey && config.stripeWebhookSecret) &&
+      mode !== "UNCONFIGURED" &&
+      webhookConfigured &&
       (mode !== "LIVE" || config.stripeLivePaymentsEnabled),
     mode,
-    webhookConfigured: Boolean(config.stripeWebhookSecret)
+    webhookConfigured
   };
 }
 
