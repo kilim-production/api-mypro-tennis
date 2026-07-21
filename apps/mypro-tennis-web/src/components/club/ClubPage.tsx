@@ -1837,26 +1837,54 @@ function TeamChampionshipPanel({
             <div className="grid gap-5">
               <article
                 aria-labelledby="club-championship-tab-standings"
-                className={`rounded-md border border-white/10 bg-white/[0.04] p-4 ${
+                className={`club-standings-panel rounded-md border border-white/10 bg-white/[0.04] p-4 ${
                   teamView === "standings" ? "" : "hidden"
                 }`}
                 id="club-championship-panel-standings"
                 role="tabpanel"
               >
                 <h3 className="font-black">Classement de la division</h3>
-                <p className="mt-1 text-sm text-slate-300">
-                  Du {new Date(championship.startsAt).toLocaleString("fr-FR")} au{" "}
-                  {new Date(championship.endsAt).toLocaleString("fr-FR")}
+                <p className="club-standings-period mt-1 text-sm text-slate-300">
+                  <span className="club-standings-desktop-copy">
+                    Du {new Date(championship.startsAt).toLocaleString("fr-FR")} au{" "}
+                    {new Date(championship.endsAt).toLocaleString("fr-FR")}
+                  </span>
+                  <span className="club-standings-mobile-copy">
+                    Saison · {new Date(championship.startsAt).toLocaleDateString("fr-FR", {
+                      day: "2-digit",
+                      month: "short"
+                    })} au {new Date(championship.endsAt).toLocaleDateString("fr-FR", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric"
+                    })}
+                  </span>
                 </p>
-                <p className="mt-2 text-xs text-slate-400">
-                  Classement : points de simples gagnés, différence de sets, différence de jeux,
-                  tirage · {promotionEnabled ? "1er promu" : "Pas de montée en Elite 1"} ·{" "}
-                  {relegationEnabled ? "13e relégué" : "Pas de relégation en Départementale 4"}
+                <p className="club-standings-rules mt-2 text-xs text-slate-400">
+                  <span className="club-standings-desktop-copy">
+                    Classement : points de simples gagnés, différence de sets, différence de jeux,
+                    tirage · {promotionEnabled ? "1er promu" : "Pas de montée en Elite 1"} ·{" "}
+                    {relegationEnabled ? "13e relégué" : "Pas de relégation en Départementale 4"}
+                  </span>
+                  <span className="club-standings-mobile-copy">
+                    Départage : simples · sets · jeux · tirage
+                  </span>
                 </p>
                 {nextMeeting ? (
-                  <p className="mt-2 rounded-md bg-emerald-300/10 p-2 text-sm text-emerald-100">
-                    Prochaine journée : J{nextMeeting.round} ·{" "}
-                    {new Date(nextMeeting.startsAt).toLocaleString("fr-FR")}
+                  <p className="club-standings-next mt-2 rounded-md bg-emerald-300/10 p-2 text-sm text-emerald-100">
+                    <span className="club-standings-desktop-copy">
+                      Prochaine journée : J{nextMeeting.round} ·{" "}
+                      {new Date(nextMeeting.startsAt).toLocaleString("fr-FR")}
+                    </span>
+                    <span className="club-standings-mobile-copy">
+                      Prochaine J{nextMeeting.round} · {new Date(nextMeeting.startsAt).toLocaleDateString("fr-FR", {
+                        day: "2-digit",
+                        month: "short"
+                      })} à {new Date(nextMeeting.startsAt).toLocaleTimeString("fr-FR", {
+                        hour: "2-digit",
+                        minute: "2-digit"
+                      })}
+                    </span>
                   </p>
                 ) : null}
                 <div className="club-standings-scroll mt-4 overflow-x-auto">
@@ -1865,7 +1893,10 @@ function TeamChampionshipPanel({
                       <tr>
                         <th className="py-2">#</th>
                         <th>Club</th>
-                        <th>Pts simples</th>
+                        <th>
+                          <span className="club-standings-desktop-copy">Pts simples</span>
+                          <span className="club-standings-mobile-copy">Pts</span>
+                        </th>
                         <th>V</th>
                         <th>Sets</th>
                         <th>Jeux</th>
@@ -1893,8 +1924,13 @@ function TeamChampionshipPanel({
                             }`}
                           >
                             <td className="py-2 font-bold">{entry.rank}</td>
-                            <td>
-                              [{entry.tag}] {entry.name}
+                            <td className="club-standings-club-cell">
+                              <strong>[{entry.tag}] {entry.name}</strong>
+                              <small className="club-standings-mobile-meta">
+                                V {entry.wins} · Sets {entry.setsFor - entry.setsAgainst >= 0 ? "+" : ""}{entry.setsFor - entry.setsAgainst}
+                                {" · "}Jeux {entry.gamesFor - entry.gamesAgainst >= 0 ? "+" : ""}{entry.gamesFor - entry.gamesAgainst}
+                                {" · "}{formatCredits(displayedCashPrize)}{movement ? ` · ${movement}` : ""}
+                              </small>
                             </td>
                             <td className="font-bold">{entry.points}</td>
                             <td>{entry.wins}</td>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
@@ -355,6 +355,7 @@ function InventoryCard({
   busyItem,
   busyUpgrade,
   onSelect,
+  onShowDetails,
   onEquip,
   onUpgrade
 }: {
@@ -363,6 +364,7 @@ function InventoryCard({
   busyItem: string | null;
   busyUpgrade: string | null;
   onSelect: () => void;
+  onShowDetails: () => void;
   onEquip: (slot: number) => void;
   onUpgrade: () => void;
 }) {
@@ -373,11 +375,25 @@ function InventoryCard({
     >
       <div className="collection-card-topline">
         <span>{item.rarity}</span>
-        {selected ? (
-          <Check size={16} />
-        ) : item.equippedSlot !== null ? (
-          <b>Slot {item.equippedSlot + 1}</b>
-        ) : null}
+        <span className="collection-card-topline-actions">
+          {selected ? (
+            <Check aria-hidden="true" size={16} />
+          ) : item.equippedSlot !== null ? (
+            <b>Slot {item.equippedSlot + 1}</b>
+          ) : null}
+          <button
+            className="collection-item-detail-trigger"
+            aria-label={`Voir toutes les caractéristiques de ${item.name}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onShowDetails();
+            }}
+            type="button"
+          >
+            <Info aria-hidden="true" size={14} />
+            <span>Détails</span>
+          </button>
+        </span>
       </div>
       <ItemVisual item={item} />
       <h3>{item.name}</h3>
@@ -451,6 +467,7 @@ function InventoryPanel({
   busyItem,
   busyUpgrade,
   onSelect,
+  onShowDetails,
   onEquip,
   onUpgrade
 }: {
@@ -459,6 +476,7 @@ function InventoryPanel({
   busyItem: string | null;
   busyUpgrade: string | null;
   onSelect: (id: string) => void;
+  onShowDetails: (id: string) => void;
   onEquip: (item: PlayerCosmeticItem, slot: number) => void;
   onUpgrade: (item: PlayerCosmeticItem) => void;
 }) {
@@ -481,6 +499,7 @@ function InventoryPanel({
             busyItem={busyItem}
             busyUpgrade={busyUpgrade}
             onSelect={() => onSelect(item.id)}
+            onShowDetails={() => onShowDetails(item.id)}
             onEquip={(slot) => onEquip(item, slot)}
             onUpgrade={() => onUpgrade(item)}
           />
@@ -764,6 +783,214 @@ function MarketPanel({
   );
 }
 
+function ItemDetailsModal({
+  item,
+  busyItem,
+  busyUpgrade,
+  onClose,
+  onEquip,
+  onUpgrade
+}: {
+  item: PlayerCosmeticItem;
+  busyItem: string | null;
+  busyUpgrade: string | null;
+  onClose: () => void;
+  onEquip: (slot: number) => void;
+  onUpgrade: () => void;
+}) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const bonusEntries = Object.entries(item.bonuses).filter(([, value]) => value > 0);
+  const totalBonus = bonusEntries.reduce((sum, [, value]) => sum + value, 0);
+  const nextTotalBonus = item.canUpgrade ? totalBonus + bonusEntries.length : totalBonus;
+  const ownedDate = new Date(item.ownedAt);
+  const ownedLabel = Number.isNaN(ownedDate.getTime())
+    ? "Date inconnue"
+    : new Intl.DateTimeFormat("fr-FR", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
+      }).format(ownedDate);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeButtonRef.current?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        ) ?? []
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
+
+  return createPortal(
+    <div className="collection-modal-overlay collection-item-details-overlay" onClick={onClose}>
+      <section
+        ref={dialogRef}
+        aria-describedby="collection-item-details-summary"
+        aria-labelledby="collection-item-details-title"
+        aria-modal="true"
+        className={`collection-item-details ${rarityClass(item.rarity)}`}
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+      >
+        <header className="collection-item-details-header">
+          <div>
+            <span className="collection-item-rarity">{item.rarity}</span>
+            <h2 id="collection-item-details-title">{item.name}</h2>
+            <p id="collection-item-details-summary">
+              Toutes les caractéristiques et leur effet actuel sur votre joueur.
+            </p>
+          </div>
+          <button
+            ref={closeButtonRef}
+            className="collection-icon-button"
+            aria-label="Fermer le détail de l’objet"
+            onClick={onClose}
+            type="button"
+          >
+            <X aria-hidden="true" size={20} />
+          </button>
+        </header>
+
+        <div className="collection-item-details-content">
+          <div className="collection-item-details-preview">
+            <ItemVisual item={item} />
+            <div className="collection-item-details-level">
+              <span>Niveau de l’objet</span>
+              <strong>{item.upgradeLevel} / 3</strong>
+              <div aria-label={`Niveau ${item.upgradeLevel} sur 3`}>
+                {[1, 2, 3].map((level) => (
+                  <i className={level <= item.upgradeLevel ? "is-active" : ""} key={level} />
+                ))}
+              </div>
+            </div>
+            <dl className="collection-item-details-meta">
+              <div>
+                <dt>État</dt>
+                <dd>{item.equippedSlot !== null ? `Équipé · slot ${item.equippedSlot + 1}` : "Non équipé"}</dd>
+              </div>
+              <div>
+                <dt>Obtenu le</dt>
+                <dd>{ownedLabel}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div className="collection-item-details-stats">
+            <div className="collection-item-details-stats-heading">
+              <div>
+                <small>Bonus total actuel</small>
+                <strong>+{totalBonus}</strong>
+              </div>
+              {item.canUpgrade ? (
+                <div className="is-next">
+                  <small>Après amélioration</small>
+                  <strong>+{nextTotalBonus}</strong>
+                </div>
+              ) : (
+                <span className="collection-item-max-level">
+                  <Check aria-hidden="true" size={15} /> Niveau maximum
+                </span>
+              )}
+            </div>
+
+            <div className="collection-item-bonus-list" aria-label="Caractéristiques de l’objet">
+              {bonusEntries.length ? (
+                bonusEntries.map(([statKey, value]) => {
+                  const baseValue = Math.max(0, value - item.upgradeLevel);
+                  return (
+                    <div className="collection-item-bonus-row" key={statKey}>
+                      <span className="collection-item-bonus-icon">
+                        <StatGlyph statKey={statKey} size={21} />
+                      </span>
+                      <span className="collection-item-bonus-name">
+                        <strong>{statLabels[statKey] ?? statKey}</strong>
+                        <small>
+                          Base +{baseValue} · améliorations +{item.upgradeLevel}
+                        </small>
+                      </span>
+                      <strong className="collection-item-bonus-current">+{value}</strong>
+                      {item.canUpgrade ? (
+                        <span className="collection-item-bonus-next">
+                          <ChevronRight aria-hidden="true" size={14} /> +{value + 1}
+                        </span>
+                      ) : null}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="collection-item-no-bonus">Bonus à révéler</div>
+              )}
+            </div>
+
+            <div className="collection-item-details-actions">
+              <div>
+                <small>Équiper dans un slot</small>
+                <div className="collection-slot-buttons" aria-label={`Choisir un slot pour ${item.name}`}>
+                  {[0, 1, 2, 3].map((slot) => (
+                    <button
+                      key={slot}
+                      className={item.equippedSlot === slot ? "is-active" : ""}
+                      disabled={busyItem === item.id || item.equippedSlot === slot}
+                      onClick={() => onEquip(slot)}
+                      type="button"
+                    >
+                      {slot + 1}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {item.canUpgrade && item.nextUpgradeCost ? (
+                <button
+                  className="collection-card-action is-upgrade"
+                  disabled={busyUpgrade === item.id}
+                  onClick={onUpgrade}
+                  type="button"
+                >
+                  {busyUpgrade === item.id
+                    ? "Amélioration..."
+                    : `Améliorer · ${formatCredits(item.nextUpgradeCost)}`}
+                </button>
+              ) : (
+                <button className="collection-outline-button" onClick={onClose} type="button">
+                  Fermer
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>,
+    document.body
+  );
+}
+
 function SlotPicker({
   slot,
   cosmetics,
@@ -845,6 +1072,7 @@ export function CollectionPage() {
   const [loadError, setLoadError] = useState("");
   const [tab, setTab] = useState<CollectionTab>("equipment");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [detailItemId, setDetailItemId] = useState<string | null>(null);
   const [slotPicker, setSlotPicker] = useState<number | null>(null);
   const [busyItem, setBusyItem] = useState<string | null>(null);
   const [busyUpgrade, setBusyUpgrade] = useState<string | null>(null);
@@ -896,6 +1124,7 @@ export function CollectionPage() {
   const totalEquipmentBonus = sortedCosmetics
     .filter((item) => item.equippedSlot !== null)
     .reduce((sum, item) => sum + bonusTotal(item.bonuses), 0);
+  const detailItem = sortedCosmetics.find((item) => item.id === detailItemId) ?? null;
   const unlockableCards = (data?.cards ?? []).filter((card) => card.unlockable).length;
 
   async function equip(item: PlayerCosmeticItem, slot: number) {
@@ -1099,6 +1328,7 @@ export function CollectionPage() {
                 busyItem={busyItem}
                 busyUpgrade={busyUpgrade}
                 onSelect={setSelectedItemId}
+                onShowDetails={setDetailItemId}
                 onEquip={(item, slot) => void equip(item, slot)}
                 onUpgrade={(item) => void upgrade(item)}
               />
@@ -1173,6 +1403,16 @@ export function CollectionPage() {
           busyItem={busyItem}
           onClose={() => setSlotPicker(null)}
           onEquip={(item, slot) => void equip(item, slot)}
+        />
+      ) : null}
+      {detailItem ? (
+        <ItemDetailsModal
+          item={detailItem}
+          busyItem={busyItem}
+          busyUpgrade={busyUpgrade}
+          onClose={() => setDetailItemId(null)}
+          onEquip={(slot) => void equip(detailItem, slot)}
+          onUpgrade={() => void upgrade(detailItem)}
         />
       ) : null}
     </div>

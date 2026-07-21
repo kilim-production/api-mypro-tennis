@@ -4812,6 +4812,205 @@
   }
 }
 
+.club-standings-mobile-copy,
+.club-standings-mobile-meta {
+  display: none;
+}
+
+.club-standings-club-cell strong {
+  font-weight: inherit;
+}
+
+/* Classement mobile paysage : aucune colonne ne doit élargir l’ensemble de la page. */
+@media (max-width: 1120px) and (max-height: 520px) and (orientation: landscape) {
+  .club-championship-layout,
+  .club-championship-panel,
+  .club-championship-panel > .grid,
+  .club-championship-side-rail,
+  .club-standings-panel {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .club-championship-panel,
+  .club-championship-panel > .grid,
+  .club-championship-side-rail {
+    overflow: hidden;
+  }
+
+  .club-standings-panel {
+    overflow: hidden;
+    padding: 6px !important;
+  }
+
+  .club-standings-panel > h3 {
+    overflow: hidden;
+    margin: 0;
+    font-size: 0.72rem;
+    line-height: 1;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .club-standings-desktop-copy {
+    display: none;
+  }
+
+  .club-standings-mobile-copy {
+    display: inline;
+  }
+
+  .club-standings-period,
+  .club-standings-rules,
+  .club-standings-next {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    margin-top: 3px !important;
+    font-size: 0.46rem !important;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .club-standings-next {
+    padding: 4px 6px !important;
+  }
+
+  .club-standings-scroll {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden !important;
+    margin-top: 5px !important;
+  }
+
+  .club-standings-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100%;
+    table-layout: fixed;
+    font-size: 0.58rem;
+  }
+
+  .club-standings-table th,
+  .club-standings-table td {
+    min-width: 0;
+    overflow: hidden;
+    padding: 4px 4px 4px 0;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+
+  .club-standings-table th:nth-child(n + 4),
+  .club-standings-table td:nth-child(n + 4) {
+    display: none;
+  }
+
+  .club-standings-table th:nth-child(1),
+  .club-standings-table td:nth-child(1) {
+    width: 28px;
+    padding-left: 4px;
+  }
+
+  .club-standings-table th:nth-child(2),
+  .club-standings-table td:nth-child(2) {
+    width: auto;
+  }
+
+  .club-standings-table th:nth-child(3),
+  .club-standings-table td:nth-child(3) {
+    width: 42px;
+    padding-right: 5px;
+    text-align: right;
+  }
+
+  .club-standings-club-cell strong {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.58rem;
+    font-weight: 900;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .club-standings-mobile-meta {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    margin-top: 2px;
+    color: #91a7b5;
+    font-size: 0.39rem;
+    font-weight: 800;
+    line-height: 1.1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .club-standings-table tr.text-emerald-200 .club-standings-mobile-meta {
+    color: #7ff0c8;
+  }
+
+  .club-championship-side-rail {
+    align-self: start;
+  }
+
+  .club-ranking-preview,
+  .club-dues-card,
+  .club-ranking-table {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .club-ranking-preview > header {
+    min-width: 0;
+  }
+
+  .club-ranking-preview > header span,
+  .club-ranking-preview > header strong {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.5rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .club-ranking-preview > header strong {
+    max-width: 58%;
+    text-align: right;
+  }
+
+  .club-ranking-table > div:not(.club-ranking-separator) {
+    grid-template-columns: 20px minmax(0, 1fr) 25px;
+    gap: 3px;
+    padding-right: 4px;
+    padding-left: 4px;
+  }
+
+  .club-ranking-table > div > span > strong {
+    font-size: 0.48rem;
+  }
+
+  .club-ranking-table > div > b {
+    font-size: 0.58rem;
+  }
+}
+
+@media (max-width: 720px) and (max-height: 520px) and (orientation: landscape) {
+  .club-championship-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .club-championship-side-rail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .club-cinematic *,
   .club-cinematic *::before,
