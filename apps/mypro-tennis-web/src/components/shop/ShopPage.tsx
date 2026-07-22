@@ -220,10 +220,18 @@ function purchaseStatusLabel(status: string) {
   return "En cours";
 }
 
+const shopCatalogArtworkSources: Record<GemPack["art"] | "season", string> = {
+  season: "/visuals/shop/season-pass-chest.png",
+  diamond: "/visuals/shop/gems-100.png",
+  pile: "/visuals/shop/gems-225.png",
+  pouch: "/visuals/shop/gems-500.png",
+  chest: "/visuals/shop/gems-1100.png"
+};
+
 function ShopCatalogArtwork({ art, label }: { art: GemPack["art"] | "season"; label: string }) {
   return (
     <div className={`shop-catalog-art is-${art}`} aria-label={label} role="img">
-      <img alt="" decoding="async" draggable={false} src="/visuals/shop/shop-catalog-atlas.webp" />
+      <img alt="" decoding="async" draggable={false} src={shopCatalogArtworkSources[art]} />
     </div>
   );
 }

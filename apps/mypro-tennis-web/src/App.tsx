@@ -3128,6 +3128,32 @@ function Dashboard() {
           </main>
 
           <aside className="lobby-side lobby-side-right">
+            <button
+              aria-label="Ouvrir la Boutique : gemmes, Pass de saison et packs"
+              className="lobby-shop-promo"
+              onClick={() => navigate("/shop")}
+              onFocus={() => prefetchRouteData("/shop")}
+              onPointerEnter={() => prefetchRouteData("/shop")}
+              type="button"
+            >
+              <span className="lobby-shop-gem" aria-hidden="true">
+                <Gem />
+              </span>
+              <span className="lobby-shop-copy">
+                <strong>Boutique</strong>
+                <small>Gemmes · Pass de saison · Packs</small>
+                <b>Nouveau</b>
+              </span>
+              <span className="lobby-shop-chest" aria-hidden="true">
+                <img
+                  alt=""
+                  decoding="async"
+                  draggable={false}
+                  src="/visuals/shop/season-pass-chest.png"
+                />
+              </span>
+              <ChevronRight className="lobby-shop-chevron" aria-hidden="true" />
+            </button>
             <LobbyActionButton
               icon={Users}
               label="Mon club"

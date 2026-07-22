@@ -525,18 +525,21 @@
 .shop-catalog-art {
   position: relative;
   z-index: 2;
-  align-self: center;
-  justify-self: center;
+  display: grid;
   width: 100%;
   height: 100%;
   min-height: 0;
+  place-items: center;
   overflow: hidden;
 }
 
 .shop-catalog-art img {
-  position: absolute;
-  max-width: none;
-  height: auto;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
   pointer-events: none;
   user-select: none;
 }
@@ -546,9 +549,7 @@
 }
 
 .shop-catalog-art.is-season img {
-  top: -120%;
-  left: -39.5%;
-  width: 480%;
+  width: min(100%, 480px);
 }
 
 .shop-gem-card .shop-catalog-art {
@@ -557,28 +558,9 @@
   filter: drop-shadow(0 0 10px rgba(196, 75, 255, 0.3));
 }
 
-.shop-catalog-art.is-diamond img {
-  top: -162%;
-  left: -291%;
-  width: 829%;
-}
-
-.shop-catalog-art.is-pile img {
-  top: -162%;
-  left: -366%;
-  width: 760%;
-}
-
-.shop-catalog-art.is-pouch img {
-  top: -235%;
-  left: -292%;
-  width: 811%;
-}
-
-.shop-catalog-art.is-chest img {
-  top: -232%;
-  left: -348%;
-  width: 730%;
+.shop-gem-card .shop-catalog-art img {
+  width: 96%;
+  height: 96%;
 }
 
 .shop-gem-card > button {
