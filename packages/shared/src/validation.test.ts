@@ -10,6 +10,7 @@ import {
   playerCreationSchema,
   playerProfileUpdateSchema,
   shopPurchaseSchema,
+  shopLegalVersion,
   shopStripeCheckoutSchema,
   trainingStartSchema
 } from "./index";
@@ -196,13 +197,41 @@ describe("validations partagees", () => {
     expect(
       shopStripeCheckoutSchema.safeParse({
         productId: "gems-100",
-        idempotencyKey: "stripe-test-1234"
+        idempotencyKey: "stripe-test-1234",
+        termsAccepted: true,
+        immediateDeliveryAccepted: true,
+        purchaseAuthorityConfirmed: true,
+        termsVersion: shopLegalVersion
       }).success
     ).toBe(true);
     expect(
       shopStripeCheckoutSchema.safeParse({
         productId: "bag-elite",
-        idempotencyKey: "stripe-test-1234"
+        idempotencyKey: "stripe-test-1234",
+        termsAccepted: true,
+        immediateDeliveryAccepted: true,
+        purchaseAuthorityConfirmed: true,
+        termsVersion: shopLegalVersion
+      }).success
+    ).toBe(false);
+    expect(
+      shopStripeCheckoutSchema.safeParse({
+        productId: "gems-100",
+        idempotencyKey: "stripe-test-1234",
+        termsAccepted: true,
+        immediateDeliveryAccepted: false,
+        purchaseAuthorityConfirmed: true,
+        termsVersion: shopLegalVersion
+      }).success
+    ).toBe(false);
+    expect(
+      shopStripeCheckoutSchema.safeParse({
+        productId: "gems-100",
+        idempotencyKey: "stripe-test-1234",
+        termsAccepted: true,
+        immediateDeliveryAccepted: true,
+        purchaseAuthorityConfirmed: false,
+        termsVersion: shopLegalVersion
       }).success
     ).toBe(false);
   });

@@ -261,6 +261,8 @@ export const shopPurchaseSchema = z.object({
 
 export const shopStripeProductIdSchema = z.enum(["gems-100", "gems-225", "gems-500", "gems-1100"]);
 
+export const shopLegalVersion = "2026-07-22" as const;
+
 export const shopStripeCheckoutSchema = z.object({
   productId: shopStripeProductIdSchema,
   idempotencyKey: z
@@ -268,7 +270,11 @@ export const shopStripeCheckoutSchema = z.object({
     .trim()
     .min(8)
     .max(100)
-    .regex(/^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/)
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/),
+  termsAccepted: z.literal(true),
+  immediateDeliveryAccepted: z.literal(true),
+  purchaseAuthorityConfirmed: z.literal(true),
+  termsVersion: z.literal(shopLegalVersion)
 });
 
 export const challengeSchema = z.object({

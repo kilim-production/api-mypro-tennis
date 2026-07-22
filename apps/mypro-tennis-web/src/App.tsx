@@ -92,6 +92,7 @@ const loadDuel = () => import("./components/duel/DuelPage");
 const loadAutomaticMatch = () => import("./components/match/AutomaticMatchPage");
 const loadSeason = () => import("./components/season/SeasonPage");
 const loadShop = () => import("./components/shop/ShopPage");
+const loadLegal = () => import("./components/legal/LegalPage");
 
 const CoachDeckBuilderPage = lazy(() =>
   loadCoachDeckBuilder().then((module) => ({ default: module.CoachDeckBuilderPage }))
@@ -114,6 +115,7 @@ const SeasonCinematicPage = lazy(() =>
   loadSeason().then((module) => ({ default: module.SeasonPage }))
 );
 const ShopPage = lazy(() => loadShop().then((module) => ({ default: module.ShopPage })));
+const LegalPage = lazy(() => loadLegal().then((module) => ({ default: module.LegalPage })));
 
 const socketUrl = SOCKET_URL;
 const discordInviteUrl = import.meta.env.VITE_DISCORD_INVITE_URL ?? "";
@@ -158,6 +160,7 @@ const routeModuleLoaders: Record<string, (() => Promise<unknown>) | undefined> =
   "/skills": loadSkills,
   "/collection": loadCollection,
   "/shop": loadShop,
+  "/legal": loadLegal,
   "/collection/coach-deck": loadCoachDeckBuilder,
   "/coach-deck/tutorial": loadCoachDeckTutorial,
   "/club": loadClub,
@@ -6530,6 +6533,8 @@ export function App() {
             <Route path="/login" element={<AuthPage mode="login" />} />
             <Route path="/signup" element={<AuthPage mode="signup" />} />
             <Route path="/oauth/google" element={<GoogleOAuthCallback />} />
+            <Route path="/legal" element={<LegalPage />} />
+            <Route path="/legal/:section" element={<LegalPage />} />
             <Route
               path="/create-player"
               element={

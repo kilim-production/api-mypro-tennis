@@ -94,3 +94,35 @@ Le passage en production est une operation separee :
 6. Realisez un achat reel de faible montant et un remboursement complet avant d'ouvrir la Boutique aux joueurs.
 
 Ne reutilisez jamais les cles ou les webhooks du bac a sable en production.
+
+## 6. Informations legales Netlify
+
+Les pages publiques /legal/mentions, /legal/cgv, /legal/privacy,
+/legal/refunds et /legal/support lisent les informations publiques de
+l'editeur depuis les variables VITE*LEGAL* de Netlify. La liste complete
+figure dans .env.netlify.example.
+
+Ces valeurs sont volontairement absentes du depot. Elles doivent etre
+renseignees directement dans Netlify > Site configuration > Environment
+variables, puis le site doit etre redeploye. Les variables Vite sont publiques
+dans l'application finale : n'y placez aucun secret, aucune cle Stripe et aucun
+mot de passe.
+
+Avant de passer STRIPE_LIVE_PAYMENTS_ENABLED=1, verifiez dans l'interface :
+
+1. l'identite, l'immatriculation et les coordonnees du vendeur ;
+2. l'identite et les coordonnees de l'hebergeur ;
+3. le mediateur de la consommation choisi par le vendeur ;
+4. les CGV, les remboursements et la politique de confidentialite ;
+5. le recapitulatif d'achat et les trois cases non pre-cochees, dont la
+   confirmation de majorite ou d'autorisation parentale ;
+6. le libelle final Commander avec obligation de paiement.
+
+La convention avec SAS Mediation Solution a ete confirmee par l'editeur le
+22 juillet 2026. La variable publique
+`VITE_LEGAL_MEDIATOR_CONVENTION_CONFIRMED` doit donc valoir `1` dans Netlify.
+Remettez-la a `0` pour verrouiller immediatement les paiements si la convention
+cesse de couvrir le service.
+
+La version juridique enregistree avec chaque tentative Stripe est
+2026-07-22.

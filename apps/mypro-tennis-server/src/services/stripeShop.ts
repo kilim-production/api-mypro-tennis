@@ -57,10 +57,18 @@ function gemProduct(productId: string) {
 }
 
 function checkoutMetadata(purchase: ShopPurchase, product: StripeGemProduct) {
+  const acceptance = decodeJson<{
+    termsVersion?: string;
+    immediateDeliveryAccepted?: boolean;
+    purchaseAuthorityConfirmed?: boolean;
+  }>(purchase.legalAcceptance);
   return {
     purchaseId: purchase.id,
     playerId: purchase.playerId,
-    productId: product.id
+    productId: product.id,
+    termsVersion: acceptance.termsVersion ?? "unknown",
+    immediateDeliveryAccepted: acceptance.immediateDeliveryAccepted ? "true" : "false",
+    purchaseAuthorityConfirmed: acceptance.purchaseAuthorityConfirmed ? "true" : "false"
   };
 }
 
@@ -119,7 +127,14 @@ async function findOrCreateStripePurchase(playerId: string, input: ShopStripeChe
         amount: product.priceCents,
         status: "CREATING",
         idempotencyKey: input.idempotencyKey,
-        paymentProvider: STRIPE_PROVIDER
+        paymentProvider: STRIPE_PROVIDER,
+        legalAcceptance: encodeJson({
+          termsAccepted: input.termsAccepted,
+          immediateDeliveryAccepted: input.immediateDeliveryAccepted,
+          purchaseAuthorityConfirmed: input.purchaseAuthorityConfirmed,
+          termsVersion: input.termsVersion,
+          acceptedAt: new Date().toISOString()
+        })
       }
     });
     return { purchase, product };

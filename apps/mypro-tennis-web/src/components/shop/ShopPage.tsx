@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { shopLegalVersion } from "@mypro/shared";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowDown,
   ArrowLeft,
   CalendarDays,
   Check,
+  CheckCircle2,
   Coins,
   ExternalLink,
+  FileCheck2,
   Gem,
   Gift,
   HelpCircle,
@@ -24,6 +27,7 @@ import {
 } from "lucide-react";
 import { useGameStore } from "../../store";
 import { api } from "../../api";
+import { legalPublicationReady, missingLegalFields } from "../legal/legalConfig";
 import "./shop.css";
 
 type ShopTab = "featured" | "gems" | "bags" | "credits";
@@ -131,6 +135,12 @@ type ShopHistoryPurchase = {
 type ShopHistoryResponse = {
   gemDebt: number;
   purchases: ShopHistoryPurchase[];
+};
+
+type CheckoutReview = {
+  productId: string;
+  gems: number;
+  price: string;
 };
 
 const gemPacks: GemPack[] = [
@@ -304,6 +314,10 @@ export function ShopPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [purchaseHistory, setPurchaseHistory] = useState<ShopHistoryResponse | null>(null);
+  const [checkoutReview, setCheckoutReview] = useState<CheckoutReview | null>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [immediateDeliveryAccepted, setImmediateDeliveryAccepted] = useState(false);
+  const [purchaseAuthorityConfirmed, setPurchaseAuthorityConfirmed] = useState(false);
   const retryKeys = useRef<Record<string, string>>({});
   const noticeTimeout = useRef<number | null>(null);
   const checkoutReturnHandled = useRef(false);
@@ -406,13 +420,15 @@ export function ShopPage() {
   }, [navigate, patchPlayer, refreshPlayer]);
 
   useEffect(() => {
-    if (!historyOpen) return;
+    if (!historyOpen && !checkoutReview) return;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setHistoryOpen(false);
+      if (event.key !== "Escape") return;
+      setHistoryOpen(false);
+      closeCheckoutReview();
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [historyOpen]);
+  }, [checkoutReview, historyOpen]);
 
   if (!player) return null;
 
@@ -425,6 +441,14 @@ export function ShopPage() {
 
   async function startStripeCheckout(productId: string) {
     if (busyProduct) return;
+    if (!legalPublicationReady) {
+      showNotice("Les informations légales doivent être complétées avant l'ouverture.", "error");
+      return;
+    }
+    if (!termsAccepted || !immediateDeliveryAccepted || !purchaseAuthorityConfirmed) {
+      showNotice("Les trois confirmations sont requises avant le paiement.", "error");
+      return;
+    }
     if (!catalog?.payments.enabled) {
       showNotice("Stripe doit encore être configuré par l'administrateur.", "error");
       return;
@@ -437,7 +461,14 @@ export function ShopPage() {
     try {
       const result = await api<StripeCheckoutResponse>("/shop/stripe/checkout", {
         method: "POST",
-        body: JSON.stringify({ productId, idempotencyKey })
+        body: JSON.stringify({
+          productId,
+          idempotencyKey,
+          termsAccepted: true,
+          immediateDeliveryAccepted: true,
+          purchaseAuthorityConfirmed: true,
+          termsVersion: shopLegalVersion
+        })
       });
       if (result.alreadyCompleted && result.wallet) {
         delete retryKeys.current[productId];
@@ -451,6 +482,22 @@ export function ShopPage() {
       showNotice(error instanceof Error ? error.message : "Paiement impossible.", "error");
       setBusyProduct(null);
     }
+  }
+
+  function openCheckoutReview(review: CheckoutReview) {
+    if (busyProduct) return;
+    setTermsAccepted(false);
+    setImmediateDeliveryAccepted(false);
+    setPurchaseAuthorityConfirmed(false);
+    setCheckoutReview(review);
+  }
+
+  function closeCheckoutReview() {
+    if (busyProduct) return;
+    setCheckoutReview(null);
+    setTermsAccepted(false);
+    setImmediateDeliveryAccepted(false);
+    setPurchaseAuthorityConfirmed(false);
   }
 
   async function loadPurchaseHistory() {
@@ -609,7 +656,9 @@ export function ShopPage() {
                     <button
                       aria-busy={busyProduct === pack.id}
                       disabled={Boolean(busyProduct)}
-                      onClick={() => void startStripeCheckout(pack.id)}
+                      onClick={() =>
+                        openCheckoutReview({ productId: pack.id, gems: pack.gems, price })
+                      }
                       type="button"
                     >
                       {busyProduct === pack.id ? "Connexion..." : price}
@@ -716,10 +765,141 @@ export function ShopPage() {
           <span>Paiements sécurisés par Stripe</span>
           <i>•</i>
           <span>Probabilités affichées avant achat</span>
+          <Link to="/legal/cgv">CGV</Link>
+          <Link to="/legal/privacy">Confidentialité</Link>
+          <Link to="/legal/refunds">Remboursements</Link>
           <button onClick={openPurchaseHistory} type="button">
             <ReceiptText /> Mes achats
           </button>
         </footer>
+
+        {checkoutReview ? (
+          <div className="shop-checkout-backdrop" onClick={closeCheckoutReview} role="presentation">
+            <section
+              aria-labelledby="shop-checkout-title"
+              aria-modal="true"
+              className="shop-checkout-dialog"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+            >
+              <header>
+                <span>
+                  <FileCheck2 />
+                </span>
+                <div>
+                  <small>Commande numérique</small>
+                  <h2 id="shop-checkout-title">Vérifier la commande</h2>
+                </div>
+                <button aria-label="Fermer" onClick={closeCheckoutReview} type="button">
+                  <X />
+                </button>
+              </header>
+
+              <div className="shop-checkout-summary">
+                <div>
+                  <small>Produit</small>
+                  <strong>{checkoutReview.gems.toLocaleString("fr-FR")} gemmes</strong>
+                  <span>Créditées sur ce compte après validation Stripe</span>
+                </div>
+                <div>
+                  <small>Total TTC</small>
+                  <strong>{checkoutReview.price}</strong>
+                  <span>Paiement unique, sans abonnement</span>
+                </div>
+              </div>
+
+              {!legalPublicationReady ? (
+                <div className="shop-checkout-blocked" role="alert">
+                  <ShieldCheck />
+                  <span>
+                    Paiement réel verrouillé : {missingLegalFields.length} information(s) légale(s)
+                    restent à renseigner.
+                  </span>
+                </div>
+              ) : null}
+
+              {!catalog?.payments.enabled ? (
+                <div className="shop-checkout-blocked" role="alert">
+                  <ShieldCheck />
+                  <span>
+                    Paiements réels encore désactivés par sécurité. Aucun débit ne peut être lancé.
+                  </span>
+                </div>
+              ) : null}
+
+              <div className="shop-checkout-consents">
+                <label>
+                  <input
+                    checked={termsAccepted}
+                    onChange={(event) => setTermsAccepted(event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>
+                    J’ai lu et j’accepte les{" "}
+                    <Link target="_blank" to="/legal/cgv">
+                      conditions générales de vente
+                    </Link>
+                    , la{" "}
+                    <Link target="_blank" to="/legal/privacy">
+                      politique de confidentialité
+                    </Link>{" "}
+                    et la{" "}
+                    <Link target="_blank" to="/legal/refunds">
+                      politique de remboursement
+                    </Link>
+                    .
+                  </span>
+                </label>
+                <label>
+                  <input
+                    checked={immediateDeliveryAccepted}
+                    onChange={(event) => setImmediateDeliveryAccepted(event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>
+                    Je demande la livraison immédiate des gemmes et reconnais qu’après leur crédit
+                    sur mon compte, je perds mon droit de rétractation pour ce contenu numérique.
+                  </span>
+                </label>
+                <label>
+                  <input
+                    checked={purchaseAuthorityConfirmed}
+                    onChange={(event) => setPurchaseAuthorityConfirmed(event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>
+                    Je certifie être majeur ou disposer de l’autorisation de mon représentant légal
+                    pour effectuer cet achat.
+                  </span>
+                </label>
+              </div>
+
+              <footer>
+                <button className="is-secondary" onClick={closeCheckoutReview} type="button">
+                  Annuler
+                </button>
+                <button
+                  className="is-confirm"
+                  disabled={
+                    !legalPublicationReady ||
+                    !catalog?.payments.enabled ||
+                    !termsAccepted ||
+                    !immediateDeliveryAccepted ||
+                    !purchaseAuthorityConfirmed ||
+                    Boolean(busyProduct)
+                  }
+                  onClick={() => void startStripeCheckout(checkoutReview.productId)}
+                  type="button"
+                >
+                  <CheckCircle2 />
+                  {busyProduct === checkoutReview.productId
+                    ? "Connexion à Stripe..."
+                    : "Commander avec obligation de paiement · " + checkoutReview.price}
+                </button>
+              </footer>
+            </section>
+          </div>
+        ) : null}
 
         {historyOpen ? (
           <div
