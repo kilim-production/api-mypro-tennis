@@ -89,7 +89,11 @@ async function publish(filePath, imagePaths = []) {
     timestamp: new Date().toISOString(),
     ...(imagePaths[0] ? { image: { url: `attachment://${basename(imagePaths[0])}` } } : {})
   };
-  const payload = { allowed_mentions: { parse: [] }, embeds: [embed] };
+  const imageEmbeds = imagePaths.slice(1, 10).map((imagePath) => ({
+    color: 0x43e5b0,
+    image: { url: `attachment://${basename(imagePath)}` }
+  }));
+  const payload = { allowed_mentions: { parse: [] }, embeds: [embed, ...imageEmbeds] };
   const options = imagePaths.length
     ? (() => {
         const body = new FormData();
