@@ -2,7 +2,6 @@ import { Prisma, type ShopPurchase } from "@prisma/client";
 import { prisma } from "@mypro/database";
 import type { ShopPurchaseInput } from "@mypro/shared";
 import {
-  createChestInFreeSlot,
   openInstantChestReward,
   type ChestRarity,
   type ChestRewards
@@ -31,6 +30,7 @@ type BagProduct = {
   type: "BAG_PACK";
   label: string;
   gemPrice: number;
+  bagCount: number;
   odds: ShopBagOdds;
 };
 
@@ -109,6 +109,7 @@ export const shopBagPacks: BagProduct[] = [
     type: "BAG_PACK",
     label: "Pack Découverte",
     gemPrice: 50,
+    bagCount: 3,
     odds: [
       { rarity: "Bronze", probability: 60 },
       { rarity: "Argent", probability: 30 },
@@ -121,6 +122,7 @@ export const shopBagPacks: BagProduct[] = [
     type: "BAG_PACK",
     label: "Pack Compétition",
     gemPrice: 100,
+    bagCount: 4,
     odds: [
       { rarity: "Bronze", probability: 30 },
       { rarity: "Argent", probability: 40 },
@@ -134,6 +136,7 @@ export const shopBagPacks: BagProduct[] = [
     type: "BAG_PACK",
     label: "Pack Élite",
     gemPrice: 250,
+    bagCount: 5,
     odds: [
       { rarity: "Argent", probability: 30 },
       { rarity: "Or", probability: 45 },
@@ -274,13 +277,10 @@ async function purchaseResponse(client: ShopClient, playerId: string, purchase: 
 type ShopRewardPayload = {
   gemsSpent: number;
   credits?: number;
-  chest?: {
-    id: string;
-    rarity: string;
-    slotIndex: number;
-    status: string;
-    unlocksAt: Date;
-  };
+  bagOpenings?: Array<{
+    rarity: ChestRarity;
+    rewards: ChestRewards;
+  }>;
   seasonPass?: {
     id: string;
     startsAt: Date;
@@ -313,7 +313,8 @@ export async function purchaseShopProduct(playerId: string, input: ShopPurchaseI
           amount: product.gemPrice,
           status: "PROCESSING",
           idempotencyKey: input.idempotencyKey,
-          paymentProvider: "IN_GAME"
+          paymentProvider: "IN_GAME",
+          quantity: product.type === "BAG_PACK" ? product.bagCount : 1
         }
       });
 
@@ -336,23 +337,17 @@ export async function purchaseShopProduct(playerId: string, input: ShopPurchaseI
       }
 
       if (product.type === "BAG_PACK") {
-        const rarity = rollShopBagRarity(product.id, purchase.id);
-        const chest = await createChestInFreeSlot(
-          playerId,
-          tx,
-          `Boutique · ${product.label}`,
-          rarity
-        );
-        if (!chest) {
-          throw new ShopError("Les quatre emplacements de sacs sont occupés.");
+        rewards.bagOpenings = [];
+        for (let index = 0; index < product.bagCount; index += 1) {
+          const rarity = rollShopBagRarity(product.id, `${purchase.id}:${index}`);
+          const bagRewards = await openInstantChestReward(
+            tx,
+            playerId,
+            rarity,
+            `shop-${purchase.id}-${index}`
+          );
+          rewards.bagOpenings.push({ rarity, rewards: bagRewards });
         }
-        rewards.chest = {
-          id: chest.id,
-          rarity: chest.rarity,
-          slotIndex: chest.slotIndex,
-          status: chest.status,
-          unlocksAt: chest.unlocksAt
-        };
       }
 
       if (product.type === "SEASON_PASS") {

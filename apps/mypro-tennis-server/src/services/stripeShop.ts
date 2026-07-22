@@ -79,6 +79,7 @@ function publicStripePurchase(purchase: ShopPurchase) {
     productType: purchase.productType,
     currency: purchase.currency,
     amount: purchase.amount,
+    quantity: purchase.quantity,
     status: purchase.status,
     paymentProvider: purchase.paymentProvider,
     checkoutSessionId: purchase.externalReference,

@@ -21,8 +21,14 @@ afterAll(async () => {
 
 describe("boutique MYPRO", () => {
   it("publie un catalogue cohérent et des probabilités complètes", async () => {
+    const expectedBagCounts = new Map([
+      ["bag-discovery", 3],
+      ["bag-competition", 4],
+      ["bag-elite", 5]
+    ]);
     for (const pack of shopBagPacks) {
       expect(pack.odds.reduce((total, chance) => total + chance.probability, 0)).toBe(100);
+      expect(pack.bagCount).toBe(expectedBagCounts.get(pack.id));
       expect(rollShopBagRarity(pack.id, "test-seed")).toBeTruthy();
     }
   });
@@ -73,12 +79,38 @@ describe("boutique MYPRO", () => {
     expect(repeatedConversion.wallet).toEqual(conversion.wallet);
     expect(await prisma.shopPurchase.count({ where: { playerId: player.id } })).toBe(1);
 
+    const unlocksAt = new Date(Date.now() + 60 * 60_000);
+    await prisma.tennisBagChest.createMany({
+      data: [0, 1, 2, 3].map((slotIndex) => ({
+        playerId: player.id,
+        rarity: "Argent",
+        slotIndex,
+        source: "Slots déjà occupés avant l'achat Boutique",
+        status: "LOCKED",
+        unlocksAt
+      }))
+    });
+
+    const bagKey = `bag-${suffix}`;
     const bag = await purchaseShopProduct(player.id, {
       productId: "bag-competition",
-      idempotencyKey: `bag-${suffix}`
+      idempotencyKey: bagKey
     });
-    expect(bag.purchase.rewards).toHaveProperty("chest");
-    expect(await prisma.tennisBagChest.count({ where: { playerId: player.id } })).toBe(1);
+    const bagOpenings = (bag.purchase.rewards as {
+      bagOpenings?: Array<{ rarity: string; rewards: { cards: unknown[]; money: number } }>;
+    }).bagOpenings;
+    expect(bag.purchase.quantity).toBe(4);
+    expect(bagOpenings).toHaveLength(4);
+    expect(bagOpenings?.every((opening) => opening.rewards.cards.length > 0)).toBe(true);
+    expect(bagOpenings?.every((opening) => opening.rewards.money > 0)).toBe(true);
+    expect(await prisma.tennisBagChest.count({ where: { playerId: player.id } })).toBe(4);
+
+    const repeatedBag = await purchaseShopProduct(player.id, {
+      productId: "bag-competition",
+      idempotencyKey: bagKey
+    });
+    expect(repeatedBag.wallet).toEqual(bag.wallet);
+    expect(repeatedBag.purchase.id).toBe(bag.purchase.id);
 
     const pass = await purchaseShopProduct(player.id, {
       productId: "season-pass",

@@ -14,6 +14,7 @@ import {
   Gem,
   Gift,
   HelpCircle,
+  PackageOpen,
   Settings,
   ShieldCheck,
   ShoppingBag,
@@ -45,8 +46,23 @@ type BagPack = {
   id: BagPackId;
   label: string;
   price: number;
+  bagCount: number;
   image: string;
   probabilities: Array<{ label: string; value: number; tone: string }>;
+};
+
+type ShopBagRarity = "Bronze" | "Argent" | "Or" | "Légendaire" | "Mythique";
+
+type ShopBagRewards = {
+  cards: Array<{ statKey: string; label: string; copies: number; bonus: number }>;
+  money: number;
+  gems: number;
+  cosmetics: Array<{ id: string; name: string; rarity: ShopBagRarity }>;
+};
+
+type ShopBagOpening = {
+  rarity: ShopBagRarity;
+  rewards: ShopBagRewards;
 };
 
 type ShopSeasonPass = {
@@ -68,6 +84,7 @@ type ShopCatalogResponse = {
     id: string;
     label: string;
     gemPrice: number;
+    bagCount: number;
     odds: Array<{ rarity: string; probability: number }>;
   }>;
   creditPacks: Array<{ id: string; gemPrice: number; credits: number }>;
@@ -90,9 +107,10 @@ type ShopCatalogResponse = {
 type ShopPurchaseResponse = {
   purchase: {
     productId: string;
+    quantity: number;
     rewards: {
       credits?: number;
-      chest?: { rarity: string; slotIndex: number };
+      bagOpenings?: ShopBagOpening[];
       seasonPass?: { expiresAt: string };
     };
   };
@@ -123,12 +141,13 @@ type ShopHistoryPurchase = {
   productId: string;
   currency: string;
   amount: number;
+  quantity: number;
   status: string;
   paymentProvider: string;
   receiptUrl: string | null;
   refundedAmount: number;
   reversedGems: number;
-  rewards: { gems?: number; credits?: number; chest?: { rarity?: string } };
+  rewards: { gems?: number; credits?: number; bagOpenings?: ShopBagOpening[] };
   createdAt: string;
 };
 
@@ -155,6 +174,7 @@ const bagPacks: BagPack[] = [
     id: "discovery",
     label: "Découverte",
     price: 50,
+    bagCount: 3,
     image: "/visuals/chests/tennis-bag-argent.webp",
     probabilities: [
       { label: "Bronze", value: 60, tone: "bronze" },
@@ -167,6 +187,7 @@ const bagPacks: BagPack[] = [
     id: "competition",
     label: "Compétition",
     price: 100,
+    bagCount: 4,
     image: "/visuals/chests/tennis-bag-or.webp",
     probabilities: [
       { label: "Bronze", value: 30, tone: "bronze" },
@@ -180,6 +201,7 @@ const bagPacks: BagPack[] = [
     id: "elite",
     label: "Élite",
     price: 250,
+    bagCount: 5,
     image: "/visuals/chests/tennis-bag-mythique.webp",
     probabilities: [
       { label: "Argent", value: 30, tone: "silver" },
@@ -209,6 +231,22 @@ function formatPurchaseAmount(purchase: ShopHistoryPurchase) {
     });
   }
   return `${purchase.amount.toLocaleString("fr-FR")} gemmes`;
+}
+
+const shopBagImages: Record<ShopBagRarity, string> = {
+  Bronze: "/visuals/chests/tennis-bag-bronze.webp",
+  Argent: "/visuals/chests/tennis-bag-argent.webp",
+  Or: "/visuals/chests/tennis-bag-or.webp",
+  Légendaire: "/visuals/chests/tennis-bag-legendaire.webp",
+  Mythique: "/visuals/chests/tennis-bag-mythique.webp"
+};
+
+function shopBagRarityTone(rarity: ShopBagRarity) {
+  if (rarity === "Argent") return "silver";
+  if (rarity === "Or") return "gold";
+  if (rarity === "Légendaire") return "legendary";
+  if (rarity === "Mythique") return "mythic";
+  return "bronze";
 }
 
 function purchaseStatusLabel(status: string) {
@@ -322,6 +360,10 @@ export function ShopPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [purchaseHistory, setPurchaseHistory] = useState<ShopHistoryResponse | null>(null);
+  const [bagRewardReveal, setBagRewardReveal] = useState<{
+    label: string;
+    openings: ShopBagOpening[];
+  } | null>(null);
   const [checkoutReview, setCheckoutReview] = useState<CheckoutReview | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [immediateDeliveryAccepted, setImmediateDeliveryAccepted] = useState(false);
@@ -364,6 +406,21 @@ export function ShopPage() {
   const seasonPassDaysLeft = catalog?.seasonPass
     ? Math.max(1, Math.ceil(catalog.seasonPass.remainingMs / (24 * 60 * 60 * 1_000)))
     : 0;
+  const bagRewardTotals = useMemo(
+    () =>
+      bagRewardReveal?.openings.reduce(
+        (totals, opening) => ({
+          money: totals.money + opening.rewards.money,
+          gems: totals.gems + opening.rewards.gems,
+          cards:
+            totals.cards +
+            opening.rewards.cards.reduce((sum, card) => sum + card.copies, 0),
+          cosmetics: totals.cosmetics + opening.rewards.cosmetics.length
+        }),
+        { money: 0, gems: 0, cards: 0, cosmetics: 0 }
+      ) ?? { money: 0, gems: 0, cards: 0, cosmetics: 0 },
+    [bagRewardReveal]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -543,10 +600,13 @@ export function ShopPage() {
         current ? { ...current, wallet: result.wallet, seasonPass: result.seasonPass } : current
       );
       const rewards = result.purchase.rewards;
-      if (rewards.chest) {
-        showNotice(
-          `Sac ${rewards.chest.rarity} ajouté à l'emplacement ${rewards.chest.slotIndex + 1}.`
-        );
+      if (rewards.bagOpenings?.length) {
+        const purchasedPack = catalog?.bagPacks.find((pack) => pack.id === productId);
+        setBagRewardReveal({
+          label: purchasedPack?.label ?? "Pack de sacs",
+          openings: rewards.bagOpenings
+        });
+        showNotice(`${rewards.bagOpenings.length} sacs ouverts immédiatement.`);
       } else if (rewards.credits) {
         showNotice(`${formatCredits(rewards.credits)} ajoutés à votre compte.`);
       } else if (rewards.seasonPass) {
@@ -690,6 +750,10 @@ export function ShopPage() {
                     type="button"
                   >
                     <strong>{pack.label}</strong>
+                    <small className="shop-bag-count">
+                      {catalog?.bagPacks.find((item) => item.id === `bag-${pack.id}`)?.bagCount ??
+                        pack.bagCount} sacs
+                    </small>
                     <img alt="" decoding="async" draggable={false} src={pack.image} />
                     <span>
                       {catalog?.bagPacks.find((item) => item.id === `bag-${pack.id}`)?.gemPrice ??
@@ -711,6 +775,7 @@ export function ShopPage() {
                     </span>
                   ))}
                 </div>
+                <p>Chaque sac est tiré séparément et ouvert immédiatement.</p>
               </div>
               <button
                 className="shop-primary-action"
@@ -720,7 +785,7 @@ export function ShopPage() {
               >
                 {busyProduct === `bag-${selectedBag}`
                   ? "Achat..."
-                  : `Acheter · ${selectedBagProduct?.gemPrice ?? selectedBagPack.price} gemmes`}
+                  : `Ouvrir ${selectedBagProduct?.bagCount ?? selectedBagPack.bagCount} sacs · ${selectedBagProduct?.gemPrice ?? selectedBagPack.price} gemmes`}
               </button>
             </section>
 
@@ -780,6 +845,75 @@ export function ShopPage() {
             <ReceiptText /> Mes achats
           </button>
         </footer>
+
+        {bagRewardReveal ? (
+          <div
+            className="shop-bag-reward-backdrop"
+            onClick={() => setBagRewardReveal(null)}
+            role="presentation"
+          >
+            <section
+              aria-labelledby="shop-bag-reward-title"
+              aria-modal="true"
+              className="shop-bag-reward-dialog"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+            >
+              <header>
+                <span><PackageOpen /></span>
+                <div>
+                  <small>{bagRewardReveal.label}</small>
+                  <h2 id="shop-bag-reward-title">{bagRewardReveal.openings.length} sacs ouverts</h2>
+                </div>
+                <button aria-label="Fermer" onClick={() => setBagRewardReveal(null)} type="button">
+                  <X />
+                </button>
+              </header>
+
+              <div className="shop-bag-reward-summary">
+                <span><Coins /><small>Crédits</small><strong>{formatCredits(bagRewardTotals.money)}</strong></span>
+                <span><Gem /><small>Gemmes</small><strong>+{bagRewardTotals.gems}</strong></span>
+                <span><Sparkles /><small>Cartes</small><strong>+{bagRewardTotals.cards}</strong></span>
+                <span><Gift /><small>Objets</small><strong>+{bagRewardTotals.cosmetics}</strong></span>
+              </div>
+
+              <div className="shop-bag-reward-grid">
+                {bagRewardReveal.openings.map((opening, index) => {
+                  const cardCopies = opening.rewards.cards.reduce(
+                    (sum, card) => sum + card.copies,
+                    0
+                  );
+                  return (
+                    <article
+                      className={`is-${shopBagRarityTone(opening.rarity)}`}
+                      key={`${opening.rarity}-${index}`}
+                    >
+                      <small>Sac {index + 1}</small>
+                      <strong>{opening.rarity}</strong>
+                      <img alt={`Sac ${opening.rarity}`} src={shopBagImages[opening.rarity]} />
+                      <div>
+                        <span><Coins /> {formatCredits(opening.rewards.money)}</span>
+                        <span><Gem /> +{opening.rewards.gems}</span>
+                        <span><Sparkles /> +{cardCopies} cartes</span>
+                        <span><Gift /> +{opening.rewards.cosmetics.length} objet</span>
+                      </div>
+                      <p>
+                        {opening.rewards.cards
+                          .map((card) => `${card.label} +${card.copies}`)
+                          .join(" · ")}
+                      </p>
+                    </article>
+                  );
+                })}
+              </div>
+
+              <footer>
+                <span><CheckCircle2 /> Toutes les récompenses sont déjà créditées.</span>
+                <button onClick={() => setBagRewardReveal(null)} type="button">Continuer</button>
+              </footer>
+            </section>
+          </div>
+        ) : null}
 
         {checkoutReview ? (
           <div className="shop-checkout-backdrop" onClick={closeCheckoutReview} role="presentation">
