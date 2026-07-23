@@ -47,6 +47,11 @@ export type ChestRewards = {
   statBonuses: Record<string, number>;
 };
 
+export type InstantChestOpening = {
+  rarity: ChestRarity;
+  rewards: ChestRewards;
+};
+
 const chestDefinitions: Record<ChestRarity, ChestDefinition> = {
   Bronze: {
     rarity: "Bronze",
@@ -372,35 +377,68 @@ export async function openChest(playerId: string, chestId: string) {
   });
 }
 
-export async function grantChestRewards(
+async function grantChestRewardBundle(
   tx: Prisma.TransactionClient,
   playerId: string,
-  rewards: ChestRewards
+  rewardBundle: ChestRewards[]
 ) {
-  for (const rewardCard of rewards.cards) {
-    const existing = await tx.playerStatCard.findUnique({
-      where: { playerId_statKey: { playerId, statKey: rewardCard.statKey } }
-    });
-    const beforeCopies = existing?.copies ?? 0;
-    const beforeLevel = existing?.level ?? 0;
-    const beforeEarnedLevel = trainingCardLevelForCopies(beforeCopies);
-    const totalCopies = beforeCopies + rewardCard.copies;
-    const afterLevel = trainingCardLevelForCopies(totalCopies);
-    const bonus = Math.max(0, afterLevel - Math.max(beforeLevel, beforeEarnedLevel));
-    const progress = trainingCardProgress(totalCopies);
-    rewardCard.totalCopies = totalCopies;
-    rewardCard.levelBefore = beforeLevel;
-    rewardCard.levelAfter = afterLevel;
-    rewardCard.bonus = bonus;
-    rewardCard.nextRequired = progress.nextFloor;
+  const existingCards = await tx.playerStatCard.findMany({ where: { playerId } });
+  const runningCards = new Map(
+    existingCards.map((card) => [
+      card.statKey,
+      {
+        copies: card.copies,
+        level: card.level
+      }
+    ])
+  );
+  const addedCopies = new Map<string, number>();
+  const readyCards = new Map<string, { label: string; bonus: number }>();
+
+  for (const rewards of rewardBundle) {
+    for (const rewardCard of rewards.cards) {
+      const current = runningCards.get(rewardCard.statKey) ?? { copies: 0, level: 0 };
+      const beforeCopies = current.copies;
+      const beforeLevel = current.level;
+      const beforeEarnedLevel = trainingCardLevelForCopies(beforeCopies);
+      const totalCopies = beforeCopies + rewardCard.copies;
+      const afterLevel = trainingCardLevelForCopies(totalCopies);
+      const bonus = Math.max(0, afterLevel - Math.max(beforeLevel, beforeEarnedLevel));
+      const progress = trainingCardProgress(totalCopies);
+
+      rewardCard.totalCopies = totalCopies;
+      rewardCard.levelBefore = beforeLevel;
+      rewardCard.levelAfter = afterLevel;
+      rewardCard.bonus = bonus;
+      rewardCard.nextRequired = progress.nextFloor;
+
+      runningCards.set(rewardCard.statKey, { copies: totalCopies, level: beforeLevel });
+      addedCopies.set(
+        rewardCard.statKey,
+        (addedCopies.get(rewardCard.statKey) ?? 0) + rewardCard.copies
+      );
+      if (bonus > 0) {
+        const ready = readyCards.get(rewardCard.statKey);
+        readyCards.set(rewardCard.statKey, {
+          label: rewardCard.label,
+          bonus: (ready?.bonus ?? 0) + bonus
+        });
+      }
+    }
+  }
+
+  for (const [statKey, copies] of addedCopies) {
     await tx.playerStatCard.upsert({
-      where: { playerId_statKey: { playerId, statKey: rewardCard.statKey } },
-      update: { copies: totalCopies },
-      create: { playerId, statKey: rewardCard.statKey, copies: totalCopies, level: 0 }
+      where: { playerId_statKey: { playerId, statKey } },
+      update: { copies: { increment: copies } },
+      create: { playerId, statKey, copies, level: 0 }
     });
   }
 
-  for (const cosmetic of rewards.cosmetics) {
+  const cosmetics = new Map(
+    rewardBundle.flatMap((rewards) => rewards.cosmetics).map((cosmetic) => [cosmetic.id, cosmetic])
+  );
+  for (const cosmetic of cosmetics.values()) {
     await tx.playerCosmetic.upsert({
       where: { playerId_cosmeticId: { playerId, cosmeticId: cosmetic.id } },
       update: {
@@ -418,12 +456,23 @@ export async function grantChestRewards(
     });
   }
 
-  const readyCards = rewards.cards.filter((card) => card.bonus > 0);
-  const playerOwner = readyCards.length
-    ? await tx.player.findUnique({ where: { id: playerId }, select: { userId: true } })
-    : null;
-  if (playerOwner?.userId && readyCards.length) {
-    const cardList = readyCards.map((card) => `${card.label} +${card.bonus}`).join(", ");
+  const playerOwner = await tx.player.update({
+    where: { id: playerId },
+    data: {
+      budget: {
+        increment: rewardBundle.reduce((total, rewards) => total + rewards.money, 0)
+      },
+      gems: {
+        increment: rewardBundle.reduce((total, rewards) => total + rewards.gems, 0)
+      }
+    },
+    select: { userId: true }
+  });
+
+  if (playerOwner.userId && readyCards.size) {
+    const cardList = [...readyCards.values()]
+      .map((card) => `${card.label} +${card.bonus}`)
+      .join(", ");
     await tx.notification.create({
       data: {
         userId: playerOwner.userId,
@@ -433,14 +482,37 @@ export async function grantChestRewards(
       }
     });
   }
+}
 
-  await tx.player.update({
-    where: { id: playerId },
-    data: {
-      budget: { increment: rewards.money },
-      gems: { increment: rewards.gems }
-    }
-  });
+export async function grantChestRewards(
+  tx: Prisma.TransactionClient,
+  playerId: string,
+  rewards: ChestRewards
+) {
+  await grantChestRewardBundle(tx, playerId, [rewards]);
+}
+
+export async function openInstantChestRewardBundle(
+  tx: Prisma.TransactionClient,
+  playerId: string,
+  chests: Array<{ rarity: ChestRarity; source: string }>
+): Promise<InstantChestOpening[]> {
+  const createdAt = new Date();
+  const openings = chests.map(({ rarity, source }) => ({
+    rarity,
+    rewards: rollRewards({
+      id: `instant-${source}`,
+      playerId,
+      rarity,
+      createdAt
+    })
+  }));
+  await grantChestRewardBundle(
+    tx,
+    playerId,
+    openings.map((opening) => opening.rewards)
+  );
+  return openings;
 }
 
 export async function openInstantChestReward(
@@ -449,14 +521,9 @@ export async function openInstantChestReward(
   rarity: ChestRarity,
   source: string
 ) {
-  const rewards = rollRewards({
-    id: `instant-${source}`,
-    playerId,
-    rarity,
-    createdAt: new Date()
-  });
-  await grantChestRewards(tx, playerId, rewards);
-  return rewards;
+  const [opening] = await openInstantChestRewardBundle(tx, playerId, [{ rarity, source }]);
+  if (!opening) throw new Error("Impossible d'ouvrir la récompense instantanée.");
+  return opening.rewards;
 }
 
 export async function unlockStatCardBonus(playerId: string, statKey: string) {

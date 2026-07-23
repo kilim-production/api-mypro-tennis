@@ -3,6 +3,7 @@ import { prisma } from "@mypro/database";
 import type { ShopPurchaseInput } from "@mypro/shared";
 import {
   openInstantChestReward,
+  openInstantChestRewardBundle,
   type ChestRarity,
   type ChestRewards
 } from "./chests";
@@ -294,107 +295,120 @@ export async function purchaseShopProduct(playerId: string, input: ShopPurchaseI
   if (!product) throw new ShopError("Produit indisponible.", 404);
 
   try {
-    return await prisma.$transaction(async (tx) => {
-      const existing = await tx.shopPurchase.findUnique({
-        where: { playerId_idempotencyKey: { playerId, idempotencyKey: input.idempotencyKey } }
-      });
-      if (existing) return purchaseResponse(tx, playerId, existing);
-
-      if (product.type === "SEASON_PASS" && (await activeSeasonPassForPlayer(playerId, tx))) {
-        throw new ShopError("Votre Pack de saison est déjà actif.");
-      }
-
-      const purchase = await tx.shopPurchase.create({
-        data: {
-          playerId,
-          productId: product.id,
-          productType: product.type,
-          currency: "GEMS",
-          amount: product.gemPrice,
-          status: "PROCESSING",
-          idempotencyKey: input.idempotencyKey,
-          paymentProvider: "IN_GAME",
-          quantity: product.type === "BAG_PACK" ? product.bagCount : 1
-        }
-      });
-
-      const debit = await tx.player.updateMany({
-        where: { id: playerId, gems: { gte: product.gemPrice } },
-        data: { gems: { decrement: product.gemPrice } }
-      });
-      if (debit.count !== 1) {
-        throw new ShopError(`Gemmes insuffisantes. Il faut ${product.gemPrice} gemmes.`);
-      }
-
-      const rewards: ShopRewardPayload = { gemsSpent: product.gemPrice };
-
-      if (product.type === "CREDITS") {
-        await tx.player.update({
-          where: { id: playerId },
-          data: { budget: { increment: product.credits } }
+    return await prisma.$transaction(
+      async (tx) => {
+        const existing = await tx.shopPurchase.findUnique({
+          where: { playerId_idempotencyKey: { playerId, idempotencyKey: input.idempotencyKey } }
         });
-        rewards.credits = product.credits;
-      }
+        if (existing) return purchaseResponse(tx, playerId, existing);
 
-      if (product.type === "BAG_PACK") {
-        rewards.bagOpenings = [];
-        for (let index = 0; index < product.bagCount; index += 1) {
-          const rarity = rollShopBagRarity(product.id, `${purchase.id}:${index}`);
-          const bagRewards = await openInstantChestReward(
+        if (product.type === "SEASON_PASS" && (await activeSeasonPassForPlayer(playerId, tx))) {
+          throw new ShopError("Votre Pack de saison est déjà actif.");
+        }
+
+        const purchase = await tx.shopPurchase.create({
+          data: {
+            playerId,
+            productId: product.id,
+            productType: product.type,
+            currency: "GEMS",
+            amount: product.gemPrice,
+            status: "PROCESSING",
+            idempotencyKey: input.idempotencyKey,
+            paymentProvider: "IN_GAME",
+            quantity: product.type === "BAG_PACK" ? product.bagCount : 1
+          }
+        });
+
+        const debit = await tx.player.updateMany({
+          where: { id: playerId, gems: { gte: product.gemPrice } },
+          data: { gems: { decrement: product.gemPrice } }
+        });
+        if (debit.count !== 1) {
+          throw new ShopError(`Gemmes insuffisantes. Il faut ${product.gemPrice} gemmes.`);
+        }
+
+        const rewards: ShopRewardPayload = { gemsSpent: product.gemPrice };
+
+        if (product.type === "CREDITS") {
+          await tx.player.update({
+            where: { id: playerId },
+            data: { budget: { increment: product.credits } }
+          });
+          rewards.credits = product.credits;
+        }
+
+        if (product.type === "BAG_PACK") {
+          rewards.bagOpenings = await openInstantChestRewardBundle(
             tx,
             playerId,
-            rarity,
-            `shop-${purchase.id}-${index}`
+            Array.from({ length: product.bagCount }, (_, index) => ({
+              rarity: rollShopBagRarity(product.id, `${purchase.id}:${index}`),
+              source: `shop-${purchase.id}-${index}`
+            }))
           );
-          rewards.bagOpenings.push({ rarity, rewards: bagRewards });
         }
-      }
 
-      if (product.type === "SEASON_PASS") {
-        const startsAt = new Date();
-        const expiresAt = new Date(startsAt.getTime() + product.durationDays * DAY_MS);
-        const pass = await tx.playerSeasonPass.create({
-          data: { playerId, purchaseId: purchase.id, startsAt, expiresAt }
-        });
-        rewards.seasonPass = {
-          id: pass.id,
-          startsAt: pass.startsAt,
-          expiresAt: pass.expiresAt
-        };
-        rewards.instantChest = await openInstantChestReward(
-          tx,
-          playerId,
-          product.benefits.instantChestRarity,
-          `shop-season-pass-${purchase.id}`
-        );
-        const owner = await tx.player.findUnique({
-          where: { id: playerId },
-          select: { userId: true }
-        });
-        if (owner?.userId) {
-          await tx.notification.create({
-            data: {
-              userId: owner.userId,
-              title: "Pack de saison activé",
-              body: `Vos bonus sont actifs jusqu'au ${expiresAt.toLocaleDateString("fr-FR")}.`,
-              type: "SHOP"
-            }
+        if (product.type === "SEASON_PASS") {
+          const startsAt = new Date();
+          const expiresAt = new Date(startsAt.getTime() + product.durationDays * DAY_MS);
+          const pass = await tx.playerSeasonPass.create({
+            data: { playerId, purchaseId: purchase.id, startsAt, expiresAt }
           });
+          rewards.seasonPass = {
+            id: pass.id,
+            startsAt: pass.startsAt,
+            expiresAt: pass.expiresAt
+          };
+          rewards.instantChest = await openInstantChestReward(
+            tx,
+            playerId,
+            product.benefits.instantChestRarity,
+            `shop-season-pass-${purchase.id}`
+          );
+          const owner = await tx.player.findUnique({
+            where: { id: playerId },
+            select: { userId: true }
+          });
+          if (owner?.userId) {
+            await tx.notification.create({
+              data: {
+                userId: owner.userId,
+                title: "Pack de saison activé",
+                body: `Vos bonus sont actifs jusqu'au ${expiresAt.toLocaleDateString("fr-FR")}.`,
+                type: "SHOP"
+              }
+            });
+          }
         }
-      }
 
-      const completed = await tx.shopPurchase.update({
-        where: { id: purchase.id },
-        data: { status: "COMPLETED", rewards: encodeJson(rewards) }
-      });
-      return purchaseResponse(tx, playerId, completed);
-    });
+        const completed = await tx.shopPurchase.update({
+          where: { id: purchase.id },
+          data: { status: "COMPLETED", rewards: encodeJson(rewards) }
+        });
+        return purchaseResponse(tx, playerId, completed);
+      },
+      {
+        maxWait: 10_000,
+        timeout: 30_000
+      }
+    );
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const existing = await prisma.shopPurchase.findUnique({
         where: { playerId_idempotencyKey: { playerId, idempotencyKey: input.idempotencyKey } }
       });
       if (existing) return purchaseResponse(prisma, playerId, existing);
+    }
+    if (
+      (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2028") ||
+      (error instanceof Error &&
+        /Transaction API error|Transaction not found|old closed transaction/i.test(error.message))
+    ) {
+      throw new ShopError(
+        "L'ouverture du pack a pris trop de temps. Aucune gemme n'a été débitée. Réessayez.",
+        503
+      );
     }
     throw error;
   }

@@ -1118,8 +1118,8 @@ gameRouter.post(
       if (error instanceof ShopError) {
         return response.status(error.statusCode).json({ message: error.message });
       }
-      return response.status(409).json({
-        message: error instanceof Error ? error.message : "Achat impossible."
+      return response.status(500).json({
+        message: "Achat temporairement indisponible. Aucune gemme n'a été débitée. Réessayez."
       });
     }
   }

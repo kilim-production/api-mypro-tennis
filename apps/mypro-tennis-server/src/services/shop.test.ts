@@ -93,20 +93,22 @@ describe("boutique MYPRO", () => {
 
     const bagKey = `bag-${suffix}`;
     const bag = await purchaseShopProduct(player.id, {
-      productId: "bag-competition",
+      productId: "bag-elite",
       idempotencyKey: bagKey
     });
-    const bagOpenings = (bag.purchase.rewards as {
-      bagOpenings?: Array<{ rarity: string; rewards: { cards: unknown[]; money: number } }>;
-    }).bagOpenings;
-    expect(bag.purchase.quantity).toBe(4);
-    expect(bagOpenings).toHaveLength(4);
+    const bagOpenings = (
+      bag.purchase.rewards as {
+        bagOpenings?: Array<{ rarity: string; rewards: { cards: unknown[]; money: number } }>;
+      }
+    ).bagOpenings;
+    expect(bag.purchase.quantity).toBe(5);
+    expect(bagOpenings).toHaveLength(5);
     expect(bagOpenings?.every((opening) => opening.rewards.cards.length > 0)).toBe(true);
     expect(bagOpenings?.every((opening) => opening.rewards.money > 0)).toBe(true);
     expect(await prisma.tennisBagChest.count({ where: { playerId: player.id } })).toBe(4);
 
     const repeatedBag = await purchaseShopProduct(player.id, {
-      productId: "bag-competition",
+      productId: "bag-elite",
       idempotencyKey: bagKey
     });
     expect(repeatedBag.wallet).toEqual(bag.wallet);
