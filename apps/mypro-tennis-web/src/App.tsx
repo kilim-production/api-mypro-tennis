@@ -118,7 +118,9 @@ const ShopPage = lazy(() => loadShop().then((module) => ({ default: module.ShopP
 const LegalPage = lazy(() => loadLegal().then((module) => ({ default: module.LegalPage })));
 
 const socketUrl = SOCKET_URL;
-const discordInviteUrl = import.meta.env.VITE_DISCORD_INVITE_URL ?? "";
+const discordInviteUrl = (
+  import.meta.env.VITE_DISCORD_INVITE_URL ?? "https://discord.gg/yu3EZCQqDU"
+).trim();
 
 const nav = [
   ["Tableau de bord", "/dashboard", Activity],
